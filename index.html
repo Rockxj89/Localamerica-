@@ -12,6 +12,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com/3.4.17"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<!-- Meta (Facebook) Pixel: same pixel as the Glide guide -->
+<script src="pixel.js"></script>
 <script>
   // Same palette as the Glide guide
   tailwind.config = { theme: { extend: {
@@ -256,6 +258,8 @@ const sessionId = (() => {
 })();
 
 async function logEvent(type, locationId = null, meta = {}) {
+  // Sales steps (unlock_gps_click, checkout_start, checkout_complete) also go to the Meta pixel
+  try { if (window.laPixel) window.laPixel.event(type, locationId); } catch (e) { /* never break the app */ }
   try {
     if (!sb) return;
     await sb.from('poi_traffic_events').insert({

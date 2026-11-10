@@ -1,6 +1,6 @@
 // Local America service worker: app shell cached, data always fresh
-const CACHE = 'local-america-v1';
-const SHELL = ['./', './index.html', './manifest.json'];
+const CACHE = 'local-america-v2';
+const SHELL = ['./', './index.html', './manifest.json', './pixel.js'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
@@ -21,6 +21,9 @@ self.addEventListener('fetch', (event) => {
 
   // Never cache Supabase data, auth, or storage: always go to the network
   if (url.hostname.endsWith('supabase.co')) return;
+
+  // Never cache Meta pixel traffic: every tracking hit must reach Facebook
+  if (url.hostname.endsWith('facebook.com') || url.hostname.endsWith('facebook.net')) return;
 
   // Page loads: network first, fall back to the cached shell when offline
   if (req.mode === 'navigate') {
