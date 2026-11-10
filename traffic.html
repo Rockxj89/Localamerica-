@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#15803D">
+<title>Local America · Traffic</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+  // Same palette as the guide
+  tailwind.config = { theme: { extend: {
+    fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'] },
+    colors: {
+      accent: '#15803D', accentfg: '#FFFFFF',
+      primary: '#1B231E', secondary: '#3F4A43', tertiary: '#5C675F',
+      page: '#f7f9fa', raised: '#FFFFFF', inset: '#EDF1EA',
+      line: '#D3DBD0', lineweak: '#E3E9E0', linestrong: '#AFBBAD',
+      okweak: '#E3F0E4', okink: '#1D5B2E',
+      infoweak: '#E2EDF3', infoink: '#1F4B66',
+      warnweak: '#F5EDD7', warnink: '#6A4A0E',
+      errweak: '#F6E2DF', errink: '#8A2A20'
+    }
+  } } };
+</script>
+<style>
+  html, body { background: #f7f9fa; }
+  body { -webkit-tap-highlight-color: transparent; color: #1B231E; }
+  .num { font-variant-numeric: tabular-nums; }
+  .card { background: #fff; border: 1px solid #D3DBD0; border-radius: 0.75rem; padding: 1rem; }
+  .bar { fill: #15803D; }
+  .bar.dim { fill: #AFBBAD; }
+  .bar.hl { fill: #1D5B2E; }
+  .hit { fill: transparent; cursor: pointer; }
+  .grid { stroke: #E3E9E0; stroke-width: 1; }
+  .axis { fill: #5C675F; font-size: 20px; }
+  table.t { width: 100%; border-collapse: collapse; }
+  table.t th { text-align: left; font-weight: 600; font-size: 0.8rem; color: #5C675F; padding: 0.4rem 0.5rem 0.4rem 0; border-bottom: 1px solid #D3DBD0; }
+  table.t td { padding: 0.5rem 0.5rem 0.5rem 0; border-bottom: 1px solid #E3E9E0; vertical-align: top; }
+  table.t th.r, table.t td.r { text-align: right; padding-right: 0; padding-left: 0.5rem; }
+  details > summary { list-style: none; cursor: pointer; }
+  details > summary::-webkit-details-marker { display: none; }
+</style>
+</head>
+<body class="font-sans">
+
+<header class="sticky top-0 z-40 bg-accent text-accentfg">
+  <div class="mx-auto flex max-w-3xl items-center justify-between gap-3 px-4 py-3">
+    <div class="min-w-0">
+      <p class="text-xs font-medium opacity-80">Local America · private</p>
+      <h1 class="text-lg font-bold leading-tight">Traffic</h1>
+    </div>
+    <div class="flex items-center gap-2">
+      <button id="refreshBtn" class="hidden rounded-full bg-white/15 px-3 py-1.5 text-sm font-semibold">Refresh</button>
+      <button id="signOutBtn" class="hidden rounded-full bg-white/15 px-3 py-1.5 text-sm font-semibold">Sign out</button>
+    </div>
+  </div>
+</header>
+
+<main id="view" class="mx-auto max-w-3xl px-4 pb-24 pt-5"></main>
+
+<script>
+// ================= CONFIG =================
+const CFG = {
+  SUPABASE_URL: 'https://ycdlxdijrlfsxvxksyrq.supabase.co',
+  SUPABASE_KEY: 'sb_publishable_2ExdXbNtW9HpuOGAq1Oa7g_gPdONH_s',
+  TZ: 'America/Chicago',
+  PRICE: 4.99
+};
+const PERIODS = [
+  { days: 1, label: 'Today' },
+  { days: 7, label: '7 days' },
+  { days: 30, label: '30 days' },
+  { days: 90, label: '90 days' },
+  { days: null, label: 'All time' }
+];
+
+// Stay signed in on this phone: the session is kept in local storage and refreshed automatically.
+const sb = supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_KEY, {
+  auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: 'pkce', storageKey: 'la-traffic-auth' }
+});
+
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+const fmt = (n) => Number(n || 0).toLocaleString('en-US');
+const money = (n) => '$' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const pct = (a, b) => (b ? Math.round((a / b) * 100) : 0);
+
+const state = {
+  days: (() => { try { const v = localStorage.getItem('la-traffic-days'); return v === 'all' ? null : (Number(v) || 30); } catch (e) { return 30; } })(),
+  data: null, loading: false, error: null, user: null, picks: {}
+};
+
+// ================= SIGN IN =================
+function viewSignIn(msg) {
+  $('#refreshBtn').classList.add('hidden');
+  $('#signOutBtn').classList.add('hidden');
+  $('#view').innerHTML = `
+  <div class="card mx-auto mt-6 max-w-md text-center">
+    <h2 class="text-xl font-bold">Sign in to see your traffic</h2>
+    <p class="mt-2 text-secondary">This page is private. Sign in once and this phone stays signed in.</p>
+    ${msg ? `<p class="mt-4 rounded-lg bg-errweak p-3 text-sm text-errink">${esc(msg)}</p>` : ''}
+    <button id="googleBtn" class="mt-5 inline-flex w-full items-center justify-center gap-3 rounded-lg border border-linestrong bg-white px-4 py-3 font-semibold text-primary">
+      <svg viewBox="0 0 48 48" width="20" height="20" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>
+      Sign in with Google
+    </button>
+    <details class="mt-5 text-left">
+      <summary class="text-center text-sm font-medium text-secondary underline underline-offset-2">Google not working? Email me a sign-in link</summary>
+      <form id="emailForm" class="mt-3 flex flex-col gap-2">
+        <input id="emailInput" type="email" required autocomplete="email" placeholder="Your email" class="rounded-lg border border-line bg-white px-3 py-2.5 text-base">
+        <button class="rounded-lg bg-accent px-4 py-2.5 font-semibold text-accentfg">Send link</button>
+        <p id="emailMsg" class="text-sm text-secondary"></p>
+      </form>
+    </details>
+  </div>`;
+  $('#googleBtn').onclick = async () => {
+    const { error } = await sb.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: location.origin + location.pathname, queryParams: { prompt: 'select_account' } }
+    });
+    if (error) viewSignIn(friendlyAuthError(error));
+  };
+  $('#emailForm').onsubmit = async (e) => {
+    e.preventDefault();
+    const email = $('#emailInput').value.trim();
+    $('#emailMsg').textContent = 'Sending…';
+    const { error } = await sb.auth.signInWithOtp({ email, options: { emailRedirectTo: location.origin + location.pathname } });
+    $('#emailMsg').textContent = error ? friendlyAuthError(error) : 'Check your email and tap the link. Open it on this phone.';
+  };
+}
+
+function friendlyAuthError(err) {
+  const m = String(err && err.message || err || '');
+  if (/provider is not enabled|Unsupported provider/i.test(m)) return 'Google sign-in is not switched on in Supabase yet. Finish the Google setup steps, then try again.';
+  if (/rate limit/i.test(m)) return 'Too many tries. Wait a minute and try again.';
+  return m || 'Sign-in had a problem. Please try again.';
+}
+
+// ================= DATA =================
+async function load() {
+  state.loading = true; state.error = null; render();
+  const { data, error } = await sb.rpc('traffic_summary', { p_days: state.days });
+  state.loading = false;
+  if (error) {
+    if (error.code === '42501' || /not_allowed/.test(error.message)) {
+      const email = state.user && state.user.email;
+      await sb.auth.signOut();
+      return viewSignIn(`${email || 'That account'} is not allowed to see this page. Sign in with the Local America Gmail.`);
+    }
+    state.error = error.message || 'Could not load traffic.';
+  } else {
+    state.data = data;
+  }
+  render();
+}
+
+// ================= SMALL PIECES =================
+function section(title, sub, body, open = true) {
+  return `<section class="mt-6">
+    <h2 class="text-lg font-bold">${esc(title)}</h2>
+    ${sub ? `<p class="text-sm text-secondary">${sub}</p>` : ''}
+    <div class="mt-3">${body}</div>
+  </section>`;
+}
+
+function delta(now, before) {
+  if (state.days == null || before == null) return '';
+  if (!before) return '';
+  const d = Math.round(((now - before) / before) * 100);
+  const up = d >= 0;
+  return `<span class="text-xs font-semibold ${up ? 'text-okink' : 'text-errink'}">${up ? '▲' : '▼'} ${Math.abs(d)}%</span> <span class="text-xs text-tertiary">vs previous ${state.days} days</span>`;
+}
+
+function tile(label, value, extra = '') {
+  return `<div class="card"><p class="text-sm text-secondary">${esc(label)}</p>
+    <p class="num mt-1 text-2xl font-semibold">${value}</p>${extra ? `<p class="mt-1">${extra}</p>` : ''}</div>`;
+}
+
+function empty(text) { return `<p class="text-sm text-tertiary">${esc(text)}</p>`; }
+
+// Column chart in SVG. items: [{label, value, tip}]. Tap/hover a column to read it.
+function columns(id, items, opts = {}) {
+  if (!items.length) return empty('No data yet.');
+  const W = 640, H = opts.height || 160, padL = 52, padB = 32, padT = 12;
+  const max = Math.max(1, ...items.map((d) => d.value));
+  const step = niceStep(max);
+  const top = Math.ceil(max / step) * step;
+  const slot = (W - padL) / items.length;
+  const bw = Math.max(2, Math.min(24, slot - 2));
+  const y = (v) => padT + (H - padT - padB) * (1 - v / top);
+  let grid = '';
+  for (let v = 0; v <= top; v += step) {
+    grid += `<line class="grid" x1="${padL}" x2="${W}" y1="${y(v)}" y2="${y(v)}"/><text class="axis num" x="${padL - 8}" y="${y(v) + 7}" text-anchor="end">${fmt(v)}</text>`;
+  }
+  const best = opts.highlightMax ? items.reduce((a, b) => (b.value > a.value ? b : a), items[0]) : null;
+  let bars = '', hits = '', labels = '';
+  const every = opts.labelEvery || Math.ceil(items.length / 8);
+  items.forEach((d, i) => {
+    const x = padL + i * slot + (slot - bw) / 2;
+    const h = Math.max(0, y(0) - y(d.value));
+    const r = Math.min(4, bw / 2, h);
+    const cls = best && d === best && d.value > 0 ? 'bar hl' : (d.dim ? 'bar dim' : 'bar');
+    if (h > 0) bars += `<path class="${cls}" d="${roundTop(x, y(0), bw, h, r)}"/>`;
+    hits += `<rect class="hit" data-chart="${id}" data-i="${i}" x="${padL + i * slot}" y="${padT}" width="${slot}" height="${H - padT - padB}"/>`;
+    const last = items.length - 1;
+    if ((i % every === 0 && (i === last || last - i >= every * 0.75)) || i === last) labels += `<text class="axis" x="${padL + i * slot + slot / 2}" y="${H - 6}" text-anchor="${i === last && items.length > 8 ? 'end' : 'middle'}">${esc(d.label)}</text>`;
+  });
+  state.picks[id] = items;
+  return `<div class="card">
+    <p id="${id}-tip" class="num mb-2 min-h-[1.25rem] text-sm font-medium text-secondary">${esc(opts.hint || 'Tap a column to see its number.')}</p>
+    <svg viewBox="0 0 ${W} ${H}" class="w-full" role="img" aria-label="${esc(opts.aria || 'Chart')}">${grid}${bars}${labels}${hits}</svg>
+  </div>`;
+}
+function roundTop(x, base, w, h, r) {
+  const t = base - h;
+  return `M${x},${base} L${x},${t + r} Q${x},${t} ${x + r},${t} L${x + w - r},${t} Q${x + w},${t} ${x + w},${t + r} L${x + w},${base} Z`;
+}
+function niceStep(max) {
+  const raw = max / 4, p = Math.pow(10, Math.floor(Math.log10(raw)));
+  const n = raw / p;
+  return Math.max(1, (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * p);
+}
+
+// Horizontal bars with the number at the tip. rows: [{label, value, note}]
+function hbars(rows, opts = {}) {
+  if (!rows.length) return empty(opts.empty || 'Nothing yet.');
+  const max = Math.max(1, ...rows.map((r) => r.value));
+  return `<div class="card space-y-3">${rows.map((r) => `
+    <div>
+      <div class="flex items-baseline justify-between gap-3 text-sm">
+        <span class="min-w-0 truncate font-medium">${esc(r.label)}</span>
+        <span class="num shrink-0 text-secondary">${fmt(r.value)}${r.note ? ` <span class="text-tertiary">· ${esc(r.note)}</span>` : ''}</span>
+      </div>
+      <div class="mt-1 h-2 rounded-full bg-inset"><div class="h-2 rounded-full ${r.dim ? 'bg-linestrong' : 'bg-accent'}" style="width:${Math.max(r.value ? 2 : 0, (r.value / max) * 100)}%"></div></div>
+    </div>`).join('')}</div>`;
+}
+
+function table(head, rows, emptyText) {
+  if (!rows.length) return empty(emptyText || 'Nothing yet.');
+  return `<div class="card overflow-x-auto"><table class="t text-sm">
+    <thead><tr>${head.map((h, i) => `<th class="${i ? 'r' : ''}">${esc(h)}</th>`).join('')}</tr></thead>
+    <tbody>${rows.map((r) => `<tr>${r.map((c, i) => `<td class="${i ? 'r num' : ''}">${c}</td>`).join('')}</tr>`).join('')}</tbody>
+  </table></div>`;
+}
+
+const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const hourName = (h) => (h === 0 ? '12 am' : h < 12 ? `${h} am` : h === 12 ? '12 pm' : `${h - 12} pm`);
+const REASONS = {
+  permission_denied: 'Visitor blocked location permission',
+  timeout: 'Phone took too long to find GPS',
+  position_unavailable: 'Phone could not find a position',
+  unsupported: 'Browser has no location support',
+  unknown: 'Unknown (older Glide records)'
+};
+function shortDate(iso) {
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+function when(ts) {
+  return new Date(ts).toLocaleString('en-US', { timeZone: CFG.TZ, month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
+
+// ================= PAGE =================
+function render() {
+  const v = $('#view');
+  $('#refreshBtn').classList.remove('hidden');
+  $('#signOutBtn').classList.remove('hidden');
+
+  const chips = `<div class="flex flex-wrap gap-2">${PERIODS.map((p) => {
+    const on = p.days === state.days;
+    return `<button data-days="${p.days ?? 'all'}" class="rounded-full px-3 py-1.5 text-sm font-semibold ${on ? 'bg-accent text-accentfg' : 'border border-line bg-white text-primary'}">${p.label}</button>`;
+  }).join('')}</div>`;
+
+  if (state.error) { v.innerHTML = chips + `<div class="mt-5 rounded-lg bg-errweak p-4 text-sm text-errink"><b>Could not load traffic.</b><p class="mt-1">${esc(state.error)}</p></div>`; return; }
+  if (!state.data) { v.innerHTML = chips + `<p class="py-16 text-center text-secondary">Loading traffic…</p>`; return; }
+
+  const d = state.data, t = d.totals || {}, prev = d.previous || {}, sales = d.sales || {}, q = d.quality || {};
+  const label = (PERIODS.find((p) => p.days === state.days) || {}).label || '';
+  const periodText = state.days == null ? 'since you started tracking' : state.days === 1 ? 'in the last 24 hours' : `in the last ${state.days} days`;
+
+  // ---- Headline tiles
+  let html = chips + (state.loading ? `<p class="mt-2 text-xs text-tertiary">Updating…</p>` : `<p class="mt-2 text-xs text-tertiary">Updated ${esc(when(d.generated_at))} · Central time · bots left out</p>`);
+  html += `<div class="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+    ${tile('Visits', fmt(t.visits), delta(t.visits, prev.visits))}
+    ${tile('Visits today', fmt(t.today))}
+    ${tile('Real people', fmt(t.people_sessions), `<span class="text-xs text-tertiary">touched, tapped or scrolled</span>`)}
+    ${tile('Place views', fmt(t.place_views), delta(t.place_views, prev.place_views))}
+    ${tile('Unlock GPS taps', fmt(t.unlock_taps), delta(t.unlock_taps, prev.unlock_taps))}
+    ${tile('Sales', `${fmt(sales.paid)} <span class="text-base font-medium text-secondary">· ${money(sales.revenue)}</span>`, `<span class="text-xs text-tertiary">${fmt(sales.paid_all_time)} all time</span>`)}
+  </div>`;
+
+  // ---- Visits per day
+  const daily = (d.daily || []).map((x) => ({ label: shortDate(x.date), value: x.visits, tip: `${shortDate(x.date)}: ${fmt(x.visits)} visits · ${fmt(x.views)} place views` }));
+  html += section('Visits per day', `Each column is one day (${esc(label.toLowerCase())}).`,
+    columns('daily', daily, { aria: 'Visits per day', height: 170 }));
+
+  // ---- Sales funnel
+  const funnel = d.funnel || [];
+  const top = funnel[0] ? funnel[0].n : 0;
+  html += section('From visit to sale', `How far visitors got ${periodText}. Each step counts visitors, not taps.`,
+    `<div class="card space-y-3">${funnel.map((s, i) => {
+      const prevN = i ? funnel[i - 1].n : s.n;
+      const w = top ? Math.max(s.n ? 2 : 0, (s.n / top) * 100) : 0;
+      return `<div>
+        <div class="flex items-baseline justify-between gap-3 text-sm">
+          <span class="font-medium">${i + 1}. ${esc(s.step)}</span>
+          <span class="num text-secondary">${fmt(s.n)}${i ? ` <span class="text-tertiary">· ${pct(s.n, prevN)}% of step ${i}</span>` : ''}</span>
+        </div>
+        <div class="mt-1 h-2 rounded-full bg-inset"><div class="h-2 rounded-full bg-accent" style="width:${w}%"></div></div>
+      </div>`;
+    }).join('')}
+    ${sales.unfinished ? `<p class="text-sm text-warnink">${fmt(sales.unfinished)} checkout${sales.unfinished === 1 ? '' : 's'} opened at Stripe but not paid.</p>` : ''}
+    ${t.checkout_cancelled ? `<p class="text-sm text-secondary">${fmt(t.checkout_cancelled)} pressed Back on the Stripe page.</p>` : ''}
+    </div>`);
+
+  // ---- Best time to post
+  const hours = d.hours || [], wk = d.weekdays || [];
+  const bestH = hours.reduce((a, b) => (b.visits > a.visits ? b : a), hours[0] || { visits: 0 });
+  const bestD = wk.reduce((a, b) => (b.visits > a.visits ? b : a), wk[0] || { visits: 0 });
+  const insight = t.visits >= 20 && bestH.visits
+    ? `Most visits come around <b>${hourName(bestH.hour)}</b>, and <b>${DAYS[bestD.dow]}</b> is your busiest day. Posting on Facebook an hour or so before that gives a post time to spread.`
+    : 'Not enough visits yet in this period to see a pattern.';
+  html += section('Best time to post', insight,
+    columns('hours', hours.map((h) => ({ label: hourName(h.hour).replace(' ', ''), value: h.visits, tip: `${hourName(h.hour)}: ${fmt(h.visits)} visits` })), { aria: 'Visits by hour of day', labelEvery: 4, highlightMax: true, height: 140, hint: 'Visits by hour of day (Central). Tap a column.' }) +
+    `<div class="mt-3">${columns('days', wk.map((x) => ({ label: DAYS[x.dow].slice(0, 3), value: x.visits, tip: `${DAYS[x.dow]}: ${fmt(x.visits)} visits` })), { aria: 'Visits by day of week', labelEvery: 1, highlightMax: true, height: 130, hint: 'Visits by day of the week. Tap a column.' })}</div>`);
+
+  // ---- Where visitors come from
+  html += section('Where visitors come from', 'Which link brought them in. "Direct" includes home-screen opens and links where the app could not tell.',
+    table(['Source', 'Visits', 'People', 'Place views', 'Unlock taps'],
+      (d.sources || []).map((s) => [esc(s.source), fmt(s.opens), fmt(s.people), fmt(s.place_views), fmt(s.unlock_taps)]), 'No visits yet.'));
+
+  // ---- New vs returning
+  const vis = d.visitors || {};
+  html += section('New and returning visitors', 'Counted per phone. This started with the new app, so older Glide visits are not included.',
+    vis.tracked
+      ? `<div class="grid grid-cols-3 gap-3">${tile('Phones', fmt(vis.tracked))}${tile('New', fmt(vis.new))}${tile('Came back', fmt(vis.returning), `<span class="text-xs text-tertiary">on 2+ different days</span>`)}</div>`
+      : empty('No phones counted yet. This fills in as people use the new app.'));
+
+  // ---- Top places
+  html += section('Most viewed places', `Free places show GPS openly; paid places are the ones that can sell.`,
+    table(['Place', 'Views', 'Maps', 'Unlock'],
+      (d.places || []).map((p) => [`${esc(p.name)} <span class="ml-1 rounded px-1.5 py-0.5 text-xs font-semibold ${p.access === 'free' ? 'bg-okweak text-okink' : 'bg-warnweak text-warnink'}">${p.access === 'free' ? 'Free' : 'Paid'}</span><div class="text-xs text-tertiary">${esc(p.category)}</div>`, fmt(p.views), fmt(p.maps), fmt(p.unlock_taps)]),
+      'No place views yet.'));
+
+  // ---- Paid places people tried to unlock
+  html += section('Paid places people tried to unlock', 'Good candidates for a Facebook post or card.',
+    table(['Place', 'Views', 'Unlock taps', 'Checkouts'],
+      (d.unlock_places || []).map((p) => [esc(p.name), fmt(p.views), fmt(p.unlock_taps), fmt(p.checkouts)]),
+      'No one has tapped Unlock GPS in this period.'));
+
+  // ---- Categories
+  html += section('Most browsed categories', 'Category page opens plus place views in that category.',
+    hbars((d.categories || []).slice(0, 12).map((c) => ({ label: c.category, value: c.total, note: `${fmt(c.place_views)} place views` }))));
+
+  // ---- Near me
+  const nm = d.near_me || {};
+  const fails = (nm.fail_reasons || []).map((r) => ({ label: REASONS[r.reason] || r.reason, value: r.times }));
+  html += section('Near me', `${fmt(t.near_me_clicks)} taps on Near me ${periodText}.`,
+    `<div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      ${tile('Taps', fmt(t.near_me_clicks))}
+      ${tile('Location found', fmt(t.location_ready))}
+      ${tile('Saw nearby places', fmt(nm.sessions_with_results))}
+      ${tile('Then opened a place', fmt(nm.those_opening_place))}
+    </div>
+    <h3 class="mt-4 mb-2 text-sm font-semibold text-secondary">Why location failed</h3>
+    ${hbars(fails, { empty: 'No location failures in this period.' })}
+    ${nm.in_app_browser_fails ? `<p class="mt-2 text-sm text-secondary">${fmt(nm.in_app_browser_fails)} of these happened inside Facebook or Instagram's built-in browser, which often blocks GPS.</p>` : ''}`);
+
+  // ---- No results
+  html += section('Searches that found nothing', 'Times Near me came back empty. A sign of where people want places you don\'t have yet.',
+    table(['What happened', 'Category', 'Times'],
+      (d.no_results || []).map((r) => [esc(r.kind), esc(r.category), fmt(r.times)]), 'Every search found something in this period.'));
+
+  // ---- Visitor quality
+  html += section('Real people vs. bots', 'Bots (link previews, crawlers) are already left out of every number above.',
+    `<div class="grid grid-cols-3 gap-3">
+      ${tile('Likely people', fmt(q.person), `<span class="text-xs text-tertiary">real touch or scroll</span>`)}
+      ${tile('Unclear', fmt(q.unclear), `<span class="text-xs text-tertiary">left before touching</span>`)}
+      ${tile('Bots', fmt(q.automated), `<span class="text-xs text-tertiary">${fmt(q.automated_events)} hits removed</span>`)}
+    </div>
+    <h3 class="mt-4 mb-2 text-sm font-semibold text-secondary">Phones and browsers</h3>
+    ${hbars((d.browsers || []).map((b) => ({ label: b.browser, value: b.opens, dim: b.browser === 'Unknown browser' })))}`);
+
+  // ---- Recent visitors
+  html += `<details class="mt-6"><summary class="flex items-center justify-between">
+      <span><span class="block text-lg font-bold">Recent visitors</span><span class="block text-sm text-secondary">The last 40 visits, newest first. Tap to open.</span></span>
+      <span class="text-sm font-semibold text-accent">Show</span></summary>
+    <div class="mt-3">${table(['Visitor', 'Places', 'Near me', 'Unlock'],
+      (d.recent || []).map((r) => [`<div class="font-medium">${esc(when(r.last_seen))} <span class="ml-1 rounded px-1.5 py-0.5 text-xs font-semibold ${r.class === 'person' ? 'bg-okweak text-okink' : r.class === 'automated' ? 'bg-errweak text-errink' : 'bg-inset text-secondary'}">${r.class === 'person' ? 'Person' : r.class === 'automated' ? 'Bot' : 'Unclear'}</span></div><div class="text-xs text-tertiary">${esc(r.browser)} · from ${esc(r.referrer)}</div>`, fmt(r.places), fmt(r.near_me), fmt(r.unlock)]),
+      'No visits in the last 30 days.')}</div></details>`;
+
+  html += `<p class="mt-8 text-xs text-tertiary">Tracking began ${d.first_event ? esc(when(d.first_event)) : '—'}. Visits before Nov 10, 2026 were recorded by the old Glide app and copied here. Signed in as ${esc(state.user && state.user.email)}.</p>`;
+
+  v.innerHTML = html;
+}
+
+// ================= EVENTS =================
+document.addEventListener('click', (e) => {
+  const chip = e.target.closest('[data-days]');
+  if (chip) {
+    state.days = chip.dataset.days === 'all' ? null : Number(chip.dataset.days);
+    try { localStorage.setItem('la-traffic-days', chip.dataset.days); } catch (err) { /* fine */ }
+    return load();
+  }
+  const hit = e.target.closest('.hit');
+  if (hit) {
+    const items = state.picks[hit.dataset.chart] || [];
+    const item = items[Number(hit.dataset.i)];
+    const tip = document.getElementById(hit.dataset.chart + '-tip');
+    if (item && tip) tip.textContent = item.tip;
+  }
+});
+document.addEventListener('mouseover', (e) => {
+  const hit = e.target.closest('.hit');
+  if (!hit) return;
+  const item = (state.picks[hit.dataset.chart] || [])[Number(hit.dataset.i)];
+  const tip = document.getElementById(hit.dataset.chart + '-tip');
+  if (item && tip) tip.textContent = item.tip;
+});
+$('#refreshBtn').onclick = () => load();
+$('#signOutBtn').onclick = async () => { await sb.auth.signOut(); state.data = null; viewSignIn(); };
+
+// ================= START =================
+(async function start() {
+  const params = new URLSearchParams(location.search + location.hash.replace(/^#/, '&'));
+  const authErr = params.get('error_description');
+  const { data: { session } } = await sb.auth.getSession();
+  // Clean ?code= / #access_token out of the address bar after sign-in
+  if (location.search || location.hash) history.replaceState(null, '', location.pathname);
+  if (!session) return viewSignIn(authErr ? decodeURIComponent(authErr.replace(/\+/g, ' ')) : '');
+  state.user = session.user;
+  load();
+})();
+
+sb.auth.onAuthStateChange((event, session) => {
+  if (event === 'SIGNED_IN' && session && !state.user) { state.user = session.user; load(); }
+  if (event === 'SIGNED_OUT') { state.user = null; }
+});
+</script>
+</body>
+</html>

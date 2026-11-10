@@ -1,5 +1,5 @@
 // Local America service worker: app shell cached, data always fresh
-const CACHE = 'local-america-v2';
+const CACHE = 'local-america-v3';
 const SHELL = ['./', './index.html', './manifest.json', './pixel.js'];
 
 self.addEventListener('install', (event) => {
@@ -24,6 +24,9 @@ self.addEventListener('fetch', (event) => {
 
   // Never cache Meta pixel traffic: every tracking hit must reach Facebook
   if (url.hostname.endsWith('facebook.com') || url.hostname.endsWith('facebook.net')) return;
+
+  // The private traffic page is never cached (and never saved in place of the guide)
+  if (url.pathname.endsWith('/traffic.html') || url.pathname.endsWith('/traffic')) return;
 
   // Page loads: network first, fall back to the cached shell when offline
   if (req.mode === 'navigate') {
