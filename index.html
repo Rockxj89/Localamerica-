@@ -151,7 +151,7 @@ const ICON_PATHS = {
   landmark: '<line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/>',
   compass: '<circle cx="12" cy="12" r="10"/><path d="m16.24 7.76-2.12 6.36-6.36 2.12 2.12-6.36 6.36-2.12z"/>',
   pin: '<path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/>',
-  shield: '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="M12 8v4"/><path d="M12 16h.01"/>',
+  shield: '<path d="M20 13c0 5-3.5 7.5-7.66 8.950a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="M12 8v4"/><path d="M12 16h.01"/>',
   arrow: '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
   lock: '<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>'
 };
@@ -273,20 +273,87 @@ const accessToken = (() => {
   } catch (e) { return null; }
 })();
 
+// ================= TRAFFIC COUNTER (read on the private traffic.html page) =================
+// Long-lived random id per phone, so the Traffic page can tell new from returning visitors.
+const visitorId = (() => {
+  try {
+    let v = localStorage.getItem('la_vid');
+    if (!/^[a-z0-9-]{16,40}$/.test(v || '')) { v = crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2) + Date.now(); localStorage.setItem('la_vid', v); }
+    return v;
+  } catch (e) { return null; }
+})();
+
+// Where this visit came from (Facebook, Instagram...), remembered for the whole visit.
+const landingReferrer = (() => {
+  try {
+    const stored = sessionStorage.getItem('la_ref');
+    if (stored !== null) return stored || null;
+    let host = '';
+    try { host = document.referrer ? new URL(document.referrer).hostname : ''; } catch (e) { host = ''; }
+    if (host === location.hostname) host = '';
+    // Facebook/Instagram's own in-app browser often hides the referrer; the user agent still tells us.
+    if (!host && /FBAN|FBAV|FB_IAB|FBIOS|Messenger/i.test(navigator.userAgent)) host = 'facebook.com';
+    if (!host && /Instagram/i.test(navigator.userAgent)) host = 'instagram.com';
+    sessionStorage.setItem('la_ref', host);
+    return host || null;
+  } catch (e) { return null; }
+})();
+
+const ua = navigator.userAgent || '';
+const isBot = !!navigator.webdriver || /bot|crawl|spider|slurp|facebookexternalhit|facebot|preview|headless|lighthouse|vercel|pingdom|uptime|python-requests|curl|wget/i.test(ua);
+const inAppBrowser = /FBAN|FBAV|FB_IAB|FBIOS|Instagram|Messenger|Line\//i.test(ua);
+const isStandalone = (() => { try { return window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true; } catch (e) { return false; } })();
+const browserLabel = (() => {
+  if (isBot) return 'Bot or automation';
+  const os = /iPhone|iPad|iPod/i.test(ua) ? 'iPhone or iPad' : /Android/i.test(ua) ? 'Android' : /Windows/i.test(ua) ? 'Windows' : /Mac OS X|Macintosh/i.test(ua) ? 'Mac' : /Linux/i.test(ua) ? 'Linux' : 'other device';
+  let b = 'Other browser';
+  if (/FBAN|FBAV|FB_IAB|FBIOS/i.test(ua)) b = 'Facebook app';
+  else if (/Instagram/i.test(ua)) b = 'Instagram app';
+  else if (/SamsungBrowser/i.test(ua)) b = 'Samsung Internet';
+  else if (/Edg\//i.test(ua)) b = 'Edge';
+  else if (/Firefox|FxiOS/i.test(ua)) b = 'Firefox';
+  else if (/CriOS|Chrome\//i.test(ua)) b = 'Chrome';
+  else if (/Safari/i.test(ua)) b = 'Safari';
+  return `${b} on ${os}`;
+})();
+
 async function logEvent(type, locationId = null, meta = {}) {
   // Sales steps (unlock_gps_click, checkout_start, checkout_complete) also go to the Meta pixel
-  try { if (window.laPixel) window.laPixel.event(type, locationId); } catch (e) { /* never break the app */ }
+  try { if (window.laPixel && !isBot) window.laPixel.event(type, locationId); } catch (e) { /* never break the app */ }
   // The traffic table only stores a place id for these event types
   const dbLocation = ['place_view', 'open_in_maps', 'unlock_gps_click', 'checkout_start'].includes(type) ? locationId : null;
   if (dbLocation == null && locationId != null) meta = { ...meta, location_id: locationId };
-  try {
-    if (!sb) return;
-    await sb.from('poi_traffic_events').insert({
-      event_type: type, location_id: dbLocation, visitor_session_hash: sessionId,
-      browser_type: 'pwa', referrer_host: null, event_metadata: meta
-    });
-  } catch (e) { /* analytics must never break the app */ }
+  if (visitorId) meta = { ...meta, vid: visitorId };
+  const row = {
+    event_type: type, location_id: dbLocation, visitor_session_hash: sessionId,
+    browser_type: browserLabel, referrer_host: landingReferrer,
+    automation_signal: isBot, event_metadata: meta
+  };
+  // Anything that happens before the database connection is ready waits here and is sent right after
+  if (!sb) { pendingEvents.push(row); return; }
+  try { await sb.from('poi_traffic_events').insert(row); } catch (e) { /* analytics must never break the app */ }
 }
+const pendingEvents = [];
+function flushPendingEvents() {
+  if (!sb || !pendingEvents.length) return;
+  const rows = pendingEvents.splice(0);
+  sb.from('poi_traffic_events').insert(rows).then(() => {}, () => {});
+}
+
+// One "interaction" per visit after the first real touch, tap, key press or scroll.
+// Bots almost never do this, so it's how the Traffic page tells people from bots.
+(function watchForPerson() {
+  try { if (sessionStorage.getItem('la_touched')) return; } catch (e) { return; }
+  const names = ['pointerdown', 'touchstart', 'keydown', 'scroll', 'wheel'];
+  const started = Date.now();
+  function done(ev) {
+    if (!ev.isTrusted || Date.now() - started < 300) return;
+    names.forEach((n) => window.removeEventListener(n, done));
+    try { sessionStorage.setItem('la_touched', '1'); } catch (e) { /* fine */ }
+    logEvent('interaction');
+  }
+  names.forEach((n) => window.addEventListener(n, done, { passive: true }));
+})();
 
 // ================= CHECKOUT (Stripe via Supabase function) =================
 async function checkoutApi(action, extra = {}) {
@@ -346,6 +413,7 @@ async function startUnlock(id) {
 // ================= DATA =================
 async function loadData() {
   sb = supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_KEY);
+  flushPendingEvents();
   const [l, p] = await Promise.all([
     sb.from('poi_public_locations').select('*').order('name').range(0, 999),
     sb.from('poi_public_photos').select('*').order('id').range(0, 4999)
@@ -376,17 +444,33 @@ function getPos() {
 
 async function findMe() {
   state.locStatus = 'loading'; render();
-  logEvent('near_me_click');
+  const where = location.hash.startsWith('#/c/') ? 'category' : 'near_page';
+  const category = where === 'category' ? (state.cats.find((c) => toSlug(c.name) === decodeURIComponent(location.hash.split('/')[2] || '')) || {}).name : (state.nearType || null);
+  logEvent('near_me_click', null, { from: where, ...(category ? { category } : {}) });
+  let c;
   try {
-    const c = await getPos();
+    c = await getPos();
+  } catch (e) {
+    const code = e && e.code;
+    if (code === 1) logEvent('near_me_permission_denied', null, { inAppBrowser });
+    else logEvent('near_me_location_unavailable', null, { reason: code === 3 ? 'timeout' : code === 2 ? 'position_unavailable' : 'unsupported', inAppBrowser });
+    state.locStatus = code === 1 ? 'denied' : 'error';
+    return render();
+  }
+  logEvent('near_me_location_ready');
+  try {
     state.userPos = { lat: c.latitude, lng: c.longitude };
     const { data, error } = await sb.rpc('poi_distances', { user_lat: c.latitude, user_lng: c.longitude });
     if (error) throw error;
     state.distances = {};
     (data || []).forEach((r) => { state.distances[r.id] = r.miles; });
     state.locStatus = 'ready';
+    // How many places this person actually sees nearby (0 = they wanted something we don't have close by)
+    const pool = state.locs.filter((l) => (!category || l.category === category) && state.distances[l.id] != null &&
+      (where === 'category' ? state.distances[l.id] <= CFG.NEAR_MILES : true));
+    logEvent('near_me_results', null, { resultCount: pool.length, ...(category ? { category } : {}) });
   } catch (e) {
-    state.locStatus = (e && e.code === 1) ? 'denied' : 'error';
+    state.locStatus = 'error';
   }
   render();
 }
@@ -623,6 +707,7 @@ function render() {
 
   const [, a, b] = (location.hash.slice(1) || '/').split('/');
   const key = `${a || ''}/${b || ''}`;
+  const wasCatNear = state.catNear;
   if (key !== lastRouteKey) { state.shown = CFG.PAGE_SIZE; if (a !== 'c') state.catNear = false; }
 
   let html;
@@ -644,9 +729,17 @@ function render() {
   });
 
   if (key !== lastRouteKey) {
+    const cameFrom = lastRouteKey;
     lastRouteKey = key; window.scrollTo(0, 0);
-    if (a === 'p' && b) logEvent('place_view', Number(b));
-    else if (a === 'c' && b) logEvent('category_view');
+    if (a === 'p' && b) {
+      // Note when the place was opened from a Near me list, so the Traffic page can see if Near me leads anywhere
+      const meta = cameFrom === 'near/' && state.distances ? { source: 'near_me' }
+        : cameFrom.startsWith('c/') && wasCatNear ? { source: 'near_me_category' } : {};
+      logEvent('place_view', Number(b), meta);
+    } else if (a === 'c' && b) {
+      const cat = state.cats.find((c) => toSlug(c.name) === decodeURIComponent(b));
+      logEvent('category_view', null, cat ? { category: cat.name } : {});
+    }
   }
 }
 
@@ -684,8 +777,9 @@ window.addEventListener('pageshow', (e) => { if (e.persisted && state.busy) { st
 
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault(); state.installEvent = e; $('#installCard').classList.remove('hidden');
+  try { if (!sessionStorage.getItem('la_ip')) { sessionStorage.setItem('la_ip', '1'); logEvent('install_prompt_shown'); } } catch (err) { /* fine */ }
 });
-window.addEventListener('appinstalled', () => { $('#installCard').classList.add('hidden'); toast('App installed'); });
+window.addEventListener('appinstalled', () => { $('#installCard').classList.add('hidden'); toast('App installed'); logEvent('app_installed'); });
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
@@ -696,7 +790,7 @@ render();
 loadData()
   .then(async () => {
     render();
-    logEvent('app_open');
+    logEvent('app_open', null, { standalone: isStandalone, inAppBrowser });
     await handleCheckoutReturn();
     await loadUnlocked();
     render();
