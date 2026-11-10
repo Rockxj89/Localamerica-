@@ -3,63 +3,207 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#5b3a24">
+<meta name="theme-color" content="#f7f9fa">
 <meta name="mobile-web-app-capable" content="yes">
 <title>Local America</title>
 <link rel="manifest" href="manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com/3.4.17"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script>
-  tailwind.config = { theme: { extend: { colors: {
-    bark: '#5b3a24', bark2: '#7a5232', paper: '#f4ecdc', sepia: '#e6d8bc', ink: '#2b1d12'
-  } } } };
+  // Same palette as the Glide guide
+  tailwind.config = { theme: { extend: {
+    fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'] },
+    colors: {
+      accent: '#15803D', accentfg: '#FFFFFF',
+      primary: '#1B231E', secondary: '#3F4A43', tertiary: '#5C675F',
+      page: '#f7f9fa', raised: '#FFFFFF', inset: '#EDF1EA',
+      line: '#D3DBD0', lineweak: '#E3E9E0', linestrong: '#AFBBAD',
+      okweak: '#E3F0E4', okink: '#1D5B2E',
+      infoweak: '#E2EDF3', infoink: '#1F4B66',
+      warnweak: '#F5EDD7', warnink: '#6A4A0E',
+      errweak: '#F6E2DF', errink: '#8A2A20'
+    }
+  } } };
 </script>
 <style>
-  html, body { background: #f4ecdc; overscroll-behavior-y: contain; }
-  body { padding-top: env(safe-area-inset-top); -webkit-tap-highlight-color: transparent; }
-  .nav-pad { padding-bottom: env(safe-area-inset-bottom); }
+  html, body { background: #f7f9fa; overscroll-behavior-y: contain; }
+  body { -webkit-tap-highlight-color: transparent; color: #1B231E; }
+  /* Faded American flag across the top of the page, like the Glide app */
+  .flag-bg { position: relative; isolation: isolate; min-height: 100dvh; background: #f7f9fa; }
+  .flag-bg::before {
+    content: ""; position: absolute; top: 0; left: 0; right: 0; aspect-ratio: 19 / 10;
+    pointer-events: none; z-index: 0; background-repeat: no-repeat;
+    background-size: 40% 53.85%, 40% 53.85%, 100% 100%;
+    background-position: top left, top left, top left;
+    background-image:
+      var(--stars),
+      linear-gradient(rgba(61, 91, 143, 0.65), rgba(61, 91, 143, 0.65)),
+      linear-gradient(to bottom,
+        rgba(224,109,109,.55) 0%, rgba(224,109,109,.55) 7.69%,
+        rgba(247,249,250,.20) 7.69%, rgba(247,249,250,.20) 15.38%,
+        rgba(224,109,109,.55) 15.38%, rgba(224,109,109,.55) 23.07%,
+        rgba(247,249,250,.20) 23.07%, rgba(247,249,250,.20) 30.76%,
+        rgba(224,109,109,.55) 30.76%, rgba(224,109,109,.55) 38.46%,
+        rgba(247,249,250,.20) 38.46%, rgba(247,249,250,.20) 46.15%,
+        rgba(224,109,109,.55) 46.15%, rgba(224,109,109,.55) 53.84%,
+        rgba(247,249,250,.20) 53.84%, rgba(247,249,250,.20) 61.53%,
+        rgba(224,109,109,.55) 61.53%, rgba(224,109,109,.55) 69.23%,
+        rgba(247,249,250,.20) 69.23%, rgba(247,249,250,.20) 76.92%,
+        rgba(224,109,109,.55) 76.92%, rgba(224,109,109,.55) 84.61%,
+        rgba(247,249,250,.20) 84.61%, rgba(247,249,250,.20) 92.30%,
+        rgba(224,109,109,.55) 92.30%, rgba(224,109,109,.55) 100%);
+    -webkit-mask-image: linear-gradient(to bottom, #000 70%, transparent 100%);
+    mask-image: linear-gradient(to bottom, #000 70%, transparent 100%);
+  }
+  /* Bigger, easier-to-read text (matches the Glide guide) */
+  .big-text .t-sm { font-size: 1.125rem; line-height: 1.75rem; }
+  .big-text .t-xs { font-size: 1rem; line-height: 1.5rem; }
   .clamp3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .ico { width: 1.5rem; height: 1.5rem; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+  .ico-sm { width: 1rem; height: 1rem; }
+  .logo { filter: contrast(1.5) brightness(.9); }
 </style>
 </head>
-<body class="text-ink font-sans">
+<body class="font-sans">
 
-<header class="sticky top-0 z-30 bg-bark text-paper shadow">
-  <div class="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
-    <a href="#/" class="flex items-center gap-2 font-bold text-lg tracking-wide">
-      <span aria-hidden="true">⛰️</span> Local America
-    </a>
-    <button id="installBtn" data-act="install" class="hidden text-xs font-semibold bg-paper text-bark rounded-full px-3 py-1.5">Install app</button>
-  </div>
-</header>
+<div id="app" class="flag-bg big-text">
 
-<main id="view" class="max-w-2xl mx-auto px-4 pt-4 pb-28"></main>
+  <!-- Desktop top bar (hidden on phones, like Glide) -->
+  <nav class="hidden md:block sticky top-0 z-50 bg-accent">
+    <div class="grid grid-cols-[minmax(14rem,1fr)_auto_1fr] items-center gap-4 min-h-[4rem] px-4 mx-auto max-w-[1200px]">
+      <a href="#/" class="text-base font-semibold text-accentfg">Local America</a>
+      <div class="flex items-center gap-1">
+        <a data-nav="home"  href="#/"      class="px-3 py-1.5 rounded-lg text-sm font-medium text-accentfg">Home</a>
+        <a data-nav="near"  href="#/near"  class="px-3 py-1.5 rounded-lg text-sm font-medium text-accentfg">Near Me</a>
+        <a data-nav="about" href="#/about" class="px-3 py-1.5 rounded-lg text-sm font-medium text-accentfg">About</a>
+      </div>
+      <div></div>
+    </div>
+  </nav>
 
-<nav class="fixed bottom-0 inset-x-0 z-30 bg-bark text-paper nav-pad border-t border-bark2">
-  <div class="max-w-2xl mx-auto grid grid-cols-3 text-center text-xs">
-    <a id="nav-home"  href="#/"      class="py-3 flex flex-col items-center gap-0.5"><span class="text-lg">🏠</span>Home</a>
-    <a id="nav-near"  href="#/near"  class="py-3 flex flex-col items-center gap-0.5"><span class="text-lg">📍</span>Near Me</a>
-    <a id="nav-about" href="#/about" class="py-3 flex flex-col items-center gap-0.5"><span class="text-lg">ℹ️</span>About</a>
-  </div>
-</nav>
+  <main id="view" class="relative z-10 mx-auto w-full max-w-[1200px] px-4 pb-4 pt-8 text-primary"></main>
 
-<div id="lb" class="hidden fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-3" data-act="lb-close">
+  <footer class="relative z-10 mx-auto w-full max-w-[1200px] px-4 pb-32">
+    <p class="mt-4 py-3 t-sm text-secondary">Coordinates get you close, not always exact. Finding the spot is part of the fun.</p>
+    <div id="installCard" class="hidden mt-2 rounded-lg bg-raised border border-line p-4">
+      <p class="font-semibold">Add Local America to your home screen</p>
+      <p class="t-sm text-secondary mt-1">Open the guide like an app, right from your phone.</p>
+      <button data-act="install" class="mt-3 rounded-full bg-accent text-accentfg font-semibold px-4 py-2">Install app</button>
+    </div>
+    <div class="mt-4 flex flex-col gap-3 py-4 t-sm text-secondary md:flex-row md:items-center md:justify-between">
+      <p>Use this guide as a starting point, never as your only navigation source.</p>
+      <div class="flex flex-wrap items-center gap-x-6 gap-y-2">
+        <a href="#/about" class="font-medium text-primary hover:underline">Contact</a>
+        <a href="#/safety" class="inline-flex items-center gap-2 font-medium text-primary hover:underline">Read Safety &amp; Terms <span data-icon="arrow" class="contents"></span></a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Phone nav: floating green pill at the bottom -->
+  <nav class="md:hidden fixed left-1/2 -translate-x-1/2 z-50 rounded-full bg-accent p-1 w-[16rem] max-w-[calc(100%-16px)]"
+       style="bottom: max(0.5rem, calc(env(safe-area-inset-bottom, 0px) - 13px));">
+    <div class="flex items-center gap-1">
+      <a data-nav="home"  href="#/"      class="flex-1 flex flex-col items-center gap-0.5 rounded-full px-2 py-1.5 text-xs font-semibold text-accentfg"><span data-icon="house" class="contents"></span>Home</a>
+      <a data-nav="near"  href="#/near"  class="flex-1 flex flex-col items-center gap-0.5 rounded-full px-2 py-1.5 text-xs font-semibold text-accentfg"><span data-icon="nav" class="contents"></span>Near Me</a>
+      <a data-nav="about" href="#/about" class="flex-1 flex flex-col items-center gap-0.5 rounded-full px-2 py-1.5 text-xs font-semibold text-accentfg"><span data-icon="book" class="contents"></span>About</a>
+    </div>
+  </nav>
+</div>
+
+<div id="lb" class="hidden fixed inset-0 z-[60] bg-black/90 flex items-center justify-center p-3" data-act="lb-close">
   <button class="absolute top-3 right-4 text-white text-3xl leading-none" data-act="lb-close" aria-label="Close">×</button>
   <img id="lbImg" class="max-h-full max-w-full object-contain rounded" alt="">
 </div>
 
-<div id="toast" class="hidden fixed bottom-24 inset-x-0 z-50 flex justify-center pointer-events-none">
-  <div class="bg-ink text-paper text-sm rounded-full px-4 py-2 shadow-lg"></div>
+<div id="toast" class="hidden fixed bottom-24 inset-x-0 z-[60] flex justify-center pointer-events-none">
+  <div class="bg-primary text-white text-sm rounded-full px-4 py-2 shadow-lg"></div>
 </div>
 
 <script>
 // ================= CONFIG =================
 const CFG = {
-  SUPABASE_URL: 'https://ycdlxdijrlfsxvxksyrq.supabase.co',   // <-- put your FULL project URL here
+  SUPABASE_URL: 'https://ycdlxdijrlfsxvxksyrq.supabase.co',
   SUPABASE_KEY: 'sb_publishable_2ExdXbNtW9HpuOGAq1Oa7g_gPdONH_s',
   PHOTO_BUCKET: 'poi-photos',
+  // Logo is still loaded from the Glide app for now; move it into this repo later.
+  LOGO_URL: 'https://p256a925d-mtnf-poi-guide--localamerica25.glideos.app/assets/cb6960f0f9b568b3cc06d2ca684f3ff76142f6f0b5fc5a2158c3dad1e605a405/IMG_20250808_184722_225.webp',
   NEAR_MILES: 75,
   PAGE_SIZE: 24
 };
+
+// ================= ICONS (same set as the Glide guide) =================
+const ICON_PATHS = {
+  house: '<path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+  nav: '<polygon points="3 11 22 2 13 21 11 13 3 11"/>',
+  book: '<path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/>',
+  waves: '<path d="M2 6c.6.5 1.2 1 2.5 1C7 7 7 5 9.5 5c2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/><path d="M2 12c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/><path d="M2 18c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/>',
+  tent: '<path d="M3.5 21 14 3"/><path d="M20.5 21 10 3"/><path d="M15.5 21 12 15l-3.5 6"/><path d="M2 21h20"/>',
+  mountain: '<path d="m8 3 4 8 5-5 5 15H2L8 3z"/>',
+  tree: '<path d="m17 14 3 3.3a1 1 0 0 1-.7 1.7H4.7a1 1 0 0 1-.7-1.7L7 14h-.3a1 1 0 0 1-.7-1.7L9 9h-.2A1 1 0 0 1 8 7.3L12 3l4 4.3a1 1 0 0 1-.8 1.7H15l3 3.3a1 1 0 0 1-.7 1.7H17Z"/><path d="M12 22v-3"/>',
+  feet: '<path d="M4 16v-2.38C4 11.5 2.97 10.5 3 8c.03-2.72 1.49-6 4.5-6C9.37 2 10 3.8 10 5.5c0 3.11-2 5.66-2 8.68V16a2 2 0 1 1-4 0Z"/><path d="M20 20v-2.38c0-2.12 1.03-3.12 1-5.62-.03-2.72-1.49-6-4.5-6C14.63 6 14 7.8 14 9.5c0 3.11 2 5.66 2 8.68V20a2 2 0 1 0 4 0Z"/><path d="M16 17h4"/><path d="M4 13h4"/>',
+  landmark: '<line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/>',
+  compass: '<circle cx="12" cy="12" r="10"/><path d="m16.24 7.76-2.12 6.36-6.36 2.12 2.12-6.36 6.36-2.12z"/>',
+  pin: '<path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/>',
+  shield: '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="M12 8v4"/><path d="M12 16h.01"/>',
+  arrow: '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
+  lock: '<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>'
+};
+const icon = (name, cls = '') => `<svg viewBox="0 0 24 24" class="ico ${cls}" aria-hidden="true">${ICON_PATHS[name] || ''}</svg>`;
+document.querySelectorAll('[data-icon]').forEach((el) => {
+  el.outerHTML = icon(el.dataset.icon, el.dataset.icon === 'arrow' ? 'ico-sm' : '');
+});
+
+function categoryIcon(c) {
+  if (c === 'Swimming holes') return 'waves';
+  if (c === 'Established campsites') return 'tent';
+  if (c === 'Caves') return 'mountain';
+  if (c === 'Scenic views') return 'tree';
+  if (String(c).includes('trail')) return 'feet';
+  if (c === 'Buildings and stores') return 'landmark';
+  return 'compass';
+}
+
+const CATEGORY_DESCRIPTIONS = {
+  'Buildings and stores': 'Old buildings, shops, and structures',
+  'Caves': 'Caverns, overhangs, and tucked-away openings',
+  'Dead end trails': 'Trails that finish away from a through route',
+  'Established campsites': 'Known places to set up camp',
+  'Forgotten grounds': 'Overgrown or quiet places with a story',
+  'Frog ponds': 'Small ponds and wetland spots',
+  'Legends/lore': 'Places connected to local stories',
+  'Mud holes/trails': 'Rough tracks and muddy routes',
+  'Non-vehicle trails': 'Routes intended for walking',
+  'Popular locations': 'Well-known places worth starting with',
+  'Rappelling bluffs': 'Cliffs and rock faces for vertical routes',
+  'Rocks/Flex': 'Rock formations and flexible-use spots',
+  'Scenic views': 'Lookouts and wide-open views',
+  'Swimming holes': 'Creeks, pools, and water spots',
+  'Unmarked trails': 'Routes without a formal trail marker',
+  'Yardage fields': 'Open areas measured for yardage'
+};
+
+// 50 stars for the flag background (same layout as the Glide app)
+(function drawStars() {
+  const R = 40, r = R * 0.382;
+  const star = (cx, cy) => {
+    const pts = [];
+    for (let i = 0; i < 10; i++) {
+      const rad = i % 2 === 0 ? R : r, a = (-90 + i * 36) * Math.PI / 180;
+      pts.push(`${(cx + rad * Math.cos(a)).toFixed(1)},${(cy + rad * Math.sin(a)).toFixed(1)}`);
+    }
+    return `<polygon points="${pts.join(' ')}"/>`;
+  };
+  let s = '';
+  for (let row = 0; row < 9; row++) {
+    const y = 70.2 * (row + 1), long = row % 2 === 0;
+    for (let k = 0; k < (long ? 6 : 5); k++) s += star((long ? 81.9 : 163.8) + k * 163.8, y);
+  }
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 988 700"><g fill="#ffffff" fill-opacity="0.85">${s}</g></svg>`;
+  document.getElementById('app').style.setProperty('--stars', `url("data:image/svg+xml,${encodeURIComponent(svg)}")`);
+})();
 
 // ================= HELPERS =================
 const $ = (s) => document.querySelector(s);
@@ -82,16 +226,23 @@ function photoUrl(key) {
 
 function roadAccess(category) {
   const c = String(category || '').toLowerCase();
-  if (/building|store|popular|legend|lore/.test(c)) return ['Easy access', 'bg-green-100 text-green-800'];
-  if (/non-vehicle/.test(c)) return ['Walk-in only', 'bg-amber-100 text-amber-800'];
-  return ['Rough roads likely', 'bg-red-100 text-red-800'];
+  if (/building|store|popular|legend|lore/.test(c)) return ['Easy access', 'bg-accent text-accentfg'];
+  if (/non-vehicle/.test(c)) return ['Walk-in only', 'bg-infoweak text-infoink'];
+  return ['Rough roads likely', 'bg-warnweak text-warnink'];
+}
+
+// Photo tile with a 4:3 shape, like Glide's Media component
+function media(src, alt, iconName) {
+  return src
+    ? `<div class="aspect-[4/3] w-full overflow-hidden rounded-lg bg-inset"><img loading="lazy" src="${esc(src)}" alt="${esc(alt)}" class="h-full w-full object-cover"></div>`
+    : `<div class="aspect-[4/3] w-full rounded-lg bg-inset flex items-center justify-center text-tertiary">${icon(iconName)}</div>`;
 }
 
 // ================= STATE =================
 const state = {
   ready: false, error: null,
   locs: [], photos: {}, cats: [],
-  userPos: null, distances: null, locStatus: 'idle', // idle | loading | ready | denied | error
+  userPos: null, distances: null, locStatus: 'idle',
   catNear: false, nearType: '', shown: CFG.PAGE_SIZE, installEvent: null
 };
 
@@ -116,9 +267,6 @@ async function logEvent(type, locationId = null, meta = {}) {
 
 // ================= DATA =================
 async function loadData() {
-  if (CFG.SUPABASE_URL.includes('YOUR-PROJECT-REF')) {
-    throw new Error('Setup needed: open index.html and set SUPABASE_URL to your full project URL (https://<project-ref>.supabase.co).');
-  }
   sb = supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_KEY);
   const [l, p] = await Promise.all([
     sb.from('poi_public_locations').select('*').order('name').range(0, 999),
@@ -132,9 +280,9 @@ async function loadData() {
 
   const map = {};
   state.locs.forEach((loc) => {
-    const c = map[loc.category] ||= { name: loc.category, count: 0, photo: null };
+    const c = map[loc.category] ||= { name: loc.category, count: 0, photo: null, photoOf: '' };
     c.count++;
-    if (!c.photo && state.photos[loc.id]?.length) c.photo = state.photos[loc.id][0].object_key;
+    if (!c.photo && state.photos[loc.id]?.length) { c.photo = state.photos[loc.id][0].object_key; c.photoOf = loc.name; }
   });
   state.cats = Object.values(map).sort((a, b) => a.name.localeCompare(b.name));
   state.ready = true;
@@ -166,65 +314,86 @@ async function findMe() {
 }
 
 // ================= VIEW PIECES =================
-function badge(text, cls) { return `<span class="inline-block text-[11px] font-semibold rounded-full px-2 py-0.5 ${cls}">${esc(text)}</span>`; }
+function badge(text, cls) { return `<span class="inline-flex items-center rounded-md px-2 py-0.5 text-sm font-semibold ${cls}">${esc(text)}</span>`; }
 
 function accessBadge(l) {
-  return isFree(l) ? badge('Free', 'bg-green-100 text-green-800') : badge('Paid · GPS locked', 'bg-amber-100 text-amber-900');
+  return isFree(l) ? badge('Free', 'bg-okweak text-okink') : badge('Paid', 'bg-warnweak text-warnink');
 }
 
-function distLabel(l) {
-  const d = state.distances && state.distances[l.id];
-  return d != null ? `<span class="text-xs font-semibold text-bark">≈ ${d} mi</span>` : '';
+function excerpt(text, len = 116) {
+  const v = (text || '').trim() || 'Field notes are still being added for this location.';
+  return v.length > len ? v.slice(0, len).trim() + '…' : v;
 }
 
 function cardHtml(l) {
   const ph = state.photos[l.id]?.[0];
   const [rt, rc] = roadAccess(l.category);
-  const excerpt = (l.description || '').trim();
+  const d = state.distances && state.distances[l.id];
   return `
-  <a href="#/p/${l.id}" class="block bg-white rounded-2xl shadow-sm border border-sepia overflow-hidden active:scale-[.99] transition">
-    ${ph ? `<img loading="lazy" src="${esc(photoUrl(ph.object_key))}" alt="${esc(l.name)}" class="w-full h-40 object-cover bg-sepia">`
-         : `<div class="w-full h-24 bg-sepia flex items-center justify-center text-3xl">⛰️</div>`}
-    <div class="p-3">
-      <div class="flex flex-wrap gap-1.5 mb-1.5">${accessBadge(l)}${badge(rt, rc)}</div>
-      <div class="flex items-start justify-between gap-2">
-        <h3 class="font-bold leading-snug">${esc(l.name)}</h3>${distLabel(l)}
-      </div>
-      <p class="text-xs text-bark2 mt-0.5">${esc(l.category)}</p>
-      ${excerpt ? `<p class="text-sm text-ink/80 mt-1.5 clamp3">${esc(excerpt)}</p>` : ''}
-      ${hasCoords(l) ? `<p class="text-xs font-mono text-bark mt-2">${Number(l.latitude).toFixed(5)}, ${Number(l.longitude).toFixed(5)}</p>` : ''}
+  <article class="flex min-w-0 flex-col gap-4">
+    <a href="#/p/${l.id}" class="block">${media(ph ? photoUrl(ph.object_key) : '', l.name + ' field photo', 'pin')}</a>
+    <div class="min-w-0 space-y-2">
+      <div class="flex flex-wrap items-center gap-2">${accessBadge(l)}${badge(rt, rc)}${d != null ? badge('≈ ' + d + ' mi', 'bg-inset text-secondary') : ''}</div>
+      ${hasCoords(l) ? `<span class="inline-flex items-center gap-1 t-xs text-secondary">${icon('pin', 'ico-sm')} GPS: <span class="select-text">${Number(l.latitude).toFixed(5)}, ${Number(l.longitude).toFixed(5)}</span></span>` : ''}
+      <a href="#/p/${l.id}" class="block min-w-0">
+        <h3 class="truncate text-base font-semibold text-primary">${esc(l.name)}</h3>
+        <p class="t-sm text-secondary">${esc(excerpt(l.description))}</p>
+      </a>
     </div>
-  </a>`;
+  </article>`;
 }
 
 function locNotice() {
   const s = state.locStatus;
-  if (s === 'loading') return `<p class="text-sm text-bark2 my-3">Finding your location…</p>`;
-  if (s === 'denied') return `<p class="text-sm bg-red-50 text-red-800 rounded-xl p-3 my-3">Location permission was blocked. Allow location for this site in Chrome settings, then tap Try again.</p>`;
-  if (s === 'error') return `<p class="text-sm bg-red-50 text-red-800 rounded-xl p-3 my-3">Couldn't get your location. Check that GPS is on, then tap Try again.</p>`;
+  if (s === 'loading') return `<p class="t-sm text-secondary my-3">Finding your location…</p>`;
+  if (s === 'denied') return `<p class="t-sm bg-errweak text-errink rounded-lg p-3 my-3">Location permission was blocked. Allow location for this site in Chrome settings, then tap Try again.</p>`;
+  if (s === 'error') return `<p class="t-sm bg-errweak text-errink rounded-lg p-3 my-3">Couldn't get your location. Check that GPS is on, then tap Try again.</p>`;
   return '';
 }
+
+const btnPrimary = 'inline-flex items-center justify-center gap-2 rounded-lg bg-accent text-accentfg font-semibold px-4 py-2.5';
+const btnSecondary = 'inline-flex items-center justify-center gap-2 rounded-lg bg-raised border border-line text-primary font-semibold px-4 py-2.5';
 
 // ================= SCREENS =================
 function viewHome() {
   const total = state.locs.length;
   return `
-  <section class="text-center mb-5">
-    <h1 class="text-3xl font-extrabold text-bark">The Ozarks</h1>
-    <p class="text-sm text-bark2 mt-1">Every location in this guide is on public land.</p>
-  </section>
-  <div class="grid grid-cols-2 gap-3">
-    ${state.cats.map((c) => `
-      <a href="#/c/${toSlug(c.name)}" class="bg-white rounded-2xl border border-sepia shadow-sm overflow-hidden active:scale-[.98] transition">
-        ${c.photo ? `<img loading="lazy" src="${esc(photoUrl(c.photo))}" alt="" class="w-full h-24 object-cover bg-sepia">`
-                  : `<div class="w-full h-24 bg-sepia flex items-center justify-center text-3xl">🧭</div>`}
-        <div class="p-2.5">
-          <div class="font-bold text-sm leading-snug">${esc(c.name)}</div>
-          <div class="text-xs text-bark2">${c.count} place${c.count === 1 ? '' : 's'}</div>
-        </div>
-      </a>`).join('')}
-  </div>
-  <p class="text-center text-xs text-bark2 mt-5">${total} field records · <a class="underline" href="#/safety">Safety notice</a></p>`;
+  <div class="space-y-8">
+    <header class="-mx-4 flex justify-center pt-2 sm:mx-0">
+      <img src="${esc(CFG.LOGO_URL)}" alt="Local America logo" class="logo aspect-square w-full max-w-[38rem] object-contain" onerror="this.style.display='none'">
+    </header>
+    <h1 class="-mt-10 text-center text-5xl font-bold text-primary">The Ozarks</h1>
+    <aside class="py-3 t-sm text-secondary"><p>All locations are situated on public land and are fully accessible to the general public.</p></aside>
+
+    ${state.cats.length ? `
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      ${state.cats.map((c) => `
+        <article class="flex min-w-0 flex-col gap-3">
+          <a href="#/c/${toSlug(c.name)}" class="block">${media(c.photo ? photoUrl(c.photo) : '', c.photoOf ? `${c.photoOf} in ${c.name}` : '', categoryIcon(c.name))}</a>
+          <a href="#/c/${toSlug(c.name)}" class="flex min-w-0 items-start justify-between gap-4">
+            <div class="flex min-w-0 items-start gap-4">
+              <span class="mt-0.5 shrink-0 text-primary">${icon(categoryIcon(c.name))}</span>
+              <div class="min-w-0">
+                <h3 class="truncate text-base font-semibold text-primary">${esc(c.name)}</h3>
+                <p class="mt-1 t-sm text-secondary">${esc(CATEGORY_DESCRIPTIONS[c.name] || 'Field-collected locations in this group')}</p>
+              </div>
+            </div>
+            <span class="shrink-0 text-lg font-semibold text-primary">${c.count}</span>
+          </a>
+        </article>`).join('')}
+    </div>` : `
+    <div class="py-10 text-center">
+      <p class="text-base font-semibold text-primary">No place types are available yet.</p>
+      <p class="mt-2 t-sm text-secondary">The guide has no field records to browse.</p>
+    </div>`}
+
+    <div class="py-3 t-sm text-secondary">${total} ${total === 1 ? 'field record' : 'field records'}</div>
+
+    <aside class="flex flex-col gap-2 py-3 t-sm text-secondary sm:flex-row sm:items-center sm:justify-between">
+      <div class="flex min-w-0 items-start gap-2"><span class="mt-1">${icon('shield', 'ico-sm')}</span><p>Outdoor travel involves real risk. Verify conditions, access, and coordinates before you go.</p></div>
+      <a href="#/safety" class="inline-flex shrink-0 items-center gap-1 font-medium text-primary underline underline-offset-2">Safety &amp; Terms ${icon('arrow', 'ico-sm')}</a>
+    </aside>
+  </div>`;
 }
 
 function viewCategory(slugName) {
@@ -238,19 +407,22 @@ function viewCategory(slugName) {
   }
   const shown = items.slice(0, state.shown);
   return `
-  <a href="#/" class="text-sm text-bark underline">← All place types</a>
-  <h1 class="text-2xl font-extrabold text-bark mt-1">${esc(cat.name)}</h1>
-  <p class="text-sm text-bark2">${items.length} place${items.length === 1 ? '' : 's'}${nearOn ? ` within ${CFG.NEAR_MILES} miles` : ''}</p>
-  <div class="my-3 flex gap-2">
+  <a href="#/" class="t-sm font-medium text-primary underline underline-offset-2">← All place types</a>
+  <div class="mt-3 flex items-center gap-3">
+    <span class="text-primary">${icon(categoryIcon(cat.name))}</span>
+    <h1 class="text-3xl font-bold text-primary">${esc(cat.name)}</h1>
+  </div>
+  <p class="t-sm text-secondary mt-1">${items.length} place${items.length === 1 ? '' : 's'}${nearOn ? ` within ${CFG.NEAR_MILES} miles` : ''}</p>
+  <div class="my-5">
     ${nearOn
-      ? `<button data-act="cat-near-off" class="flex-1 rounded-xl bg-sepia text-bark font-semibold py-2.5">Show all ${esc(cat.name)}</button>`
-      : `<button data-act="cat-near-on" class="flex-1 rounded-xl bg-bark text-paper font-semibold py-2.5">📍 Near me (${CFG.NEAR_MILES} mi)</button>`}
+      ? `<button data-act="cat-near-off" class="${btnSecondary} w-full sm:w-auto">Show all ${esc(cat.name)}</button>`
+      : `<button data-act="cat-near-on" class="${btnPrimary} w-full sm:w-auto">${icon('nav', 'ico-sm')} Near me (${CFG.NEAR_MILES} mi)</button>`}
   </div>
   ${locNotice()}
-  ${state.locStatus === 'denied' || state.locStatus === 'error' ? `<button data-act="cat-near-on" class="rounded-xl bg-bark text-paper font-semibold px-4 py-2 mb-3">Try again</button>` : ''}
-  ${items.length ? `<div class="space-y-3">${shown.map(cardHtml).join('')}</div>`
-    : `<div class="text-center py-10"><p class="text-bark2">No places found.</p><a href="#/" class="underline text-bark">Browse all places</a></div>`}
-  ${items.length > shown.length ? `<button data-act="more" class="w-full mt-4 rounded-xl bg-sepia text-bark font-semibold py-3">Show more places</button>` : ''}`;
+  ${state.locStatus === 'denied' || state.locStatus === 'error' ? `<button data-act="cat-near-on" class="${btnPrimary} mb-4">Try again</button>` : ''}
+  ${items.length ? `<div class="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">${shown.map(cardHtml).join('')}</div>`
+    : `<div class="text-center py-10"><p class="text-secondary">No places found.</p><a href="#/" class="underline text-primary">Browse all places</a></div>`}
+  ${items.length > shown.length ? `<button data-act="more" class="${btnSecondary} w-full mt-6">Show more places</button>` : ''}`;
 }
 
 function viewNear() {
@@ -263,19 +435,19 @@ function viewNear() {
   }
   const shown = items.slice(0, state.shown);
   return `
-  <h1 class="text-2xl font-extrabold text-bark">Near Me</h1>
-  <p class="text-sm text-bark2 mb-3">Find places closest to where you are standing. Distances are straight-line miles, not driving time.</p>
-  <div class="flex gap-2 mb-2">
-    <select id="nearType" class="flex-1 rounded-xl border border-sepia bg-white px-3 py-2.5 text-sm">
+  <h1 class="text-3xl font-bold text-primary">Near Me</h1>
+  <p class="t-sm text-secondary mt-1 mb-5">Find places closest to where you are standing. Distances are straight-line miles, not driving time.</p>
+  <div class="flex flex-col sm:flex-row gap-2 mb-2">
+    <select id="nearType" class="flex-1 rounded-lg border border-line bg-raised px-3 py-2.5 text-base">
       <option value="">All place types</option>
       ${state.cats.map((c) => `<option value="${esc(c.name)}" ${state.nearType === c.name ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}
     </select>
-    <button data-act="find" class="rounded-xl bg-bark text-paper font-semibold px-4">${ready ? 'Refresh' : 'Find places near me'}</button>
+    <button data-act="find" class="${btnPrimary}">${icon('nav', 'ico-sm')} ${ready ? 'Refresh' : 'Find places near me'}</button>
   </div>
   ${locNotice()}
-  ${ready ? `<div class="space-y-3 mt-3">${shown.map(cardHtml).join('')}</div>
-    ${items.length > shown.length ? `<button data-act="more" class="w-full mt-4 rounded-xl bg-sepia text-bark font-semibold py-3">Show more places</button>` : ''}`
-    : `<p class="text-center text-sm text-bark2 mt-8">Tap “Find places near me” to see the closest places first.</p>`}`;
+  ${ready ? `<div class="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3 mt-5">${shown.map(cardHtml).join('')}</div>
+    ${items.length > shown.length ? `<button data-act="more" class="${btnSecondary} w-full mt-6">Show more places</button>` : ''}`
+    : `<p class="text-center t-sm text-secondary mt-10">Tap “Find places near me” to see the closest places first.</p>`}`;
 }
 
 function viewPlace(id) {
@@ -285,56 +457,59 @@ function viewPlace(id) {
   const [rt, rc] = roadAccess(l.category);
   const d = state.distances && state.distances[l.id];
   const maps = hasCoords(l) ? `https://www.google.com/maps/search/?api=1&query=${l.latitude},${l.longitude}` : '';
+  const coords = hasCoords(l) ? `${Number(l.latitude).toFixed(5)}, ${Number(l.longitude).toFixed(5)}` : '';
   return `
-  <a href="#/c/${toSlug(l.category)}" class="text-sm text-bark underline">← ${esc(l.category)}</a>
-  <div class="flex flex-wrap gap-1.5 mt-2">${accessBadge(l)}${badge(rt, rc)}${d != null ? badge('≈ ' + d + ' mi away', 'bg-sepia text-bark') : ''}</div>
-  <h1 class="text-2xl font-extrabold text-bark mt-1.5">${esc(l.name)}</h1>
-  <p class="text-sm text-bark2">${esc(l.category)}</p>
+  <a href="#/c/${toSlug(l.category)}" class="t-sm font-medium text-primary underline underline-offset-2">← ${esc(l.category)}</a>
 
-  ${Number(l.source_id) === 121 ? `<div class="mt-3 rounded-xl bg-red-50 border border-red-200 text-red-800 text-sm p-3"><b>Private-land warning.</b> Do not trespass. Respect all posted signs and property lines.</div>` : ''}
+  ${photos.length ? `<div class="mt-4">${media(photoUrl(photos[0].object_key), l.name + ' field photo', 'pin')}</div>` : ''}
+
+  <div class="flex flex-wrap gap-2 mt-4">${accessBadge(l)}${badge(rt, rc)}${d != null ? badge('≈ ' + d + ' mi away', 'bg-inset text-secondary') : ''}</div>
+  <h1 class="text-3xl font-bold text-primary mt-2">${esc(l.name)}</h1>
+  <p class="t-sm text-secondary">${esc(l.category)}</p>
+
+  ${Number(l.source_id) === 121 ? `<div class="mt-4 rounded-lg bg-errweak text-errink t-sm p-3"><b>Private-land warning.</b> Do not trespass. Respect all posted signs and property lines.</div>` : ''}
 
   ${hasCoords(l) ? `
-  <section class="mt-4 bg-white border border-sepia rounded-2xl p-3">
-    <div class="text-xs font-semibold text-bark2 uppercase tracking-wide">GPS coordinates</div>
-    <div class="font-mono text-lg mt-1">${Number(l.latitude).toFixed(5)}, ${Number(l.longitude).toFixed(5)}</div>
+  <section class="mt-5 rounded-lg bg-raised border border-line p-4">
+    <div class="t-xs font-semibold text-secondary uppercase tracking-wide">GPS coordinates</div>
+    <div class="font-mono text-lg mt-1 select-text">${coords}</div>
     <div class="flex gap-2 mt-3">
-      <button data-act="copy" data-text="${Number(l.latitude).toFixed(5)}, ${Number(l.longitude).toFixed(5)}" class="flex-1 rounded-xl bg-sepia text-bark font-semibold py-2.5">Copy</button>
-      <a data-act="maps" data-id="${l.id}" href="${maps}" target="_blank" rel="noopener" class="flex-1 text-center rounded-xl bg-bark text-paper font-semibold py-2.5">Open in Maps</a>
+      <button data-act="copy" data-text="${coords}" class="${btnSecondary} flex-1">Copy</button>
+      <a data-act="maps" data-id="${l.id}" href="${maps}" target="_blank" rel="noopener" class="${btnPrimary} flex-1">Open in Maps</a>
     </div>
   </section>` : `
-  <section class="mt-4 bg-amber-50 border border-amber-200 rounded-2xl p-4">
-    <div class="font-bold text-amber-900">🔒 GPS is locked for this place</div>
-    <p class="text-sm text-amber-900/80 mt-1">Exact coordinates for paid places are unlocked with a one-time $4.99 purchase in the main Local America app. Free places show their coordinates openly.</p>
+  <section class="mt-5 rounded-lg bg-warnweak p-4 text-warnink">
+    <div class="flex items-center gap-2 font-semibold">${icon('lock', 'ico-sm')} GPS is locked for this place</div>
+    <p class="t-sm mt-1">Exact coordinates for paid places are unlocked with a one-time purchase. Free places show their coordinates openly.</p>
   </section>`}
 
-  <section class="mt-5">
-    <h2 class="font-bold text-bark mb-1">Field notes</h2>
-    <p class="text-sm whitespace-pre-line leading-relaxed">${l.description ? esc(l.description) : 'No field notes have been added yet.'}</p>
+  <section class="mt-6">
+    <h2 class="text-lg font-semibold text-primary mb-1">Field notes</h2>
+    <p class="t-sm text-secondary whitespace-pre-line">${l.description ? esc(l.description) : 'Field notes are still being added for this location.'}</p>
   </section>
 
-  ${photos.length ? `
-  <section class="mt-5">
-    <h2 class="font-bold text-bark mb-2">Photos</h2>
-    <div class="grid grid-cols-2 gap-2">
-      ${photos.map((p) => `<img loading="lazy" src="${esc(photoUrl(p.object_key))}" alt="${esc(l.name)}" data-act="lb-open" data-src="${esc(photoUrl(p.object_key))}" class="w-full h-32 object-cover rounded-xl bg-sepia">`).join('')}
+  ${photos.length > 1 ? `
+  <section class="mt-6">
+    <h2 class="text-lg font-semibold text-primary mb-2">Photos</h2>
+    <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+      ${photos.map((p) => `<img loading="lazy" src="${esc(photoUrl(p.object_key))}" alt="${esc(l.name)}" data-act="lb-open" data-src="${esc(photoUrl(p.object_key))}" class="aspect-[4/3] w-full object-cover rounded-lg bg-inset">`).join('')}
     </div>
   </section>` : ''}
 
-  <p class="text-xs text-bark2 mt-6">Coordinates get you close, not to the exact spot. Read the <a class="underline" href="#/safety">safety notice</a> before you go.</p>
-  <a href="#/" class="block text-center mt-4 rounded-xl bg-sepia text-bark font-semibold py-3">Back to all places</a>`;
+  <a href="#/" class="${btnSecondary} w-full mt-8">Back to all places</a>`;
 }
 
 function viewAbout() {
   return `
-  <h1 class="text-2xl font-extrabold text-bark">About Local America</h1>
-  <p class="mt-2 text-sm leading-relaxed">A field guide to hard-to-find places across the Ozarks, with photos, field notes, and GPS coordinates so you can find them yourself.</p>
-  <div class="mt-4 space-y-3">
-    <div class="bg-white border border-sepia rounded-2xl p-3"><b>Public land only.</b><p class="text-sm mt-0.5">Every place listed is on public land. Never enter private property.</p></div>
-    <div class="bg-white border border-sepia rounded-2xl p-3"><b>Free and paid places.</b><p class="text-sm mt-0.5">Many places show their GPS openly. Some are paid and keep GPS locked until unlocked.</p></div>
-    <div class="bg-white border border-sepia rounded-2xl p-3"><b>Leave no trace.</b><p class="text-sm mt-0.5">Take only photos. Leave everything exactly as you found it.</p></div>
+  <h1 class="text-3xl font-bold text-primary">About Local America</h1>
+  <p class="mt-2 t-sm text-secondary">A field guide to hard-to-find places across the Ozarks, with photos, field notes, and GPS coordinates so you can find them yourself.</p>
+  <div class="mt-5 space-y-3">
+    <div class="rounded-lg bg-raised border border-line p-4"><b>Public land only.</b><p class="t-sm text-secondary mt-0.5">Every place listed is on public land. Never enter private property.</p></div>
+    <div class="rounded-lg bg-raised border border-line p-4"><b>Free and paid places.</b><p class="t-sm text-secondary mt-0.5">Many places show their GPS openly. Some are paid and keep GPS locked until unlocked.</p></div>
+    <div class="rounded-lg bg-raised border border-line p-4"><b>Leave no trace.</b><p class="t-sm text-secondary mt-0.5">Take only photos. Leave everything exactly as you found it.</p></div>
   </div>
-  <p class="mt-4 text-sm">${state.locs.length} places across ${state.cats.length} place types.</p>
-  <a href="#/safety" class="block text-center mt-4 rounded-xl bg-bark text-paper font-semibold py-3">Safety &amp; Terms</a>`;
+  <p class="mt-5 t-sm text-secondary">${state.locs.length} places across ${state.cats.length} place types.</p>
+  <a href="#/safety" class="${btnPrimary} w-full mt-5">Safety &amp; Terms</a>`;
 }
 
 function viewSafety() {
@@ -346,12 +521,12 @@ function viewSafety() {
     ['Leave it better', 'Pack out all trash, do not damage structures, and do not remove anything.']
   ];
   return `
-  <a href="#/about" class="text-sm text-bark underline">← About</a>
-  <h1 class="text-2xl font-extrabold text-bark mt-1">Safety &amp; Terms</h1>
-  <ol class="mt-3 space-y-3">
-    ${items.map((it, i) => `<li class="bg-white border border-sepia rounded-2xl p-3"><b>${i + 1}. ${it[0]}</b><p class="text-sm mt-0.5">${it[1]}</p></li>`).join('')}
+  <a href="#/about" class="t-sm font-medium text-primary underline underline-offset-2">← About</a>
+  <h1 class="text-3xl font-bold text-primary mt-3">Safety &amp; Terms</h1>
+  <ol class="mt-5 space-y-3">
+    ${items.map((it, i) => `<li class="rounded-lg bg-raised border border-line p-4"><b>${i + 1}. ${it[0]}</b><p class="t-sm text-secondary mt-0.5">${it[1]}</p></li>`).join('')}
   </ol>
-  <p class="text-xs text-bark2 mt-4">By using this guide you acknowledge and accept these terms.</p>`;
+  <p class="t-xs text-secondary mt-5">By using this guide you acknowledge and accept these terms.</p>`;
 }
 
 // ================= ROUTER =================
@@ -359,10 +534,10 @@ let lastRouteKey = '';
 function render() {
   const view = $('#view');
   if (state.error) {
-    view.innerHTML = `<div class="bg-red-50 border border-red-200 text-red-800 rounded-2xl p-4 text-sm"><b>Something needs attention</b><p class="mt-1">${esc(state.error)}</p></div>`;
+    view.innerHTML = `<div class="rounded-lg bg-errweak text-errink p-4 t-sm"><b>Something needs attention</b><p class="mt-1">${esc(state.error)}</p></div>`;
     return;
   }
-  if (!state.ready) { view.innerHTML = `<p class="text-center text-bark2 py-16">Loading places…</p>`; return; }
+  if (!state.ready) { view.innerHTML = `<p class="text-center text-secondary py-16">Loading places…</p>`; return; }
 
   const [, a, b] = (location.hash.slice(1) || '/').split('/');
   const key = `${a || ''}/${b || ''}`;
@@ -377,9 +552,14 @@ function render() {
   else html = viewHome();
   view.innerHTML = html;
 
-  ['home', 'near', 'about'].forEach((n) => $('#nav-' + n).classList.remove('bg-bark2'));
+  // Active tab = underlined, like the Glide nav
   const active = a === 'near' ? 'near' : (a === 'about' || a === 'safety') ? 'about' : 'home';
-  $('#nav-' + active).classList.add('bg-bark2');
+  document.querySelectorAll('[data-nav]').forEach((el) => {
+    const on = el.dataset.nav === active;
+    el.classList.toggle('underline', on);
+    el.classList.toggle('decoration-2', on);
+    el.classList.toggle('underline-offset-4', on);
+  });
 
   if (key !== lastRouteKey) {
     lastRouteKey = key; window.scrollTo(0, 0);
@@ -406,7 +586,7 @@ document.addEventListener('click', async (e) => {
   }
   if (act === 'install' && state.installEvent) {
     state.installEvent.prompt(); await state.installEvent.userChoice;
-    state.installEvent = null; $('#installBtn').classList.add('hidden');
+    state.installEvent = null; $('#installCard').classList.add('hidden');
   }
 });
 
@@ -417,9 +597,9 @@ document.addEventListener('change', (e) => {
 window.addEventListener('hashchange', render);
 
 window.addEventListener('beforeinstallprompt', (e) => {
-  e.preventDefault(); state.installEvent = e; $('#installBtn').classList.remove('hidden');
+  e.preventDefault(); state.installEvent = e; $('#installCard').classList.remove('hidden');
 });
-window.addEventListener('appinstalled', () => { $('#installBtn').classList.add('hidden'); toast('App installed'); });
+window.addEventListener('appinstalled', () => { $('#installCard').classList.add('hidden'); toast('App installed'); });
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
