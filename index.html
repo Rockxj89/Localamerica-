@@ -129,6 +129,8 @@
 const CFG = {
   SUPABASE_URL: 'https://ycdlxdijrlfsxvxksyrq.supabase.co',
   SUPABASE_KEY: 'sb_publishable_2ExdXbNtW9HpuOGAq1Oa7g_gPdONH_s',
+  CHECKOUT_URL: 'https://ycdlxdijrlfsxvxksyrq.supabase.co/functions/v1/checkout',
+  UNLOCK_PRICE: '$4.99',
   PHOTO_BUCKET: 'poi-photos',
   // Logo is still loaded from the Glide app for now; move it into this repo later.
   LOGO_URL: 'https://p256a925d-mtnf-poi-guide--localamerica25.glideos.app/assets/cb6960f0f9b568b3cc06d2ca684f3ff76142f6f0b5fc5a2158c3dad1e605a405/IMG_20250808_184722_225.webp',
@@ -145,7 +147,7 @@ const ICON_PATHS = {
   tent: '<path d="M3.5 21 14 3"/><path d="M20.5 21 10 3"/><path d="M15.5 21 12 15l-3.5 6"/><path d="M2 21h20"/>',
   mountain: '<path d="m8 3 4 8 5-5 5 15H2L8 3z"/>',
   tree: '<path d="m17 14 3 3.3a1 1 0 0 1-.7 1.7H4.7a1 1 0 0 1-.7-1.7L7 14h-.3a1 1 0 0 1-.7-1.7L9 9h-.2A1 1 0 0 1 8 7.3L12 3l4 4.3a1 1 0 0 1-.8 1.7H15l3 3.3a1 1 0 0 1-.7 1.7H17Z"/><path d="M12 22v-3"/>',
-  feet: '<path d="M4 16v-2.38C4 11.5 2.97 10.5 3 8c.03-2.72 1.49-6 4.5-6C9.37 2 10 3.8 10 5.5c0 3.11-2 5.66-2 8.68V16a2 2 0 1 1-4 0Z"/><path d="M20 20v-2.38c0-2.12 1.03-3.12 1-5.62-.03-2.72-1.49-6-4.5-6C14.63 6 14 7.8 14 9.5c0 3.11 2 5.66 2 8.68V20a2 2 0 1 0 4 0Z"/><path d="M16 17h4"/><path d="M4 13h4"/>',
+  feet: '<path d="M4 16v-2.38C4 11.5 2.97 10.5 3 8c.03-2.72 1.49-6 4.5-6C9.37 2 10 3.8 10 5.5c0 3.11-2 5.66-2 8.68V16a2 2 0 1 1-4 0Z"/><path d="M20 20v-2.38c0-2.12 1.030-3.12 1-5.62-.03-2.72-1.49-6-4.5-6C14.63 6 14 7.8 14 9.5c0 3.11 2 5.66 2 8.68V20a2 2 0 1 0 4 0Z"/><path d="M16 17h4"/><path d="M4 13h4"/>',
   landmark: '<line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/>',
   compass: '<circle cx="12" cy="12" r="10"/><path d="m16.24 7.76-2.12 6.36-6.36 2.12 2.12-6.36 6.36-2.12z"/>',
   pin: '<path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/>',
@@ -217,7 +219,7 @@ const hasCoords = (l) => l.latitude != null && l.longitude != null;
 function toast(msg) {
   const t = $('#toast'); t.firstElementChild.textContent = msg;
   t.classList.remove('hidden'); clearTimeout(toast._t);
-  toast._t = setTimeout(() => t.classList.add('hidden'), 2200);
+  toast._t = setTimeout(() => t.classList.add('hidden'), 3000);
 }
 
 function photoUrl(key) {
@@ -245,7 +247,8 @@ const state = {
   ready: false, error: null,
   locs: [], photos: {}, cats: [],
   userPos: null, distances: null, locStatus: 'idle',
-  catNear: false, nearType: '', shown: CFG.PAGE_SIZE, installEvent: null
+  catNear: false, nearType: '', shown: CFG.PAGE_SIZE, installEvent: null,
+  busy: null
 };
 
 let sb = null;
@@ -257,16 +260,87 @@ const sessionId = (() => {
   } catch (e) { return null; }
 })();
 
+// Private token that ties GPS purchases to this browser (only its hash is stored on the server)
+const accessToken = (() => {
+  try {
+    let t = localStorage.getItem('la_access_token');
+    if (!/^[a-f0-9]{64}$/.test(t || '')) {
+      const b = new Uint8Array(32); crypto.getRandomValues(b);
+      t = Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('');
+      localStorage.setItem('la_access_token', t);
+    }
+    return t;
+  } catch (e) { return null; }
+})();
+
 async function logEvent(type, locationId = null, meta = {}) {
   // Sales steps (unlock_gps_click, checkout_start, checkout_complete) also go to the Meta pixel
   try { if (window.laPixel) window.laPixel.event(type, locationId); } catch (e) { /* never break the app */ }
+  // The traffic table only stores a place id for these event types
+  const dbLocation = ['place_view', 'open_in_maps', 'unlock_gps_click', 'checkout_start'].includes(type) ? locationId : null;
+  if (dbLocation == null && locationId != null) meta = { ...meta, location_id: locationId };
   try {
     if (!sb) return;
     await sb.from('poi_traffic_events').insert({
-      event_type: type, location_id: locationId, visitor_session_hash: sessionId,
+      event_type: type, location_id: dbLocation, visitor_session_hash: sessionId,
       browser_type: 'pwa', referrer_host: null, event_metadata: meta
     });
   } catch (e) { /* analytics must never break the app */ }
+}
+
+// ================= CHECKOUT (Stripe via Supabase function) =================
+async function checkoutApi(action, extra = {}) {
+  if (!accessToken) return { ok: false, error: 'This browser cannot save purchases. Turn on site storage and try again.' };
+  try {
+    const res = await fetch(CFG.CHECKOUT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', apikey: CFG.SUPABASE_KEY },
+      body: JSON.stringify({ action, token: accessToken, ...extra })
+    });
+    return await res.json();
+  } catch (e) {
+    return { ok: false, error: 'No connection. Check your signal and try again.' };
+  }
+}
+
+// Fill in GPS for every place this browser has paid for
+async function loadUnlocked() {
+  const r = await checkoutApi('unlocked');
+  if (!r || !r.ok) return;
+  (r.places || []).forEach((p) => {
+    const l = state.locs.find((x) => String(x.id) === String(p.id));
+    if (l) { l.latitude = p.latitude; l.longitude = p.longitude; l.unlocked = true; }
+  });
+}
+
+// Runs when Stripe sends the buyer back to the app
+async function handleCheckoutReturn() {
+  const q = new URLSearchParams(location.search);
+  const status = q.get('checkout');
+  if (!status) return;
+  const sid = q.get('session_id');
+  history.replaceState(null, '', location.pathname + location.hash);
+  if (status === 'cancelled') { logEvent('checkout_cancelled'); toast('Checkout cancelled. You were not charged.'); return; }
+  if (status === 'success' && sid) {
+    const r = await checkoutApi('complete', { sessionId: sid });
+    if (r.ok) { logEvent('checkout_complete', r.locationId); toast('Payment received. GPS unlocked!'); }
+    else toast(r.error || 'Could not confirm payment yet. Reopen the app in a minute.');
+  }
+}
+
+async function startUnlock(id) {
+  if (state.busy) return;
+  state.busy = id; render();
+  logEvent('unlock_gps_click', id);
+  const r = await checkoutApi('start', { locationId: id, returnUrl: location.origin + location.pathname });
+  if (r.ok && r.url) {
+    logEvent('checkout_start', id);
+    setTimeout(() => { location.href = r.url; }, 400); // give the pixel a moment to send
+    return;
+  }
+  state.busy = null;
+  if (r.ok && r.alreadyActive) { await loadUnlocked(); render(); toast('Already unlocked on this phone'); return; }
+  render(); toast(r.error || 'Checkout had a problem. Please try again.');
 }
 
 // ================= DATA =================
@@ -321,7 +395,8 @@ async function findMe() {
 function badge(text, cls) { return `<span class="inline-flex items-center rounded-md px-2 py-0.5 text-sm font-semibold ${cls}">${esc(text)}</span>`; }
 
 function accessBadge(l) {
-  return isFree(l) ? badge('Free', 'bg-okweak text-okink') : badge('Paid', 'bg-warnweak text-warnink');
+  if (isFree(l)) return badge('Free', 'bg-okweak text-okink');
+  return l.unlocked ? badge('Unlocked', 'bg-okweak text-okink') : badge('Paid', 'bg-warnweak text-warnink');
 }
 
 function excerpt(text, len = 116) {
@@ -462,6 +537,7 @@ function viewPlace(id) {
   const d = state.distances && state.distances[l.id];
   const maps = hasCoords(l) ? `https://www.google.com/maps/search/?api=1&query=${l.latitude},${l.longitude}` : '';
   const coords = hasCoords(l) ? `${Number(l.latitude).toFixed(5)}, ${Number(l.longitude).toFixed(5)}` : '';
+  const busyHere = String(state.busy) === String(l.id);
   return `
   <a href="#/c/${toSlug(l.category)}" class="t-sm font-medium text-primary underline underline-offset-2">← ${esc(l.category)}</a>
 
@@ -484,7 +560,9 @@ function viewPlace(id) {
   </section>` : `
   <section class="mt-5 rounded-lg bg-warnweak p-4 text-warnink">
     <div class="flex items-center gap-2 font-semibold">${icon('lock', 'ico-sm')} GPS is locked for this place</div>
-    <p class="t-sm mt-1">Exact coordinates for paid places are unlocked with a one-time purchase. Free places show their coordinates openly.</p>
+    <p class="t-sm mt-1">Unlock the exact coordinates for this place with a one-time ${CFG.UNLOCK_PRICE} purchase. Free places show their coordinates openly.</p>
+    <button data-act="unlock" data-id="${l.id}" class="${btnPrimary} w-full mt-3" ${state.busy ? 'disabled' : ''}>${icon('lock', 'ico-sm')} ${busyHere ? 'Opening secure checkout…' : `Unlock GPS – ${CFG.UNLOCK_PRICE}`}</button>
+    <p class="t-xs mt-2">Secure payment by Stripe. Your unlock is saved on this phone and browser.</p>
   </section>`}
 
   <section class="mt-6">
@@ -578,6 +656,7 @@ document.addEventListener('click', async (e) => {
   const act = el.dataset.act;
   if (act === 'lb-close') { if (e.target === el || el.tagName === 'BUTTON') $('#lb').classList.add('hidden'); return; }
   if (act === 'lb-open') { $('#lbImg').src = el.dataset.src; $('#lb').classList.remove('hidden'); return; }
+  if (act === 'unlock') return startUnlock(Number(el.dataset.id));
   if (act === 'find') return findMe();
   if (act === 'cat-near-on') { state.catNear = true; state.shown = CFG.PAGE_SIZE; return state.distances ? render() : findMe(); }
   if (act === 'cat-near-off') { state.catNear = false; state.shown = CFG.PAGE_SIZE; return render(); }
@@ -600,6 +679,9 @@ document.addEventListener('change', (e) => {
 
 window.addEventListener('hashchange', render);
 
+// If someone backs out of Stripe, don't leave the button stuck on "Opening…"
+window.addEventListener('pageshow', (e) => { if (e.persisted && state.busy) { state.busy = null; render(); } });
+
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault(); state.installEvent = e; $('#installCard').classList.remove('hidden');
 });
@@ -611,8 +693,15 @@ if ('serviceWorker' in navigator) {
 
 // ================= START =================
 render();
-loadData().then(() => { render(); logEvent('app_open'); })
-          .catch((err) => { state.error = err.message || String(err); render(); });
+loadData()
+  .then(async () => {
+    render();
+    logEvent('app_open');
+    await handleCheckoutReturn();
+    await loadUnlocked();
+    render();
+  })
+  .catch((err) => { state.error = err.message || String(err); render(); });
 </script>
 </body>
 </html>
