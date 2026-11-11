@@ -50,7 +50,7 @@
     --fs-h1: clamp(1.875rem, 1.5rem + 1.8vw, 2.75rem);
     --fs-h2: clamp(1.5rem, 1.25rem + .8vw, 1.875rem);
     /* How far down the faded flag reaches, so page titles start below it */
-    --flag-clear: min(30vw, 220px);
+    --flag-clear: 47vw;
   }
   html, body { background: #f7f9fa; overscroll-behavior-y: contain; }
   body { -webkit-tap-highlight-color: transparent; color: #1B231E; }
@@ -78,8 +78,8 @@
         rgba(224,109,109,.55) 76.92%, rgba(224,109,109,.55) 84.61%,
         rgba(247,249,250,.20) 84.61%, rgba(247,249,250,.20) 92.30%,
         rgba(224,109,109,.55) 92.30%, rgba(224,109,109,.55) 100%);
-    -webkit-mask-image: linear-gradient(to bottom, #000 22%, transparent 60%);
-    mask-image: linear-gradient(to bottom, #000 22%, transparent 60%);
+    -webkit-mask-image: linear-gradient(to bottom, #000 70%, transparent 100%);
+    mask-image: linear-gradient(to bottom, #000 70%, transparent 100%);
   }
   /* Bigger, easier-to-read text (matches the Glide guide) */
   .big-text .t-sm { font-size: 1.125rem; line-height: 1.75rem; }
@@ -115,9 +115,9 @@
   h1, h2, h3 { text-wrap: balance; }
   p { text-wrap: pretty; }
   @media (min-width: 768px) {
-    :root { --flag-clear: 190px; }
+    :root { --flag-clear: 230px; }
     /* On wide screens the flag is a centered band instead of stretching across the whole window */
-    .flag-bg::before { left: 50%; right: auto; width: min(100%, 760px); transform: translateX(-50%); }
+    .flag-bg::before { left: 50%; right: auto; width: min(100%, 620px); transform: translateX(-50%); }
   }
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
@@ -635,14 +635,16 @@ const btnTertiary = `${btnBase} h-11 gap-2 px-5 bg-white text-primary shadow-car
 
 const eyebrow = (text) => `<p class="mb-3 t-xs font-semibold uppercase tracking-[0.12em] text-secondary">${esc(text)}</p>`;
 
-function accessBadge(l) {
+function accessBadge(l, compact = false) {
   const free = isFree(l);
-  return `<span class="inline-flex w-fit max-w-full items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 t-xs font-medium ring-1 ring-inset ${free ? 'bg-okweak text-okink ring-okink/15' : 'bg-infoweak text-infoink ring-infoink/15'}">${icon(free ? 'unlock' : 'lock', 'ico-xs')}<span class="truncate">${free ? 'Free access' : 'Paid access'}</span></span>`;
+  const sz = compact ? 'px-2 py-0.5 text-[13px] font-medium leading-tight' : 'whitespace-nowrap px-2.5 py-1 t-xs font-medium';
+  return `<span class="inline-flex w-fit max-w-full items-center gap-1 rounded-full ${sz} ring-1 ring-inset ${free ? 'bg-okweak text-okink ring-okink/15' : 'bg-infoweak text-infoink ring-infoink/15'}">${icon(free ? 'unlock' : 'lock', 'ico-xs')}<span class="${compact ? '' : 'truncate'}">${free ? 'Free access' : 'Paid access'}</span></span>`;
 }
 
-function roadBadge(l) {
+function roadBadge(l, compact = false) {
   const r = roadInfo(l);
-  return `<span class="inline-flex w-fit max-w-full items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 t-xs font-semibold ring-1 ring-inset ${r.tone}">${icon(r.icon, 'ico-sm')}<span class="truncate">${r.label}</span></span>`;
+  const sz = compact ? 'px-2 py-0.5 text-[13px] font-semibold leading-tight' : 'whitespace-nowrap px-2.5 py-1 t-xs font-semibold';
+  return `<span class="inline-flex w-fit max-w-full items-center gap-1 rounded-full ${sz} ring-1 ring-inset ${r.tone}">${icon(r.icon, compact ? 'ico-xs' : 'ico-sm')}<span class="${compact ? '' : 'truncate'}">${r.label}</span></span>`;
 }
 
 function excerpt(text, len = 116) {
@@ -668,30 +670,34 @@ function distanceUi(l) {
   return { label: `≈ ${fmtMi(d)}`, hint: state.roadFail[id] ? 'Couldn’t get road miles. Tap to retry.' : 'Straight line. Tap for road miles.' };
 }
 
+const btnTile = `${btnBase.replace('whitespace-nowrap', '')} min-h-11 w-full gap-1.5 px-3 py-2 text-center leading-tight bg-accent text-accentfg shadow-btn hover:bg-accenthover`;
+
 function cardHtml(l) {
   const ph = state.photos[l.id]?.[0];
   const du = distanceUi(l);
+  const src = ph ? photoUrl(ph.object_key) : '';
   return `
-  <article class="lift flex min-w-0 select-none flex-col overflow-hidden rounded-card bg-white shadow-card">
-    <a href="#/p/${l.id}" aria-label="Open ${esc(l.name)} details" class="relative block min-w-0">
-      ${media(ph ? photoUrl(ph.object_key) : '', ph ? l.name + ' field photo' : '', 'pin')}
-      <div class="absolute inset-x-3 top-3 flex flex-wrap items-center gap-1.5">${accessBadge(l)}${roadBadge(l)}</div>
+  <article class="lift flex min-w-0 select-none flex-col overflow-hidden rounded-tile bg-white shadow-card">
+    <a href="#/p/${l.id}" aria-label="Open ${esc(l.name)} details" class="relative block aspect-[4/5] min-w-0 overflow-hidden bg-inset md:aspect-[3/2]">
+      ${src
+        ? `<img loading="lazy" src="${esc(src)}" alt="${esc(l.name)} field photo" class="img-zoom absolute inset-0 h-full w-full object-cover">`
+        : `<div class="absolute inset-0 flex items-center justify-center text-tertiary">${icon('pin')}</div>`}
+      <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
+      <h3 class="absolute inset-x-0 bottom-0 line-clamp-2 p-3 font-display text-lg font-semibold leading-tight tracking-[-0.01em] text-white md:p-4 md:text-xl">${esc(l.name)}</h3>
     </a>
-    <div class="flex min-w-0 flex-1 flex-col gap-3 p-4">
-      ${hasCoords(l) ? `<span class="inline-flex items-center gap-1 t-xs text-secondary tabular-nums">${icon('pin', 'ico-xs')}<span>GPS:</span><span class="select-text" title="Long-press the coordinates to copy them">${Number(l.latitude).toFixed(5)}, ${Number(l.longitude).toFixed(5)}</span></span>` : ''}
-      <a href="#/p/${l.id}" class="block min-w-0">
-        <h3 class="truncate t-base font-semibold tracking-[-0.01em] text-primary">${esc(l.name)}</h3>
-        <p class="mt-1 t-sm text-secondary">${esc(excerpt(l.description))}</p>
-      </a>
+    <div class="flex min-w-0 flex-1 flex-col gap-2 p-3 md:p-4">
+      <div class="flex flex-col items-start gap-1.5">${accessBadge(l, true)}${roadBadge(l, true)}</div>
+      ${hasCoords(l) ? `<span class="inline-flex flex-wrap items-center gap-x-1 t-xs text-secondary tabular-nums">${icon('pin', 'ico-xs')}<span>GPS:</span><span class="select-text" title="Long-press the coordinates to copy them">${Number(l.latitude).toFixed(5)}, ${Number(l.longitude).toFixed(5)}</span></span>` : ''}
+      <div class="hidden md:block"><p class="clamp3 t-sm text-secondary">${esc(excerpt(l.description))}</p></div>
       <div class="mt-auto min-w-0 pt-1">
-        <button type="button" data-act="dist" data-id="${l.id}" aria-label="Show distance to ${esc(l.name)}" class="${btnPrimarySm}" ${du.busy ? 'disabled' : ''}>${icon('nav', 'ico-sm')}${esc(du.label)}</button>
+        <button type="button" data-act="dist" data-id="${l.id}" aria-label="Show distance to ${esc(l.name)}" class="${btnTile}" ${du.busy ? 'disabled' : ''}>${icon('nav', 'ico-sm')}${esc(du.label)}</button>
         ${du.hint ? `<p class="mt-2 t-xs text-secondary" role="status">${esc(du.hint)}</p>` : ''}
       </div>
     </div>
   </article>`;
 }
 
-const cardGrid = (items) => `<div class="grid grid-cols-1 gap-5 md:grid-cols-2 md:gap-6 lg:grid-cols-3">${items.map(cardHtml).join('')}</div>`;
+const cardGrid = (items) => `<div class="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-4">${items.map(cardHtml).join('')}</div>`;
 const showMore = (total, shown) => total > shown ? `<div class="text-center"><button type="button" data-act="more" class="${btnSecondary}">Show more places</button></div>` : '';
 
 // Shown only inside the Facebook, Messenger and Instagram browsers, where location often doesn't work
