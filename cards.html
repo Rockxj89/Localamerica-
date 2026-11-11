@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#15803D">
+<title>Local America · Cards</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+  // Same palette as the Traffic page
+  tailwind.config = { theme: { extend: {
+    fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'] },
+    colors: {
+      accent: '#15803D', accentfg: '#FFFFFF',
+      primary: '#1B231E', secondary: '#3F4A43', tertiary: '#5C675F',
+      page: '#f7f9fa', raised: '#FFFFFF', inset: '#EDF1EA',
+      line: '#D3DBD0', lineweak: '#E3E9E0', linestrong: '#AFBBAD',
+      okweak: '#E3F0E4', okink: '#1D5B2E',
+      infoweak: '#E2EDF3', infoink: '#1F4B66',
+      warnweak: '#F5EDD7', warnink: '#6A4A0E',
+      errweak: '#F6E2DF', errink: '#8A2A20'
+    }
+  } } };
+</script>
+<style>
+  html, body { background: #f7f9fa; }
+  body { -webkit-tap-highlight-color: transparent; color: #1B231E; }
+  .card { background: #fff; border: 1px solid #D3DBD0; border-radius: 0.75rem; padding: 1rem; }
+  select { width: 100%; border: 1px solid #D3DBD0; background: #fff; border-radius: 0.5rem; padding: 0.65rem 0.75rem; font-size: 1rem; }
+  button:disabled { opacity: 0.5; }
+</style>
+</head>
+<body class="font-sans">
+
+<header class="sticky top-0 z-40 bg-accent text-accentfg">
+  <div class="mx-auto flex max-w-3xl items-center justify-between gap-3 px-4 py-3">
+    <div class="min-w-0">
+      <p class="text-xs font-medium opacity-80">Local America · private</p>
+      <h1 class="text-lg font-bold leading-tight">Card Maker</h1>
+    </div>
+    <button id="signOutBtn" class="hidden rounded-full bg-white/15 px-3 py-1.5 text-sm font-semibold">Sign out</button>
+  </div>
+</header>
+
+<main id="view" class="mx-auto max-w-3xl px-4 pb-24 pt-5"></main>
+
+<script>
+// ================= CONFIG =================
+const CFG = {
+  SUPABASE_URL: 'https://ycdlxdijrlfsxvxksyrq.supabase.co',
+  SUPABASE_KEY: 'sb_publishable_2ExdXbNtW9HpuOGAq1Oa7g_gPdONH_s',
+  BUCKET: 'poi-photos'
+};
+
+// Same sign-in as the Traffic page, so signing in on one signs you in on the other.
+const sb = supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_KEY, {
+  auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: 'pkce', storageKey: 'la-traffic-auth' }
+});
+
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+
+const state = {
+  tab: 'make', user: null, loading: false, error: null,
+  locations: [], cards: [],
+  locationId: '', photoId: '', format: 'square', reuse: false,
+  previewUrl: '', previewError: '', busy: false, downloadError: ''
+};
+let renderToken = 0;
+
+// ================= SIGN IN =================
+function viewSignIn(msg) {
+  $('#signOutBtn').classList.add('hidden');
+  $('#view').innerHTML = `
+  <div class="card mx-auto mt-6 max-w-md text-center">
+    <h2 class="text-xl font-bold">Sign in to make cards</h2>
+    <p class="mt-2 text-secondary">This page is private. Sign in once and this phone stays signed in.</p>
+    ${msg ? `<p class="mt-4 rounded-lg bg-errweak p-3 text-sm text-errink">${esc(msg)}</p>` : ''}
+    <button id="googleBtn" class="mt-5 inline-flex w-full items-center justify-center gap-3 rounded-lg border border-linestrong bg-white px-4 py-3 font-semibold text-primary">
+      <svg viewBox="0 0 48 48" width="20" height="20" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>
+      Sign in with Google
+    </button>
+    <details class="mt-5 text-left">
+      <summary class="cursor-pointer text-center text-sm font-medium text-secondary underline underline-offset-2">Google not working? Email me a sign-in link</summary>
+      <form id="emailForm" class="mt-3 flex flex-col gap-2">
+        <input id="emailInput" type="email" required autocomplete="email" placeholder="Your email" class="rounded-lg border border-line bg-white px-3 py-2.5 text-base">
+        <button class="rounded-lg bg-accent px-4 py-2.5 font-semibold text-accentfg">Send link</button>
+        <p id="emailMsg" class="text-sm text-secondary"></p>
+      </form>
+    </details>
+  </div>`;
+  $('#googleBtn').onclick = async () => {
+    const { error } = await sb.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: location.origin + location.pathname, queryParams: { prompt: 'select_account' } }
+    });
+    if (error) viewSignIn(error.message);
+  };
+  $('#emailForm').onsubmit = async (e) => {
+    e.preventDefault();
+    $('#emailMsg').textContent = 'Sending…';
+    const { error } = await sb.auth.signInWithOtp({ email: $('#emailInput').value.trim(), options: { emailRedirectTo: location.origin + location.pathname } });
+    $('#emailMsg').textContent = error ? error.message : 'Check your email and tap the link. Open it on this phone.';
+  };
+}
+
+// ================= DATA =================
+async function notAllowed() {
+  const email = state.user && state.user.email;
+  await sb.auth.signOut();
+  state.user = null;
+  viewSignIn(`${email || 'That account'} is not allowed to see this page. Sign in with the Local America Gmail.`);
+}
+function isDenied(error) { return error && (error.code === '42501' || /not_allowed/.test(error.message || '')); }
+
+async function load() {
+  state.loading = true; state.error = null; render();
+  const [locs, cards] = await Promise.all([sb.rpc('card_maker_locations'), sb.rpc('card_maker_cards')]);
+  state.loading = false;
+  if (isDenied(locs.error) || isDenied(cards.error)) return notAllowed();
+  if (locs.error || cards.error) {
+    state.error = (locs.error || cards.error).message || 'Could not load locations.';
+  } else {
+    state.locations = locs.data || [];
+    state.cards = cards.data || [];
+    if (!state.locations.some((l) => String(l.id) === state.locationId)) state.locationId = state.locations[0] ? String(state.locations[0].id) : '';
+  }
+  render();
+}
+
+const photoSrc = (path) => `${CFG.SUPABASE_URL}/storage/v1/object/public/${CFG.BUCKET}/${String(path).split('/').map(encodeURIComponent).join('/')}`;
+const curLocation = () => state.locations.find((l) => String(l.id) === state.locationId);
+function curPhoto() {
+  const loc = curLocation();
+  if (!loc || !loc.photos.length) return null;
+  return loc.photos.find((p) => String(p.id) === state.photoId) || loc.photos[0];
+}
+function madeCard() {
+  const loc = curLocation(), photo = curPhoto();
+  if (!loc || !photo) return null;
+  return state.cards.find((c) => String(c.location_id) === String(loc.id) && String(c.photo_id) === String(photo.id) && c.format === state.format) || null;
+}
+
+// ================= CARD IMAGE (same design as the Glide card maker) =================
+const CARD_GREEN = '#173b2f', CARD_CREAM = '#f7f3e9';
+
+function loadPhoto(url) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error('The location photo could not be loaded.'));
+    img.src = url;
+  });
+}
+function drawCover(ctx, img, w, h) {
+  const scale = Math.max(w / img.width, h / img.height);
+  const sw = w / scale, sh = h / scale;
+  ctx.drawImage(img, (img.width - sw) / 2, (img.height - sh) / 2, sw, sh, 0, 0, w, h);
+}
+function wrapText(ctx, text, maxWidth, maxLines) {
+  const words = text.trim().split(/\s+/).filter(Boolean);
+  const lines = [];
+  let line = '';
+  for (const word of words) {
+    const cand = line ? `${line} ${word}` : word;
+    if (line && ctx.measureText(cand).width > maxWidth) { lines.push(line); line = word; } else { line = cand; }
+  }
+  if (line) lines.push(line);
+  if (lines.length > maxLines) {
+    const vis = lines.slice(0, maxLines);
+    let last = vis[maxLines - 1];
+    while (last.length > 0 && ctx.measureText(`${last}…`).width > maxWidth) last = last.slice(0, -1);
+    vis[maxLines - 1] = `${last.trimEnd()}…`;
+    return vis;
+  }
+  return lines;
+}
+async function renderCard(loc, photo, format) {
+  const sq = format === 'square';
+  const width = 1080, height = sq ? 1080 : 1920, photoHeight = sq ? 610 : 1010;
+  const img = await loadPhoto(photoSrc(photo.path));
+  const canvas = document.createElement('canvas');
+  canvas.width = width; canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Your browser could not prepare the card image.');
+  ctx.fillStyle = CARD_GREEN; ctx.fillRect(0, 0, width, height);
+  ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+  drawCover(ctx, img, width, photoHeight);
+
+  const inset = sq ? 66 : 82;
+  const avail = width - inset * 2;
+  let y = photoHeight + (sq ? 58 : 82);
+  ctx.textBaseline = 'top';
+  ctx.fillStyle = '#d9e8d8';
+  ctx.font = `600 ${sq ? 25 : 29}px system-ui, sans-serif`;
+  ctx.fillText('LOCAL AMERICA  ·  MARK TWAIN NATIONAL FOREST', inset, y);
+  y += sq ? 48 : 62;
+
+  ctx.fillStyle = CARD_CREAM;
+  ctx.font = `700 ${sq ? 58 : 68}px system-ui, sans-serif`;
+  for (const line of wrapText(ctx, loc.name, avail, 2)) { ctx.fillText(line, inset, y); y += sq ? 68 : 80; }
+
+  ctx.fillStyle = '#c3d6c7';
+  ctx.font = `500 ${sq ? 29 : 34}px system-ui, sans-serif`;
+  y += 8;
+  ctx.fillText(loc.category, inset, y);
+  y += sq ? 58 : 76;
+
+  const note = (loc.description || '').trim() || 'A place to explore in the Mark Twain National Forest region.';
+  ctx.fillStyle = CARD_CREAM;
+  ctx.font = `400 ${sq ? 31 : 36}px system-ui, sans-serif`;
+  for (const line of wrapText(ctx, note, avail, sq ? 3 : 6)) { ctx.fillText(line, inset, y); y += sq ? 42 : 50; }
+
+  if (loc.latitude !== null && loc.longitude !== null) {
+    const gpsY = Math.max(y + 28, height - (sq ? 94 : 142));
+    ctx.fillStyle = '#d9e8d8';
+    ctx.font = `600 ${sq ? 25 : 29}px system-ui, sans-serif`;
+    ctx.fillText('GPS COORDINATES', inset, gpsY);
+    ctx.fillStyle = CARD_CREAM;
+    ctx.font = `500 ${sq ? 31 : 38}px system-ui, sans-serif`;
+    ctx.fillText(`${Number(loc.latitude).toFixed(5)}, ${Number(loc.longitude).toFixed(5)}`, inset, gpsY + (sq ? 36 : 46));
+  }
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('The card image could not be created.'))), 'image/png');
+  });
+}
+function downloadBlob(blob, name, format) {
+  const safe = name.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `local-america-${safe || 'location'}-${format}.png`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// ================= PREVIEW =================
+async function refreshPreview() {
+  const token = ++renderToken;
+  const loc = curLocation(), photo = curPhoto();
+  if (state.previewUrl) { URL.revokeObjectURL(state.previewUrl); state.previewUrl = ''; }
+  state.previewError = '';
+  if (!loc || !photo) { paintPreview(); return; }
+  paintPreview('Preparing the card preview…');
+  try {
+    const blob = await renderCard(loc, photo, state.format);
+    if (token !== renderToken) return;
+    state.previewUrl = URL.createObjectURL(blob);
+  } catch (e) {
+    if (token !== renderToken) return;
+    state.previewError = e.message || 'The card preview could not be made.';
+  }
+  paintPreview();
+}
+function paintPreview(busyText) {
+  const box = $('#previewBox');
+  if (!box) return;
+  const loc = curLocation();
+  if (state.previewUrl) {
+    box.innerHTML = `<div class="mx-auto w-full max-w-md overflow-hidden rounded-lg border border-line bg-white"><img src="${state.previewUrl}" alt="Preview card for ${esc(loc && loc.name)}" class="block w-full"></div>`;
+  } else if (state.previewError) {
+    box.innerHTML = `<p role="alert" class="text-sm text-errink">${esc(state.previewError)}</p>`;
+  } else if (loc && !loc.photos.length) {
+    box.innerHTML = `<div class="card text-sm text-secondary"><b class="block text-primary">Photo needed</b>Choose a location with an imported photo to create a social card.</div>`;
+  } else {
+    box.innerHTML = `<div class="card text-sm text-secondary">${esc(busyText || 'Preparing the card preview…')}</div>`;
+  }
+}
+
+// ================= PAGES =================
+function tabs() {
+  const t = (id, label) => `<button data-tab="${id}" class="flex-1 rounded-full px-3 py-2 text-sm font-semibold ${state.tab === id ? 'bg-accent text-accentfg' : 'border border-line bg-white text-primary'}">${label}</button>`;
+  return `<div class="flex gap-2">${t('make', 'Make a card')}${t('recent', 'Recent Cards')}</div>`;
+}
+
+function viewMake() {
+  const loc = curLocation(), photo = curPhoto(), made = madeCard();
+  const free = loc && String(loc.access).toLowerCase() === 'free';
+  const reusing = state.reuse && made;
+  const canDownload = photo && !state.busy && (!made || reusing);
+  const label = reusing ? 'Download again' : made ? 'Already made' : 'Download PNG card';
+  return `
+  <h2 class="mt-5 text-xl font-bold">Make a location card</h2>
+  <div class="mt-4 grid grid-cols-1 gap-6 md:grid-cols-2">
+    <section class="min-w-0 space-y-5">
+      <div class="space-y-1.5"><label for="selLoc" class="text-sm font-semibold">Location</label>
+        <select id="selLoc">${state.locations.map((l) => `<option value="${l.id}" ${String(l.id) === state.locationId ? 'selected' : ''}>${esc(l.name)} · ${esc(l.category)}</option>`).join('')}</select></div>
+      ${loc.photos.length ? `<div class="space-y-1.5"><label for="selPhoto" class="text-sm font-semibold">Photo</label>
+        <select id="selPhoto">${loc.photos.map((p, i) => `<option value="${p.id}" ${photo && String(p.id) === String(photo.id) ? 'selected' : ''}>Photo ${i + 1} · ${esc(p.filename)}</option>`).join('')}</select></div>` : ''}
+      <div class="space-y-1.5"><label for="selFormat" class="text-sm font-semibold">Social format</label>
+        <select id="selFormat">
+          <option value="square" ${state.format === 'square' ? 'selected' : ''}>Square post · 1080 × 1080</option>
+          <option value="story" ${state.format === 'story' ? 'selected' : ''}>Portrait story · 1080 × 1920</option>
+        </select></div>
+      <div class="space-y-1.5">
+        <h3 class="text-lg font-semibold">Card details</h3>
+        <p class="text-sm text-secondary">${esc(loc.name)} · ${esc(loc.category)}</p>
+        <p class="text-sm text-secondary">${esc(loc.description || 'No field notes have been added.')}</p>
+        ${loc.latitude !== null && loc.longitude !== null ? `<p class="text-sm text-secondary">GPS: ${Number(loc.latitude).toFixed(5)}, ${Number(loc.longitude).toFixed(5)}</p>` : ''}
+        ${free ? `<span class="inline-block rounded px-2 py-0.5 text-xs font-semibold bg-okweak text-okink">Free access</span>` : `<span class="inline-block rounded px-2 py-0.5 text-xs font-semibold bg-infoweak text-infoink">Card maker only</span>`}
+      </div>
+      ${!loc.photos.length ? `<p class="text-sm text-warnink">This location has no imported photo yet, so it cannot be exported as a picture card.</p>` : ''}
+      ${made ? `<div class="space-y-2 rounded-lg bg-okweak p-3 text-sm text-okink"><b>Already made</b>
+        <p>You made this exact card on ${esc(new Date(made.created_at).toLocaleDateString())}. It will not be added twice.</p>
+        ${reusing ? '' : `<button id="openRecent" class="rounded-full border border-linestrong bg-white px-3 py-1.5 font-semibold text-primary">Open Recent Cards</button>`}</div>` : ''}
+      ${state.downloadError ? `<p role="alert" class="text-sm text-errink">${esc(state.downloadError)}</p>` : ''}
+      <button id="dlBtn" class="w-full rounded-lg bg-accent px-4 py-3 font-semibold text-accentfg" ${canDownload ? '' : 'disabled'}>${state.busy ? 'Working…' : label}</button>
+    </section>
+    <section class="min-w-0 space-y-3">
+      <h3 class="text-lg font-semibold">Preview</h3>
+      <div id="previewBox"></div>
+    </section>
+  </div>`;
+}
+
+function viewRecent() {
+  const cards = state.cards;
+  return `
+  <h2 class="mt-5 text-xl font-bold">Recent Cards</h2>
+  <p class="mt-1 text-sm text-secondary">Cards you have made. Tap one to download it again. This list also prevents repeats.</p>
+  ${cards.length ? `<div class="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">${cards.map((c, i) => `
+    <button data-card="${i}" class="card overflow-hidden p-0 text-left">
+      <img src="${photoSrc(c.photo_path)}" alt="" loading="lazy" class="block aspect-[4/3] w-full object-cover">
+      <div class="p-3"><p class="font-semibold leading-tight">${esc(c.location_name)}</p>
+      <p class="mt-1 text-xs text-secondary">${esc(c.category)} · ${c.format === 'square' ? 'Square post' : 'Portrait story'} · ${esc(new Date(c.created_at).toLocaleDateString())}</p></div>
+    </button>`).join('')}</div>`
+  : `<div class="card mt-4 text-sm text-secondary"><b class="block text-primary">No cards made yet</b>Make a location card and it will be saved here.</div>`}`;
+}
+
+function render() {
+  $('#signOutBtn').classList.remove('hidden');
+  const v = $('#view');
+  if (state.error) { v.innerHTML = `<div class="rounded-lg bg-errweak p-4 text-sm text-errink"><b>Could not load.</b><p class="mt-1">${esc(state.error)}</p><button id="retryBtn" class="mt-3 rounded-full bg-white px-3 py-1.5 font-semibold text-primary">Try again</button></div>`; $('#retryBtn').onclick = load; return; }
+  if (state.loading && !state.locations.length) { v.innerHTML = `<p class="py-16 text-center text-secondary">Loading locations…</p>`; return; }
+  if (!state.locations.length) { v.innerHTML = `<p class="py-16 text-center text-secondary">No locations available.</p>`; return; }
+  v.innerHTML = tabs() + (state.tab === 'make' ? viewMake() : viewRecent());
+  if (state.tab === 'make') refreshPreview();
+}
+
+// ================= ACTIONS =================
+async function download() {
+  const loc = curLocation(), photo = curPhoto(), made = madeCard();
+  if (!loc || !photo || state.busy) return;
+  const reusing = state.reuse && made;
+  if (made && !reusing) return;
+  state.busy = true; state.downloadError = ''; render();
+  try {
+    const blob = await renderCard(loc, photo, state.format);
+    if (!made) {
+      const { data, error } = await sb.rpc('card_maker_save', { p_location: loc.id, p_photo: photo.id, p_format: state.format });
+      if (isDenied(error)) return notAllowed();
+      if (error) throw new Error('The card could not be saved.');
+      const cards = await sb.rpc('card_maker_cards');
+      if (!cards.error) state.cards = cards.data || [];
+      if (!data.created) { state.downloadError = 'This card was already made. Open Recent Cards to download it again.'; return; }
+    }
+    downloadBlob(blob, loc.name, state.format);
+  } catch (e) {
+    state.downloadError = e.message || 'The card could not be downloaded.';
+  } finally {
+    state.busy = false; if (state.user) render();
+  }
+}
+
+document.addEventListener('change', (e) => {
+  if (e.target.id === 'selLoc') { state.locationId = e.target.value; state.photoId = ''; state.reuse = false; state.downloadError = ''; render(); }
+  if (e.target.id === 'selPhoto') { state.photoId = e.target.value; state.reuse = false; state.downloadError = ''; render(); }
+  if (e.target.id === 'selFormat') { state.format = e.target.value; state.reuse = false; state.downloadError = ''; render(); }
+});
+document.addEventListener('click', (e) => {
+  const tab = e.target.closest('[data-tab]');
+  if (tab) { state.tab = tab.dataset.tab; state.downloadError = ''; return render(); }
+  const card = e.target.closest('[data-card]');
+  if (card) {
+    const c = state.cards[Number(card.dataset.card)];
+    state.locationId = String(c.location_id); state.photoId = String(c.photo_id); state.format = c.format;
+    state.reuse = true; state.tab = 'make'; state.downloadError = '';
+    return render();
+  }
+  if (e.target.closest('#openRecent')) { state.tab = 'recent'; return render(); }
+  if (e.target.closest('#dlBtn')) return download();
+});
+$('#signOutBtn').onclick = async () => { await sb.auth.signOut(); state.user = null; state.locations = []; state.cards = []; viewSignIn(); };
+
+// ================= START =================
+(async function start() {
+  const params = new URLSearchParams(location.search + location.hash.replace(/^#/, '&'));
+  const authErr = params.get('error_description');
+  const { data: { session } } = await sb.auth.getSession();
+  if (location.search || location.hash) history.replaceState(null, '', location.pathname);
+  if (!session) return viewSignIn(authErr ? decodeURIComponent(authErr.replace(/\+/g, ' ')) : '');
+  state.user = session.user;
+  load();
+})();
+
+sb.auth.onAuthStateChange((event, session) => {
+  if (event === 'SIGNED_IN' && session && !state.user) { state.user = session.user; load(); }
+  if (event === 'SIGNED_OUT') { state.user = null; }
+});
+</script>
+</body>
+</html>
