@@ -9,7 +9,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com/3.4.17"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <!-- Meta (Facebook) Pixel: same pixel as the Glide guide -->
@@ -17,7 +17,18 @@
 <script>
   // Same palette as the Glide guide
   tailwind.config = { theme: { extend: {
-    fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'] },
+    fontFamily: {
+      sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+      display: ['Fraunces', 'ui-serif', 'Georgia', 'serif']
+    },
+    borderRadius: { card: '20px', tile: '16px' },
+    boxShadow: {
+      ring: '0 0 0 1px rgb(27 35 30 / .08)',
+      card: '0 0 0 1px rgb(27 35 30 / .06), 0 1px 2px rgb(27 35 30 / .05), 0 4px 12px rgb(27 35 30 / .05)',
+      lift: '0 0 0 1px rgb(27 35 30 / .06), 0 2px 4px rgb(27 35 30 / .06), 0 12px 28px rgb(27 35 30 / .10)',
+      float: '0 0 0 1px rgb(27 35 30 / .06), 0 8px 24px rgb(27 35 30 / .12), 0 24px 56px rgb(27 35 30 / .14)',
+      btn: 'inset 0 1px 0 rgb(255 255 255 / .15), 0 1px 2px rgb(0 0 0 / .18)'
+    },
     colors: {
       accent: '#15803D', accentfg: '#FFFFFF', accenthover: '#166534', warn: '#F5A524',
       primary: '#1B231E', secondary: '#3F4A43', tertiary: '#5C675F',
@@ -31,6 +42,16 @@
   } } };
 </script>
 <style>
+  :root {
+    --ease-out: cubic-bezier(.2, .8, .2, 1);
+    --dur-fast: 150ms; --dur-base: 220ms; --dur-slow: 400ms;
+    --shadow-lift: 0 0 0 1px rgb(27 35 30 / .06), 0 2px 4px rgb(27 35 30 / .06), 0 12px 28px rgb(27 35 30 / .10);
+    --fs-display: clamp(2.25rem, 1.6rem + 3vw, 3.75rem);
+    --fs-h1: clamp(1.875rem, 1.5rem + 1.8vw, 2.75rem);
+    --fs-h2: clamp(1.5rem, 1.25rem + .8vw, 1.875rem);
+    /* How far down the faded flag reaches, so page titles start below it */
+    --flag-clear: min(30vw, 220px);
+  }
   html, body { background: #f7f9fa; overscroll-behavior-y: contain; }
   body { -webkit-tap-highlight-color: transparent; color: #1B231E; }
   /* Faded American flag across the top of the page, like the Glide app */
@@ -57,8 +78,8 @@
         rgba(224,109,109,.55) 76.92%, rgba(224,109,109,.55) 84.61%,
         rgba(247,249,250,.20) 84.61%, rgba(247,249,250,.20) 92.30%,
         rgba(224,109,109,.55) 92.30%, rgba(224,109,109,.55) 100%);
-    -webkit-mask-image: linear-gradient(to bottom, #000 70%, transparent 100%);
-    mask-image: linear-gradient(to bottom, #000 70%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to bottom, #000 22%, transparent 60%);
+    mask-image: linear-gradient(to bottom, #000 22%, transparent 60%);
   }
   /* Bigger, easier-to-read text (matches the Glide guide) */
   .big-text .t-sm { font-size: 1.125rem; line-height: 1.75rem; }
@@ -72,6 +93,36 @@
   /* Round dark buttons in the full-screen photo viewer */
   .pvb { display: flex; width: 2.75rem; height: 2.75rem; align-items: center; justify-content: center; border-radius: 9999px; background: rgba(0,0,0,.6); color: #fff; }
   .pvb.hidden { display: none; }
+
+  /* ---- Modern look: motion, depth, feedback ---- */
+  .lift { transition: transform var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out); }
+  .img-zoom { transition: transform var(--dur-slow) var(--ease-out); }
+  @media (hover: hover) {
+    .lift:hover { transform: translateY(-2px); box-shadow: var(--shadow-lift); }
+    .lift:hover .img-zoom { transform: scale(1.04); }
+    .navlink:hover { background: rgb(27 35 30 / .06); }
+  }
+  .press { transition: transform var(--dur-fast) var(--ease-out), background-color var(--dur-fast), box-shadow var(--dur-base); }
+  .press:active { transform: scale(.98); }
+  a:focus-visible, button:focus-visible, select:focus-visible { outline: 2px solid #15803D; outline-offset: 2px; }
+  .navlink[aria-current="page"] { background: rgb(21 128 61 / .12); color: #166534; }
+  /* Pages whose title would land on the flag start just below it */
+  #view[data-page="list"], #view[data-page="near"], #view[data-page="p"], #view[data-page="safety"] { padding-top: calc(var(--flag-clear) - 1.5rem); }
+  .view-enter { animation: view-in var(--dur-slow) var(--ease-out); }
+  @keyframes view-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+  .skel { background: linear-gradient(90deg, rgb(27 35 30 / .06) 25%, rgb(27 35 30 / .11) 37%, rgb(27 35 30 / .06) 63%); background-size: 400% 100%; animation: shimmer 1.6s ease infinite; }
+  @keyframes shimmer { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
+  h1, h2, h3 { text-wrap: balance; }
+  p { text-wrap: pretty; }
+  @media (min-width: 768px) {
+    :root { --flag-clear: 190px; }
+    /* On wide screens the flag is a centered band instead of stretching across the whole window */
+    .flag-bg::before { left: 50%; right: auto; width: min(100%, 760px); transform: translateX(-50%); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+    .lift:hover, .press:active { transform: none; }
+  }
 </style>
 </head>
 <body class="font-sans">
@@ -79,41 +130,43 @@
 <div id="app" class="flag-bg big-text">
 
   <!-- Desktop top bar (hidden on phones, like Glide) -->
-  <nav class="hidden md:block sticky top-0 z-50 bg-accent">
-    <div class="grid grid-cols-[minmax(14rem,1fr)_auto_1fr] items-center gap-4 min-h-[4rem] px-4 mx-auto max-w-[1200px]">
-      <a href="#/" class="text-base font-semibold text-accentfg">Local America</a>
+  <nav class="hidden md:block sticky top-0 z-50 bg-white/75 shadow-ring backdrop-blur-xl backdrop-saturate-150">
+    <div class="grid grid-cols-[minmax(14rem,1fr)_auto_1fr] items-center gap-4 min-h-[4rem] px-8 mx-auto max-w-[1200px]">
+      <a href="#/" class="font-display text-lg font-semibold tracking-[-0.01em] text-primary">Local America</a>
       <div class="flex items-center gap-1">
-        <a data-nav="home"  href="#/"      class="px-3 py-1.5 rounded-lg text-sm font-medium text-accentfg">Home</a>
-        <a data-nav="near"  href="#/near"  class="px-3 py-1.5 rounded-lg text-sm font-medium text-accentfg">Near Me</a>
-        <a data-nav="about" href="#/about" class="px-3 py-1.5 rounded-lg text-sm font-medium text-accentfg">About</a>
+        <a data-nav="home"  href="#/"      class="navlink press rounded-full px-4 py-2 text-[15px] font-medium text-secondary">Home</a>
+        <a data-nav="near"  href="#/near"  class="navlink press rounded-full px-4 py-2 text-[15px] font-medium text-secondary">Near Me</a>
+        <a data-nav="about" href="#/about" class="navlink press rounded-full px-4 py-2 text-[15px] font-medium text-secondary">About</a>
       </div>
       <div></div>
     </div>
   </nav>
 
-  <div class="relative z-10 mx-auto w-full max-w-[1200px] px-4 pb-4 pt-8 text-primary">
+  <div class="relative z-10 mx-auto w-full max-w-[1200px] px-5 pb-4 pt-6 text-primary md:px-8">
     <main id="view"></main>
-    <aside aria-label="Coordinate note" class="mt-8 py-3 t-sm text-secondary">Coordinates get you close, not always exact. Finding the spot is part of the fun.</aside>
   </div>
 
-  <footer class="relative z-10 mx-auto w-full max-w-[1200px] px-4 pb-32">
+  <footer class="relative z-10 mx-auto w-full max-w-[1200px] px-5 pb-36 md:px-8">
     <div id="installCard"></div>
-    <div class="mt-4 flex flex-col gap-3 py-4 t-sm text-secondary md:flex-row md:items-center md:justify-between">
-      <p>Use this guide as a starting point, never as your only navigation source.</p>
-      <div class="flex flex-wrap items-center gap-x-6 gap-y-2">
-        <a href="#/about/contact" class="inline-flex items-center gap-2 font-medium text-primary hover:underline">Contact</a>
-        <a href="#/safety" class="inline-flex items-center gap-2 font-medium text-primary hover:underline">Read Safety &amp; Terms <span data-icon="arrow" class="contents"></span></a>
+    <div class="mt-8 space-y-3 border-t border-black/5 pt-6 t-sm text-secondary">
+      <p aria-label="Coordinate note">Coordinates get you close, not always exact. Finding the spot is part of the fun.</p>
+      <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <p>Use this guide as a starting point, never as your only navigation source.</p>
+        <div class="flex flex-wrap items-center gap-x-6 gap-y-2">
+          <a href="#/about/contact" class="inline-flex items-center gap-2 font-medium text-primary underline decoration-black/20 underline-offset-4 hover:decoration-current">Contact</a>
+          <a href="#/safety" class="inline-flex items-center gap-2 font-medium text-primary underline decoration-black/20 underline-offset-4 hover:decoration-current">Read Safety &amp; Terms <span data-icon="arrow" class="contents"></span></a>
+        </div>
       </div>
     </div>
   </footer>
 
   <!-- Phone nav: floating green pill at the bottom -->
-  <nav class="md:hidden fixed left-1/2 -translate-x-1/2 z-50 rounded-full bg-accent p-1 w-[16rem] max-w-[calc(100%-16px)]"
+  <nav class="md:hidden fixed left-1/2 -translate-x-1/2 z-50 rounded-full bg-white/80 p-1.5 shadow-float backdrop-blur-xl backdrop-saturate-150 w-[17.5rem] max-w-[calc(100%-16px)]"
        style="bottom: max(0.5rem, calc(env(safe-area-inset-bottom, 0px) - 13px));">
     <div class="flex items-center gap-1">
-      <a data-nav="home"  href="#/"      class="flex-1 flex flex-col items-center gap-0.5 rounded-full px-2 py-1.5 text-xs font-semibold text-accentfg"><span data-icon="house" class="contents"></span>Home</a>
-      <a data-nav="near"  href="#/near"  class="flex-1 flex flex-col items-center gap-0.5 rounded-full px-2 py-1.5 text-xs font-semibold text-accentfg"><span data-icon="nav" class="contents"></span>Near Me</a>
-      <a data-nav="about" href="#/about" class="flex-1 flex flex-col items-center gap-0.5 rounded-full px-2 py-1.5 text-xs font-semibold text-accentfg"><span data-icon="book" class="contents"></span>About</a>
+      <a data-nav="home"  href="#/"      class="navlink press flex-1 flex flex-col items-center gap-0.5 rounded-full px-2 py-1.5 text-xs font-semibold text-secondary"><span data-icon="house" class="contents"></span>Home</a>
+      <a data-nav="near"  href="#/near"  class="navlink press flex-1 flex flex-col items-center gap-0.5 rounded-full px-2 py-1.5 text-xs font-semibold text-secondary"><span data-icon="nav" class="contents"></span>Near Me</a>
+      <a data-nav="about" href="#/about" class="navlink press flex-1 flex flex-col items-center gap-0.5 rounded-full px-2 py-1.5 text-xs font-semibold text-secondary"><span data-icon="book" class="contents"></span>About</a>
     </div>
   </nav>
 </div>
@@ -134,7 +187,7 @@
 </div>
 
 <div id="toast" class="hidden fixed bottom-24 inset-x-0 z-[60] flex justify-center pointer-events-none">
-  <div class="bg-primary text-white text-sm rounded-full px-4 py-2 shadow-lg"></div>
+  <div class="bg-primary text-white text-base rounded-full px-5 py-2.5 shadow-float"></div>
 </div>
 
 <script>
@@ -265,9 +318,9 @@ function photoUrl(key) {
 // Road access badge: same rules, wording and colors as the Glide guide.
 // Anything not listed is treated as "rough" until the road has been verified.
 const ROAD = {
-  easy:  { label: 'Easy access', detail: 'Reachable by any vehicle.', tone: 'bg-accent text-accentfg', icon: 'car' },
-  walk:  { label: 'Walk-in only', detail: 'No vehicle access. Plan to hike in.', tone: 'bg-warn text-black', icon: 'feet' },
-  rough: { label: 'Rough roads likely', detail: 'Road not verified. Plan for unpaved, rough roads. High clearance or 4WD recommended.', tone: 'bg-[#B42318] text-white', icon: 'truck' }
+  easy:  { label: 'Easy access', detail: 'Reachable by any vehicle.', tone: 'bg-okweak text-okink ring-okink/15', icon: 'car' },
+  walk:  { label: 'Walk-in only', detail: 'No vehicle access. Plan to hike in.', tone: 'bg-warnweak text-warnink ring-warnink/20', icon: 'feet' },
+  rough: { label: 'Rough roads likely', detail: 'Road not verified. Plan for unpaved, rough roads. High clearance or 4WD recommended.', tone: 'bg-errweak text-errink ring-errink/15', icon: 'truck' }
 };
 const ROAD_BY_CATEGORY = {
   'Buildings and stores': 'easy', 'Open Stores': 'easy', 'Popular locations': 'easy',
@@ -301,11 +354,11 @@ function locErrText(reason) {
   return 'We couldn’t get your location. Try again.';
 }
 
-// Photo tile with a 4:3 shape, like Glide's Media component
-function media(src, alt, iconName) {
+// Photo tile (16:10 by default). The parent rounds the corners.
+function media(src, alt, iconName, aspect = 'aspect-[16/10]') {
   return src
-    ? `<div class="aspect-[4/3] w-full overflow-hidden rounded-lg bg-inset"><img loading="lazy" src="${esc(src)}" alt="${esc(alt)}" class="h-full w-full object-cover"></div>`
-    : `<div class="aspect-[4/3] w-full rounded-lg bg-inset flex items-center justify-center text-tertiary">${icon(iconName)}</div>`;
+    ? `<div class="relative ${aspect} w-full overflow-hidden bg-inset"><img loading="lazy" src="${esc(src)}" alt="${esc(alt)}" class="img-zoom h-full w-full object-cover"></div>`
+    : `<div class="${aspect} w-full bg-inset flex items-center justify-center text-tertiary">${icon(iconName)}</div>`;
 }
 
 // ================= STATE =================
@@ -573,23 +626,23 @@ Object.assign(state, { roadBusy: {}, roadFail: {}, cardAsk: null, locReason: nul
 
 // ================= VIEW PIECES =================
 // Buttons: same shapes and sizes as the Glide guide
-const btnBase = 'cursor-pointer inline-flex items-center justify-center whitespace-nowrap rounded-lg text-sm font-semibold shrink-0 transition-all disabled:opacity-50 disabled:pointer-events-none';
-const btnPrimary = `${btnBase} h-9 gap-2 px-4 bg-accent text-accentfg hover:bg-accenthover`;
-const btnPrimarySm = `${btnBase} h-8 gap-1.5 px-3 bg-accent text-accentfg hover:bg-accenthover`;
-const btnPrimaryLg = `${btnBase} h-10 gap-2 px-5 bg-accent text-accentfg hover:bg-accenthover`;
-const btnSecondary = `${btnBase} h-9 gap-2 px-4 bg-inset text-primary hover:bg-line`;
-const btnTertiary = `${btnBase} h-9 gap-2 px-4 border border-line bg-page text-primary hover:bg-inset`;
+const btnBase = 'press cursor-pointer inline-flex items-center justify-center whitespace-nowrap rounded-full text-base font-semibold shrink-0 transition disabled:opacity-50 disabled:pointer-events-none';
+const btnPrimary = `${btnBase} h-11 gap-2 px-5 bg-accent text-accentfg shadow-btn hover:bg-accenthover`;
+const btnPrimarySm = `${btnBase} h-11 gap-2 px-4 bg-accent text-accentfg shadow-btn hover:bg-accenthover`;
+const btnPrimaryLg = `${btnBase} h-12 gap-2 px-6 bg-accent text-accentfg shadow-btn hover:bg-accenthover`;
+const btnSecondary = `${btnBase} h-11 gap-2 px-5 bg-white text-primary shadow-card hover:shadow-lift`;
+const btnTertiary = `${btnBase} h-11 gap-2 px-5 bg-white text-primary shadow-card hover:shadow-lift`;
 
 const eyebrow = (text) => `<p class="mb-3 t-xs font-semibold uppercase tracking-[0.12em] text-secondary">${esc(text)}</p>`;
 
 function accessBadge(l) {
   const free = isFree(l);
-  return `<span class="inline-flex w-fit max-w-full items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 t-xs font-medium ${free ? 'bg-okweak text-okink' : 'bg-infoweak text-infoink'}">${icon(free ? 'unlock' : 'lock', 'ico-xs')}<span class="truncate">${free ? 'Free access' : 'Paid access'}</span></span>`;
+  return `<span class="inline-flex w-fit max-w-full items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 t-xs font-medium ring-1 ring-inset ${free ? 'bg-okweak text-okink ring-okink/15' : 'bg-infoweak text-infoink ring-infoink/15'}">${icon(free ? 'unlock' : 'lock', 'ico-xs')}<span class="truncate">${free ? 'Free access' : 'Paid access'}</span></span>`;
 }
 
 function roadBadge(l) {
   const r = roadInfo(l);
-  return `<span class="inline-flex w-fit max-w-full items-center gap-1 whitespace-nowrap rounded-full px-3 py-1 t-sm font-semibold ${r.tone}">${icon(r.icon, 'ico-sm')}<span class="truncate">${r.label}</span></span>`;
+  return `<span class="inline-flex w-fit max-w-full items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 t-xs font-semibold ring-1 ring-inset ${r.tone}">${icon(r.icon, 'ico-sm')}<span class="truncate">${r.label}</span></span>`;
 }
 
 function excerpt(text, len = 116) {
@@ -619,20 +672,18 @@ function cardHtml(l) {
   const ph = state.photos[l.id]?.[0];
   const du = distanceUi(l);
   return `
-  <article class="flex min-w-0 select-none flex-col gap-4">
-    <a href="#/p/${l.id}" aria-label="Open ${esc(l.name)} details" class="block min-w-0 overflow-hidden rounded-lg hover:opacity-90">${media(ph ? photoUrl(ph.object_key) : '', ph ? l.name + ' field photo' : '', 'pin')}</a>
-    <div class="min-w-0 space-y-3">
-      <div class="min-w-0 space-y-2">
-        <div class="flex flex-wrap items-center gap-2">${accessBadge(l)}${roadBadge(l)}</div>
-        ${hasCoords(l) ? `<span class="inline-flex items-center gap-1 t-xs text-secondary">${icon('pin', 'ico-xs')}<span>GPS:</span><span class="select-text" title="Long-press the coordinates to copy them">${Number(l.latitude).toFixed(5)}, ${Number(l.longitude).toFixed(5)}</span></span>` : ''}
-      </div>
+  <article class="lift flex min-w-0 select-none flex-col overflow-hidden rounded-card bg-white shadow-card">
+    <a href="#/p/${l.id}" aria-label="Open ${esc(l.name)} details" class="relative block min-w-0">
+      ${media(ph ? photoUrl(ph.object_key) : '', ph ? l.name + ' field photo' : '', 'pin')}
+      <div class="absolute inset-x-3 top-3 flex flex-wrap items-center gap-1.5">${accessBadge(l)}${roadBadge(l)}</div>
+    </a>
+    <div class="flex min-w-0 flex-1 flex-col gap-3 p-4">
+      ${hasCoords(l) ? `<span class="inline-flex items-center gap-1 t-xs text-secondary tabular-nums">${icon('pin', 'ico-xs')}<span>GPS:</span><span class="select-text" title="Long-press the coordinates to copy them">${Number(l.latitude).toFixed(5)}, ${Number(l.longitude).toFixed(5)}</span></span>` : ''}
       <a href="#/p/${l.id}" class="block min-w-0">
-        <h3 class="truncate t-base font-semibold text-primary">${esc(l.name)}</h3>
-        <p class="t-sm text-secondary">${esc(excerpt(l.description))}</p>
+        <h3 class="truncate t-base font-semibold tracking-[-0.01em] text-primary">${esc(l.name)}</h3>
+        <p class="mt-1 t-sm text-secondary">${esc(excerpt(l.description))}</p>
       </a>
-    </div>
-    <div class="grid grid-cols-2 items-end gap-3">
-      <div class="min-w-0">
+      <div class="mt-auto min-w-0 pt-1">
         <button type="button" data-act="dist" data-id="${l.id}" aria-label="Show distance to ${esc(l.name)}" class="${btnPrimarySm}" ${du.busy ? 'disabled' : ''}>${icon('nav', 'ico-sm')}${esc(du.label)}</button>
         ${du.hint ? `<p class="mt-2 t-xs text-secondary" role="status">${esc(du.hint)}</p>` : ''}
       </div>
@@ -640,7 +691,7 @@ function cardHtml(l) {
   </article>`;
 }
 
-const cardGrid = (items) => `<div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">${items.map(cardHtml).join('')}</div>`;
+const cardGrid = (items) => `<div class="grid grid-cols-1 gap-5 md:grid-cols-2 md:gap-6 lg:grid-cols-3">${items.map(cardHtml).join('')}</div>`;
 const showMore = (total, shown) => total > shown ? `<div class="text-center"><button type="button" data-act="more" class="${btnSecondary}">Show more places</button></div>` : '';
 
 // Shown only inside the Facebook, Messenger and Instagram browsers, where location often doesn't work
@@ -675,39 +726,50 @@ function logoSvg(matrix) {
 // ================= SCREENS =================
 function viewHome() {
   const total = state.locs.length;
+  // Popular locations leads as the big tile; the rest stay in A to Z order
+  const cats = state.cats.slice().sort((a, b) => (b.name === 'Popular locations') - (a.name === 'Popular locations'));
+  const lastWide = (cats.length - 1) % 2 === 1;
+  const tile = (c, i) => {
+    const wide = i === 0 || (lastWide && i === cats.length - 1);
+    const desc = CATEGORY_DESCRIPTIONS[c.name] || 'Field-collected locations in this group';
+    const src = c.photo ? photoUrl(c.photo) : '';
+    const alt = c.photoOf ? `${c.photoOf} in ${catLabel(c.name)} field photo` : '';
+    return `
+      <a href="#/c/${catSlug(c.name)}" aria-label="Browse ${esc(catLabel(c.name))}" class="lift press relative block overflow-hidden rounded-tile bg-inset shadow-card ${wide ? 'col-span-2 aspect-[16/10] md:col-span-1 md:aspect-[3/2]' : 'aspect-[4/5] md:aspect-[3/2]'}">
+        ${src
+          ? `<img loading="lazy" src="${esc(src)}" alt="${esc(alt)}" class="img-zoom absolute inset-0 h-full w-full object-cover">`
+          : `<div class="absolute inset-0 flex items-center justify-center text-tertiary">${icon(categoryIcon(c.name))}</div>`}
+        <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-transparent"></div>
+        <div class="absolute inset-x-0 bottom-0 p-3.5 text-white md:p-4">
+          <p class="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[.12em] text-white/80 tabular-nums">${icon(categoryIcon(c.name), 'ico-xs')}${c.count} ${c.count === 1 ? 'place' : 'places'}</p>
+          <h3 class="mt-1 font-display text-xl font-semibold leading-tight tracking-[-0.01em]">${esc(catLabel(c.name))}</h3>
+          <p class="mt-1 line-clamp-2 text-[15px] leading-snug text-white/85 ${wide ? '' : 'hidden md:block'}">${esc(desc)}</p>
+        </div>
+      </a>`;
+  };
   return `
-  <div class="space-y-8">
-    ${logoSvg('0 0 0 0 0.106 0 0 0 0 0.137 0 0 0 0 0.118 6 6 6 0 -4.2')}
-    <h1 class="-mt-10 text-center text-5xl font-bold text-primary">The Ozarks</h1>
-    <aside class="py-3 t-sm text-secondary"><p>All locations are situated on public land and are fully accessible to the general public.</p></aside>
+  <div class="space-y-10">
+    <div class="space-y-6">
+      ${logoSvg('0 0 0 0 0.106 0 0 0 0 0.137 0 0 0 0 0.118 6 6 6 0 -4.2')}
+      <h1 class="text-center font-display text-[length:var(--fs-display)] font-bold leading-[1.05] tracking-[-0.025em] text-primary">The Ozarks</h1>
+      <p class="mx-auto max-w-md text-center t-sm text-secondary">All locations are situated on public land and are fully accessible to the general public.</p>
+    </div>
 
-    ${state.cats.length ? `
-    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      ${state.cats.map((c) => `
-        <article class="flex min-w-0 flex-col gap-3">
-          <a href="#/c/${catSlug(c.name)}" aria-label="Browse ${esc(catLabel(c.name))}" class="block overflow-hidden rounded-lg hover:opacity-90">${media(c.photo ? photoUrl(c.photo) : '', c.photoOf ? `${c.photoOf} in ${catLabel(c.name)} field photo` : '', categoryIcon(c.name))}</a>
-          <a href="#/c/${catSlug(c.name)}" class="flex min-w-0 items-start justify-between gap-4">
-            <div class="flex min-w-0 items-start gap-4">
-              <span class="mt-0.5 shrink-0 text-primary">${icon(categoryIcon(c.name))}</span>
-              <div class="min-w-0">
-                <h3 class="truncate t-base font-semibold text-primary">${esc(catLabel(c.name))}</h3>
-                <p class="mt-1 t-sm text-secondary">${esc(CATEGORY_DESCRIPTIONS[c.name] || 'Field-collected locations in this group')}</p>
-              </div>
-            </div>
-            <span class="shrink-0 text-lg font-semibold text-primary">${c.count}</span>
-          </a>
-        </article>`).join('')}
-    </div>` : `
-    <div class="py-10 text-center">
-      <p class="t-base font-semibold text-primary">No place types are available yet.</p>
-      <p class="mt-2 t-sm text-secondary">The guide has no field records to browse.</p>
-    </div>`}
+    <section>
+      ${eyebrow(`${total} ${total === 1 ? 'field record' : 'field records'}`)}
+      ${state.cats.length ? `
+      <div class="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-4">
+        ${cats.map(tile).join('')}
+      </div>` : `
+      <div class="py-10 text-center">
+        <p class="t-base font-semibold text-primary">No place types are available yet.</p>
+        <p class="mt-2 t-sm text-secondary">The guide has no field records to browse.</p>
+      </div>`}
+    </section>
 
-    <div class="py-3 t-sm text-secondary">${total} ${total === 1 ? 'field record' : 'field records'}</div>
-
-    <aside aria-label="Safety notice" class="flex flex-col gap-2 py-3 t-sm text-secondary sm:flex-row sm:items-center sm:justify-between">
-      <div class="flex min-w-0 items-start gap-2"><span class="mt-1.5 shrink-0">${icon('shield', 'ico-sm')}</span><p class="min-w-0">Outdoor travel involves real risk. Verify conditions, access, and coordinates before you go.</p></div>
-      <a href="#/safety" class="inline-flex shrink-0 items-center gap-1 font-medium text-primary underline underline-offset-2 hover:no-underline">Safety &amp; Terms ${icon('arrow', 'ico-sm')}</a>
+    <aside aria-label="Safety notice" class="flex flex-col gap-3 rounded-2xl bg-inset p-4 t-sm text-secondary sm:flex-row sm:items-center sm:justify-between">
+      <div class="flex min-w-0 items-start gap-3"><span class="mt-1.5 shrink-0 text-primary">${icon('shield', 'ico-sm')}</span><p class="min-w-0">Outdoor travel involves real risk. Verify conditions, access, and coordinates before you go.</p></div>
+      <a href="#/safety" class="inline-flex shrink-0 items-center gap-1 font-medium text-primary underline decoration-black/20 underline-offset-4 hover:decoration-current">Safety &amp; Terms ${icon('arrow', 'ico-sm')}</a>
     </aside>
   </div>`;
 }
@@ -752,15 +814,15 @@ function viewList(cat) {
   return `
   <div class="space-y-8">
     <header class="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
-      <div class="min-w-0 flex-1 p-4">
+      <div class="min-w-0 flex-1">
         ${eyebrow('Local America')}
-        <h1 class="text-4xl font-medium tracking-tight text-primary">${esc(scope || 'Choose your next starting point.')}</h1>
+        <h1 class="font-display text-[length:var(--fs-h1)] font-semibold leading-[1.1] tracking-[-0.02em] text-primary">${esc(scope || 'Choose your next starting point.')}</h1>
         ${scope ? '' : `<p class="mt-3 max-w-2xl t-sm text-secondary">Use this base camp to browse places by name, type, or field note.</p>`}
       </div>
     </header>
 
     ${cat ? `
-    <section class="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between" aria-label="${esc(label)} distance filter">
+    <section class="flex flex-col gap-4 rounded-card bg-white p-5 shadow-card sm:flex-row sm:items-center sm:justify-between" aria-label="${esc(label)} distance filter">
       <div class="min-w-0">
         <h2 class="t-base font-semibold text-primary">Near me</h2>
         <p class="mt-1 t-sm text-secondary" aria-live="polite">${esc(nearMsg)}</p>
@@ -776,9 +838,9 @@ function viewList(cat) {
 function viewNear() {
   const ready = state.locStatus === 'ready' && !!state.distances;
   const header = `
-    <header class="min-w-0 p-4">
+    <header class="min-w-0">
       ${eyebrow('Local America')}
-      <h1 class="text-4xl font-medium tracking-tight text-primary">Near me</h1>
+      <h1 class="font-display text-[length:var(--fs-h1)] font-semibold leading-[1.1] tracking-[-0.02em] text-primary">Near me</h1>
       <p class="mt-3 max-w-2xl t-sm text-secondary">Every place in the guide, closest first. The nearest ${CFG.ROAD_NEAREST} show driving miles. The rest show straight-line miles, and you can tap any distance to get its driving miles. Local America doesn’t store your location.</p>
     </header>`;
 
@@ -807,9 +869,9 @@ function viewNear() {
   return `
   <div class="space-y-8">
     ${header}
-    <section class="space-y-2 px-4">
-      <label for="nearType" class="block text-sm font-medium text-primary">Place type</label>
-      <select id="nearType" class="h-9 w-full max-w-sm rounded-lg border border-line bg-raised px-3 text-sm text-primary">
+    <section class="space-y-2">
+      <label for="nearType" class="block t-sm font-medium text-primary">Place type</label>
+      <select id="nearType" class="h-11 w-full max-w-sm rounded-xl bg-white px-3 text-base text-primary shadow-card">
         <option value="">All place types</option>
         ${types.map((c) => `<option value="${esc(c)}" ${state.nearType === c ? 'selected' : ''}>${esc(catLabel(c))}</option>`).join('')}
       </select>
@@ -842,14 +904,14 @@ function viewPlace(id) {
         <span class="truncate text-secondary">${esc(l.name)}</span>
       </nav>
       <header class="space-y-4">
-        <div class="flex flex-wrap items-center gap-3">${accessBadge(l)}${roadBadge(l)}</div>
-        <h1 class="text-4xl font-medium tracking-tight text-primary">${esc(l.name)}</h1>
+        <div class="flex flex-wrap items-center gap-2">${accessBadge(l)}${roadBadge(l)}</div>
+        <h1 class="font-display text-[length:var(--fs-h1)] font-semibold leading-[1.1] tracking-[-0.02em] text-primary">${esc(l.name)}</h1>
         ${gps ? `<div class="flex flex-wrap items-center gap-x-5 gap-y-2 t-sm text-secondary"><span class="inline-flex items-center gap-2"><span class="text-primary">${icon('pin', 'ico-sm')}</span><span class="select-text">${coords}</span></span></div>` : ''}
       </header>
     </div>
 
     ${Number(l.source_id) === 121 ? `
-    <div class="flex items-start gap-3 rounded-lg border border-warnink bg-warnweak p-4 text-warnink" role="alert">
+    <div class="flex items-start gap-3 rounded-card bg-warnweak p-4 text-warnink ring-1 ring-inset ring-warnink/20" role="alert">
       <span class="mt-0.5 shrink-0">${icon('alert')}</span>
       <div class="space-y-1">
         <p class="text-lg font-semibold">Private land</p>
@@ -863,34 +925,38 @@ function viewPlace(id) {
       <p>Payment confirmed. GPS for ${esc(l.name)} is unlocked. The coordinates are shown above.</p>
     </div>` : ''}
 
-    <section>
-      <h2 class="text-2xl font-medium text-primary">Field notes</h2>
-      <p class="mt-4 whitespace-pre-line t-base leading-8 text-secondary">${l.description && l.description.trim() ? esc(l.description.trim()) : 'No field notes have been added for this location yet.'}</p>
-    </section>
-
     ${photos.length ? `
     <section>
-      <div class="grid grid-cols-2 gap-4">
-        ${photos.map((src, i) => `<button type="button" data-act="pv-open" data-id="${l.id}" data-i="${i}" aria-label="Enlarge photo ${i + 1}" class="block overflow-hidden rounded-lg hover:opacity-90"><div class="aspect-[4/3] w-full bg-inset"><img loading="lazy" src="${esc(src)}" alt="${esc(l.name)} field photo" class="h-full w-full object-cover"></div></button>`).join('')}
+      <div class="grid grid-cols-2 gap-3">
+        ${photos.map((src, i) => `<button type="button" data-act="pv-open" data-id="${l.id}" data-i="${i}" aria-label="Enlarge photo ${i + 1}" class="lift press block overflow-hidden rounded-tile bg-inset shadow-card ${i === 0 ? 'col-span-2' : ''}"><div class="${i === 0 ? 'aspect-[16/10]' : 'aspect-[4/3]'} w-full"><img loading="lazy" src="${esc(src)}" alt="${esc(l.name)} field photo" class="img-zoom h-full w-full object-cover"></div></button>`).join('')}
       </div>
     </section>` : ''}
 
-    ${!gps ? `
     <section>
-      <h2 class="text-lg font-semibold text-primary">Unlock this location’s GPS</h2>
+      <h2 class="font-display text-[length:var(--fs-h2)] font-semibold leading-[1.2] tracking-[-0.015em] text-primary">Field notes</h2>
+      <p class="mt-4 whitespace-pre-line t-base leading-7 text-secondary">${l.description && l.description.trim() ? esc(l.description.trim()) : 'No field notes have been added for this location yet.'}</p>
+    </section>
+
+
+    ${!gps ? `
+    <section class="rounded-card bg-white p-5 shadow-card sm:p-6">
+      <div class="flex items-center gap-3">
+        <span class="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-accent/10 text-accenthover">${icon('lock', 'ico-md')}</span>
+        <h2 class="font-display text-xl font-semibold tracking-[-0.01em] text-primary">Unlock this location’s GPS</h2>
+      </div>
       <p class="mt-2 t-sm text-secondary"><span class="font-medium text-primary">${road.label}.</span> ${road.detail}</p>
       <p class="mt-2 t-sm text-secondary">The photos and field notes above are free. For ${CFG.UNLOCK_PRICE} you get this spot’s exact GPS coordinates and a button that opens it in Google Maps, so you can navigate straight to it.</p>
       <p class="mt-2 t-sm text-secondary">One-time payment. No subscription, and it never expires.</p>
       ${sample ? `<p class="mt-2 t-sm text-secondary">Here’s what you get: <a href="#/p/${sample.id}" class="font-medium text-primary underline underline-offset-2 hover:no-underline">${esc(sample.name)}</a> is a free place, and its coordinates are shown openly: <span class="font-mono text-primary">${Number(sample.latitude).toFixed(5)}, ${Number(sample.longitude).toFixed(5)}</span></p>` : ''}
-      <div class="mt-4">
-        <button type="button" data-act="unlock" data-id="${l.id}" class="${btnPrimary}" ${state.busy ? 'disabled' : ''}>${busyHere ? 'Opening secure checkout…' : `Unlock GPS for ${CFG.UNLOCK_PRICE}`}</button>
+      <div class="mt-5">
+        <button type="button" data-act="unlock" data-id="${l.id}" class="${btnPrimaryLg} w-full sm:w-auto" ${state.busy ? 'disabled' : ''}>${busyHere ? 'Opening secure checkout…' : `Unlock GPS for ${CFG.UNLOCK_PRICE}`}</button>
       </div>
       <p class="mt-3 t-xs text-secondary">Your purchase is saved in the browser you pay in. If you opened this guide from Facebook, open it in your regular browser first so your unlock is there next time. Payments are processed by Stripe.</p>
     </section>` : `
-    <section>
+    <section class="rounded-card bg-white p-5 shadow-card sm:p-6">
       <p class="t-xs text-secondary">Coordinates</p>
       <p class="mt-2 font-mono t-sm text-primary select-text">${l.latitude}, ${l.longitude}</p>
-      <a data-act="maps" data-id="${l.id}" href="${maps}" target="_blank" rel="noopener" class="mt-4 inline-flex items-center t-sm font-medium text-primary hover:underline">Open in Maps <span class="ml-2 inline-flex">${icon('external', 'ico-sm')}</span></a>
+      <a data-act="maps" data-id="${l.id}" href="${maps}" target="_blank" rel="noopener" class="mt-4 ${btnSecondary}">Open in Maps ${icon('external', 'ico-sm')}</a>
     </section>`}
 
     <a href="#/places" class="${btnTertiary}">${icon('back', 'ico-sm')} Back to all places</a>
@@ -904,40 +970,40 @@ function viewAbout() {
     ['book', 'Field notes', 'Descriptions preserve the practical observations attached to each location.'],
     ['compass', 'Explore responsibly', 'Use the guide as a starting point and prepare for changing trail and road conditions.']
   ];
-  const contactBtn = 'inline-flex items-center gap-2 rounded-md border border-linestrong px-4 py-2 t-sm font-medium text-primary hover:underline';
+  const contactBtn = 'lift press inline-flex h-11 items-center gap-2 rounded-full bg-white px-5 text-base font-semibold text-primary shadow-card';
   return `
-  <div class="mx-auto max-w-3xl space-y-10">
+  <div class="mx-auto max-w-3xl space-y-12">
     ${logoSvg('0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 6 6 6 0 -4.2')}
     <section class="space-y-3">
-      <h2 class="text-2xl font-medium text-primary">Our mission</h2>
+      <h2 class="font-display text-[length:var(--fs-h2)] font-semibold leading-[1.2] tracking-[-0.015em] text-primary">Our mission</h2>
       <p class="t-sm text-secondary">Local America helps anyone find the closest place to get outside today, whether that’s a swimming hole, a campsite, a cave, a bluff, or a muddy trail for the truck. It isn’t a trip planner. It’s built for the spur-of-the-moment “let’s go” outing.</p>
       <p class="t-sm text-secondary">We start in the Mark Twain National Forest region and will grow to other areas over time. We ask everyone to explore safely and responsibly: leave no trash, and don’t make new trails.</p>
     </section>
-    <section class="grid grid-cols-1 gap-4 md:grid-cols-3">
+    <section class="grid grid-cols-1 gap-4 md:grid-cols-3 md:gap-5">
       ${principles.map((p) => `
-      <div class="py-2">
-        <div class="text-primary">${icon(p[0])}</div>
-        <h2 class="mt-4 t-base font-semibold text-primary">${p[1]}</h2>
+      <div class="rounded-card bg-white p-5 shadow-card">
+        <span class="grid h-11 w-11 place-items-center rounded-full bg-accent/10 text-accenthover">${icon(p[0])}</span>
+        <h2 class="mt-4 t-base font-semibold tracking-[-0.01em] text-primary">${p[1]}</h2>
         <p class="mt-2 t-sm text-secondary">${p[2]}</p>
       </div>`).join('')}
     </section>
-    <section>
-      <div class="flex gap-3">
+    <section class="rounded-card bg-inset p-5 sm:p-6">
+      <div class="flex gap-4">
         <span class="mt-0.5 shrink-0 text-primary">${icon('shield')}</span>
         <div>
           <h2 class="t-base font-semibold text-primary">Use good judgment in the field</h2>
           <p class="mt-2 t-sm text-secondary">Conditions, access, private property boundaries, closures, and wildlife risks can change. Confirm current rules before visiting, and do not enter closed or unsafe areas.</p>
-          <a href="#/safety" class="mt-4 inline-flex items-center gap-2 t-sm font-medium text-primary underline underline-offset-4 hover:no-underline">Read the full Safety &amp; Terms notice ${icon('arrow', 'ico-sm')}</a>
+          <a href="#/safety" class="mt-4 inline-flex items-center gap-2 t-sm font-medium text-primary underline decoration-black/20 underline-offset-4 hover:decoration-current">Read the full Safety &amp; Terms notice ${icon('arrow', 'ico-sm')}</a>
         </div>
       </div>
     </section>
     <section class="space-y-3">
-      <h2 class="text-2xl font-medium text-primary">What is included</h2>
+      <h2 class="font-display text-[length:var(--fs-h2)] font-semibold leading-[1.2] tracking-[-0.015em] text-primary">What is included</h2>
       <p class="t-sm text-secondary">Local America currently includes ${n} ${n === 1 ? 'record' : 'records'} grouped into ${m} place ${m === 1 ? 'type' : 'types'}. Each record retains its original field-log status and may link to a folder of photos.</p>
       <p class="t-sm text-secondary">The source data is maintained separately from this browsing experience, so this starting point can keep growing as more field records are reviewed.</p>
     </section>
     <section id="contact" class="space-y-3">
-      <h2 class="text-2xl font-medium text-primary">Contact</h2>
+      <h2 class="font-display text-[length:var(--fs-h2)] font-semibold leading-[1.2] tracking-[-0.015em] text-primary">Contact</h2>
       <p class="t-sm text-secondary">Questions, corrections, or a spot we should know about? Reach out.</p>
       <div class="flex flex-col gap-3 sm:flex-row">
         <a href="mailto:${CFG.CONTACT_EMAIL}" class="${contactBtn}">${icon('mail', 'ico-sm')} Email us</a>
@@ -965,10 +1031,10 @@ function viewSafety() {
     </nav>
     <header class="space-y-4">
       <p class="t-xs font-semibold uppercase tracking-[0.12em] text-secondary">Please read before using location data</p>
-      <h1 class="text-4xl font-medium tracking-tight text-primary">Safety &amp; Terms of Use</h1>
+      <h1 class="font-display text-[length:var(--fs-h1)] font-semibold leading-[1.1] tracking-[-0.02em] text-primary">Safety &amp; Terms of Use</h1>
       <p class="t-base leading-8 text-secondary">This notice explains the limits of this guide and your responsibility when deciding whether and how to visit a listed location.</p>
     </header>
-    <section>
+    <section class="rounded-card bg-warnweak p-5 ring-1 ring-inset ring-warnink/15 sm:p-6">
       <div class="flex items-start gap-3">
         <span class="mt-0.5 shrink-0 text-warnink">${icon('shield')}</span>
         <div class="space-y-2 t-sm text-warnink">
@@ -977,19 +1043,19 @@ function viewSafety() {
         </div>
       </div>
     </section>
-    <div class="space-y-6">
+    <div class="divide-y divide-black/5 rounded-card bg-white shadow-card">
       ${sections.map((s) => `
-      <section class="space-y-3">
-        <h2 class="text-2xl font-medium text-primary">${s[0]}</h2>
+      <section class="space-y-3 p-5 sm:p-6">
+        <h2 class="font-display text-[length:var(--fs-h2)] font-semibold leading-[1.2] tracking-[-0.015em] text-primary">${s[0]}</h2>
         <p class="t-base leading-8 text-secondary">${s[1]}</p>
       </section>`).join('')}
     </div>
-    <section class="space-y-3 border-t border-line pt-6">
-      <h2 class="text-2xl font-medium text-primary">Your acknowledgment</h2>
+    <section class="space-y-3 rounded-card bg-inset p-5 sm:p-6">
+      <h2 class="font-display text-[length:var(--fs-h2)] font-semibold leading-[1.2] tracking-[-0.015em] text-primary">Your acknowledgment</h2>
       <p class="mt-3 t-base leading-8 text-secondary">By accessing or using this Service, you acknowledge that you have read and understood this notice and agree to use the information at your own risk. If you do not agree, do not use the Service.</p>
       <p class="mt-4 t-sm text-secondary">This notice is general information, not legal advice. Consider having a licensed attorney review it for your specific situation.</p>
     </section>
-    <a href="#/" class="inline-flex items-center gap-2 t-sm font-medium text-primary hover:underline">${icon('back', 'ico-sm')} Return to the map</a>
+    <a href="#/" class="${btnTertiary}">${icon('back', 'ico-sm')} Return to the map</a>
   </article>`;
 }
 
@@ -1017,7 +1083,7 @@ function renderInstall() {
       ${state.steps && !state.installEvent ? `<ol class="mt-3 list-decimal space-y-1 pl-5 t-sm text-secondary">${steps}</ol>` : ''}`;
   }
   box.innerHTML = `
-  <section aria-label="Add to home screen" class="mt-4 rounded-xl border border-line bg-raised p-4 text-primary">
+  <section aria-label="Add to home screen" class="mt-4 rounded-card bg-white p-5 text-primary shadow-card">
     <div class="flex items-start gap-3">
       <span class="mt-1 shrink-0 text-secondary">${icon('phone', 'ico-md')}</span>
       <div class="min-w-0 flex-1">
@@ -1037,7 +1103,20 @@ function render() {
     view.innerHTML = `<div class="text-center"><p class="t-sm text-errink">We couldn’t load the field records.</p><button type="button" data-act="reload" class="mt-3 t-sm font-medium text-errink underline">Try again</button></div>`;
     return;
   }
-  if (!state.ready) { view.innerHTML = `<div class="py-8 text-center t-sm text-secondary">Loading field records…</div>`; return; }
+  if (!state.ready) {
+    const pg = (location.hash.slice(1) || '/').split('/')[1];
+    view.dataset.page = (pg === 'c' || pg === 'places') ? 'list' : (pg || 'home');
+    view.innerHTML = `
+    <div class="space-y-6" aria-busy="true">
+      <p class="sr-only" role="status">Loading field records…</p>
+      <div class="skel mx-auto h-24 w-2/3 rounded-2xl"></div>
+      <div class="grid grid-cols-2 gap-3">
+        <div class="skel col-span-2 aspect-[16/10] rounded-tile"></div>
+        ${'<div class="skel aspect-[4/5] rounded-tile"></div>'.repeat(4)}
+      </div>
+    </div>`;
+    return;
+  }
 
   const [, a, b] = (location.hash.slice(1) || '/').split('/');
   const key = `${a || ''}/${b || ''}`;
@@ -1056,20 +1135,20 @@ function render() {
   else if (a === 'about') html = viewAbout();
   else if (a === 'safety') html = viewSafety();
   else html = viewHome();
+  view.dataset.page = (a === 'c' || a === 'places') ? 'list' : (a || 'home');
   view.innerHTML = html;
 
-  // Active tab = underlined, like the Glide nav (no tab is underlined on place and place-type pages)
+  // Active tab = soft green pill (no tab is lit on place and place-type pages)
   const active = !a ? 'home' : a === 'near' ? 'near' : (a === 'about' || a === 'safety') ? 'about' : '';
   document.querySelectorAll('[data-nav]').forEach((el) => {
-    const on = el.dataset.nav === active;
-    el.classList.toggle('underline', on);
-    el.classList.toggle('decoration-2', on);
-    el.classList.toggle('underline-offset-4', on);
+    if (el.dataset.nav === active) el.setAttribute('aria-current', 'page');
+    else el.removeAttribute('aria-current');
   });
 
   if (key !== lastRouteKey) {
     const cameFrom = lastRouteKey;
     lastRouteKey = key; window.scrollTo(0, 0);
+    view.classList.remove('view-enter'); void view.offsetWidth; view.classList.add('view-enter');
     if (a === 'about' && b === 'contact') { const c = document.getElementById('contact'); if (c) c.scrollIntoView(); }
     if (a === 'p' && b) {
       // Note when the place was opened from a Near me list, so the Traffic page can see if Near me leads anywhere
