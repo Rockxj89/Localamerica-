@@ -130,11 +130,13 @@ const CFG = {
   SUPABASE_URL: 'https://ycdlxdijrlfsxvxksyrq.supabase.co',
   SUPABASE_KEY: 'sb_publishable_2ExdXbNtW9HpuOGAq1Oa7g_gPdONH_s',
   CHECKOUT_URL: 'https://ycdlxdijrlfsxvxksyrq.supabase.co/functions/v1/checkout',
+  ROAD_URL: 'https://ycdlxdijrlfsxvxksyrq.supabase.co/functions/v1/road-distances',
   UNLOCK_PRICE: '$4.99',
   PHOTO_BUCKET: 'poi-photos',
   // Logo is still loaded from the Glide app for now; move it into this repo later.
   LOGO_URL: 'https://p256a925d-mtnf-poi-guide--localamerica25.glideos.app/assets/cb6960f0f9b568b3cc06d2ca684f3ff76142f6f0b5fc5a2158c3dad1e605a405/IMG_20250808_184722_225.webp',
   NEAR_MILES: 75,
+  ROAD_NEAREST: 10,
   PAGE_SIZE: 24
 };
 
@@ -246,7 +248,7 @@ function media(src, alt, iconName) {
 const state = {
   ready: false, error: null,
   locs: [], photos: {}, cats: [],
-  userPos: null, distances: null, locStatus: 'idle',
+  userPos: null, distances: null, road: {}, locStatus: 'idle',
   catNear: false, nearType: '', shown: CFG.PAGE_SIZE, installEvent: null,
   busy: null
 };
@@ -442,6 +444,20 @@ function getPos() {
   });
 }
 
+// Driving miles from the server. The server looks up coordinates itself, so GPS never reaches the browser.
+async function roadMilesFor(ids) {
+  if (!state.userPos || !ids.length) return;
+  try {
+    const res = await fetch(CFG.ROAD_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', apikey: CFG.SUPABASE_KEY },
+      body: JSON.stringify({ origin: state.userPos, ids })
+    });
+    const r = await res.json();
+    if (r && r.ok) Object.assign(state.road, r.miles || {});
+  } catch (e) { /* straight-line miles still show */ }
+}
+
 async function findMe() {
   state.locStatus = 'loading'; render();
   const where = location.hash.startsWith('#/c/') ? 'category' : 'near_page';
@@ -465,6 +481,14 @@ async function findMe() {
     state.distances = {};
     (data || []).forEach((r) => { state.distances[r.id] = r.miles; });
     state.locStatus = 'ready';
+    // Driving miles for the nearest 10 in the current place type (Glide's rule), fetched after the straight-line list shows
+    state.road = {};
+    const nearest = state.locs
+      .filter((l) => (!category || l.category === category) && state.distances[l.id] != null)
+      .sort((a, b) => state.distances[a.id] - state.distances[b.id])
+      .slice(0, CFG.ROAD_NEAREST)
+      .map((l) => l.id);
+    roadMilesFor(nearest).then(() => render());
     // How many places this person actually sees nearby (0 = they wanted something we don't have close by)
     const pool = state.locs.filter((l) => (!category || l.category === category) && state.distances[l.id] != null &&
       (where === 'category' ? state.distances[l.id] <= CFG.NEAR_MILES : true));
@@ -477,6 +501,16 @@ async function findMe() {
 
 // ================= VIEW PIECES =================
 function badge(text, cls) { return `<span class="inline-flex items-center rounded-md px-2 py-0.5 text-sm font-semibold ${cls}">${esc(text)}</span>`; }
+
+// Driving miles when we have them; otherwise straight-line miles with a button for driving miles
+function distanceBadges(l) {
+  const d = state.distances && state.distances[l.id];
+  if (d == null) return '';
+  const road = state.road[l.id];
+  if (road != null) return badge('Driving ≈ ' + road + ' mi', 'bg-okweak text-okink');
+  return badge('Straight line ≈ ' + d + ' mi', 'bg-inset text-secondary') +
+    `<button data-act="road" data-id="${l.id}" class="inline-flex items-center rounded-md border border-line bg-raised px-2 py-0.5 text-sm font-semibold text-primary">Driving miles</button>`;
+}
 
 function accessBadge(l) {
   if (isFree(l)) return badge('Free', 'bg-okweak text-okink');
@@ -491,12 +525,11 @@ function excerpt(text, len = 116) {
 function cardHtml(l) {
   const ph = state.photos[l.id]?.[0];
   const [rt, rc] = roadAccess(l.category);
-  const d = state.distances && state.distances[l.id];
   return `
   <article class="flex min-w-0 flex-col gap-4">
     <a href="#/p/${l.id}" class="block">${media(ph ? photoUrl(ph.object_key) : '', l.name + ' field photo', 'pin')}</a>
     <div class="min-w-0 space-y-2">
-      <div class="flex flex-wrap items-center gap-2">${accessBadge(l)}${badge(rt, rc)}${d != null ? badge('≈ ' + d + ' mi', 'bg-inset text-secondary') : ''}</div>
+      <div class="flex flex-wrap items-center gap-2">${accessBadge(l)}${badge(rt, rc)}${distanceBadges(l)}</div>
       ${hasCoords(l) ? `<span class="inline-flex items-center gap-1 t-xs text-secondary">${icon('pin', 'ico-sm')} GPS: <span class="select-text">${Number(l.latitude).toFixed(5)}, ${Number(l.longitude).toFixed(5)}</span></span>` : ''}
       <a href="#/p/${l.id}" class="block min-w-0">
         <h3 class="truncate text-base font-semibold text-primary">${esc(l.name)}</h3>
@@ -599,7 +632,7 @@ function viewNear() {
   const shown = items.slice(0, state.shown);
   return `
   <h1 class="text-3xl font-bold text-primary">Near Me</h1>
-  <p class="t-sm text-secondary mt-1 mb-5">Find places closest to where you are standing. Distances are straight-line miles, not driving time.</p>
+  <p class="t-sm text-secondary mt-1 mb-5">Find places closest to where you are standing. Straight-line miles are shown for every place. Driving miles are shown for the closest ${CFG.ROAD_NEAREST} in the chosen type, or tap Driving miles on any card.</p>
   <div class="flex flex-col sm:flex-row gap-2 mb-2">
     <select id="nearType" class="flex-1 rounded-lg border border-line bg-raised px-3 py-2.5 text-base">
       <option value="">All place types</option>
@@ -618,7 +651,6 @@ function viewPlace(id) {
   if (!l) return `<p class="py-10 text-center">Place not found. <a class="underline" href="#/">Go home</a></p>`;
   const photos = state.photos[l.id] || [];
   const [rt, rc] = roadAccess(l.category);
-  const d = state.distances && state.distances[l.id];
   const maps = hasCoords(l) ? `https://www.google.com/maps/search/?api=1&query=${l.latitude},${l.longitude}` : '';
   const coords = hasCoords(l) ? `${Number(l.latitude).toFixed(5)}, ${Number(l.longitude).toFixed(5)}` : '';
   const busyHere = String(state.busy) === String(l.id);
@@ -627,7 +659,7 @@ function viewPlace(id) {
 
   ${photos.length ? `<div class="mt-4">${media(photoUrl(photos[0].object_key), l.name + ' field photo', 'pin')}</div>` : ''}
 
-  <div class="flex flex-wrap gap-2 mt-4">${accessBadge(l)}${badge(rt, rc)}${d != null ? badge('≈ ' + d + ' mi away', 'bg-inset text-secondary') : ''}</div>
+  <div class="flex flex-wrap gap-2 mt-4">${accessBadge(l)}${badge(rt, rc)}${distanceBadges(l)}</div>
   <h1 class="text-3xl font-bold text-primary mt-2">${esc(l.name)}</h1>
   <p class="t-sm text-secondary">${esc(l.category)}</p>
 
@@ -754,6 +786,7 @@ document.addEventListener('click', async (e) => {
   if (act === 'cat-near-on') { state.catNear = true; state.shown = CFG.PAGE_SIZE; return state.distances ? render() : findMe(); }
   if (act === 'cat-near-off') { state.catNear = false; state.shown = CFG.PAGE_SIZE; return render(); }
   if (act === 'more') { state.shown += CFG.PAGE_SIZE; return render(); }
+  if (act === 'road') { await roadMilesFor([Number(el.dataset.id)]); return render(); }
   if (act === 'maps') { logEvent('open_in_maps', Number(el.dataset.id)); return; }
   if (act === 'copy') {
     try { await navigator.clipboard.writeText(el.dataset.text); toast('Coordinates copied'); }
