@@ -19,7 +19,7 @@
   tailwind.config = { theme: { extend: {
     fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'] },
     colors: {
-      accent: '#15803D', accentfg: '#FFFFFF',
+      accent: '#15803D', accentfg: '#FFFFFF', accenthover: '#166534', warn: '#F5A524',
       primary: '#1B231E', secondary: '#3F4A43', tertiary: '#5C675F',
       page: '#f7f9fa', raised: '#FFFFFF', inset: '#EDF1EA',
       line: '#D3DBD0', lineweak: '#E3E9E0', linestrong: '#AFBBAD',
@@ -63,10 +63,15 @@
   /* Bigger, easier-to-read text (matches the Glide guide) */
   .big-text .t-sm { font-size: 1.125rem; line-height: 1.75rem; }
   .big-text .t-xs { font-size: 1rem; line-height: 1.5rem; }
+  :where(.big-text) .t-base { font-size: 1.125rem; line-height: 1.75rem; }
   .clamp3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
   .ico { width: 1.5rem; height: 1.5rem; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+  .ico-md { width: 1.25rem; height: 1.25rem; }
   .ico-sm { width: 1rem; height: 1rem; }
-  .logo { filter: contrast(1.5) brightness(.9); }
+  .ico-xs { width: .875rem; height: .875rem; }
+  /* Round dark buttons in the full-screen photo viewer */
+  .pvb { display: flex; width: 2.75rem; height: 2.75rem; align-items: center; justify-content: center; border-radius: 9999px; background: rgba(0,0,0,.6); color: #fff; }
+  .pvb.hidden { display: none; }
 </style>
 </head>
 <body class="font-sans">
@@ -86,19 +91,17 @@
     </div>
   </nav>
 
-  <main id="view" class="relative z-10 mx-auto w-full max-w-[1200px] px-4 pb-4 pt-8 text-primary"></main>
+  <div class="relative z-10 mx-auto w-full max-w-[1200px] px-4 pb-4 pt-8 text-primary">
+    <main id="view"></main>
+    <aside aria-label="Coordinate note" class="mt-8 py-3 t-sm text-secondary">Coordinates get you close, not always exact. Finding the spot is part of the fun.</aside>
+  </div>
 
   <footer class="relative z-10 mx-auto w-full max-w-[1200px] px-4 pb-32">
-    <p class="mt-4 py-3 t-sm text-secondary">Coordinates get you close, not always exact. Finding the spot is part of the fun.</p>
-    <div id="installCard" class="hidden mt-2 rounded-lg bg-raised border border-line p-4">
-      <p class="font-semibold">Add Local America to your home screen</p>
-      <p class="t-sm text-secondary mt-1">Open the guide like an app, right from your phone.</p>
-      <button data-act="install" class="mt-3 rounded-full bg-accent text-accentfg font-semibold px-4 py-2">Install app</button>
-    </div>
+    <div id="installCard"></div>
     <div class="mt-4 flex flex-col gap-3 py-4 t-sm text-secondary md:flex-row md:items-center md:justify-between">
       <p>Use this guide as a starting point, never as your only navigation source.</p>
       <div class="flex flex-wrap items-center gap-x-6 gap-y-2">
-        <a href="#/about" class="font-medium text-primary hover:underline">Contact</a>
+        <a href="#/about/contact" class="inline-flex items-center gap-2 font-medium text-primary hover:underline">Contact</a>
         <a href="#/safety" class="inline-flex items-center gap-2 font-medium text-primary hover:underline">Read Safety &amp; Terms <span data-icon="arrow" class="contents"></span></a>
       </div>
     </div>
@@ -115,9 +118,19 @@
   </nav>
 </div>
 
-<div id="lb" class="hidden fixed inset-0 z-[60] bg-black/90 flex items-center justify-center p-3" data-act="lb-close">
-  <button class="absolute top-3 right-4 text-white text-3xl leading-none" data-act="lb-close" aria-label="Close">×</button>
-  <img id="lbImg" class="max-h-full max-w-full object-contain rounded" alt="">
+<!-- Full-screen photo viewer: pinch, scroll or double-tap to zoom, drag to look around (same as the Glide guide) -->
+<div id="pv" class="hidden fixed inset-0 z-[60]" style="background: rgba(0,0,0,.92);" role="dialog" aria-modal="true" aria-label="Enlarged photo">
+  <div id="pvStage" class="absolute inset-0 flex touch-none select-none items-center justify-center overflow-hidden">
+    <img id="pvImg" draggable="false" class="max-h-full max-w-full object-contain" alt="">
+  </div>
+  <button type="button" data-act="pv-close" aria-label="Close enlarged photo" class="pvb absolute right-4 top-4"><span data-icon="x" class="contents"></span></button>
+  <button type="button" id="pvPrev" data-act="pv-prev" aria-label="Previous photo" class="pvb absolute left-4 top-1/2 -translate-y-1/2"><span data-icon="left" class="contents"></span></button>
+  <button type="button" id="pvNext" data-act="pv-next" aria-label="Next photo" class="pvb absolute right-4 top-1/2 -translate-y-1/2"><span data-icon="right" class="contents"></span></button>
+  <div class="absolute inset-x-0 bottom-4 flex items-center justify-center gap-3">
+    <button type="button" data-act="pv-out" aria-label="Zoom out" class="pvb text-xl">−</button>
+    <span id="pvCap" class="max-w-[60%] rounded-md px-3 py-1.5 text-center text-xs text-white" style="background: rgba(0,0,0,.6);"></span>
+    <button type="button" data-act="pv-in" aria-label="Zoom in" class="pvb text-xl">+</button>
+  </div>
 </div>
 
 <div id="toast" class="hidden fixed bottom-24 inset-x-0 z-[60] flex justify-center pointer-events-none">
@@ -135,6 +148,8 @@ const CFG = {
   PHOTO_BUCKET: 'poi-photos',
   // Logo is still loaded from the Glide app for now; move it into this repo later.
   LOGO_URL: 'https://p256a925d-mtnf-poi-guide--localamerica25.glideos.app/assets/cb6960f0f9b568b3cc06d2ca684f3ff76142f6f0b5fc5a2158c3dad1e605a405/IMG_20250808_184722_225.webp',
+  CONTACT_EMAIL: 'Localamerica25@gmail.com',
+  FACEBOOK_URL: 'https://www.facebook.com/share/1QRkXzhmJo/',
   NEAR_MILES: 75,
   ROAD_NEAREST: 10,
   PAGE_SIZE: 24
@@ -157,6 +172,23 @@ const ICON_PATHS = {
   arrow: '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
   lock: '<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>'
 };
+Object.assign(ICON_PATHS, {
+  unlock: '<circle cx="12" cy="16" r="1"/><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/>',
+  car: '<path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/>',
+  truck: '<path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M15 18H9"/><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/>',
+  alert: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+  check: '<circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/>',
+  external: '<path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>',
+  mail: '<rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>',
+  message: '<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/>',
+  phone: '<rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/>',
+  plus: '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M8 12h8"/><path d="M12 8v8"/>',
+  share: '<path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" x2="12" y1="2" y2="15"/>',
+  left: '<path d="m15 18-6-6 6-6"/>',
+  right: '<path d="m9 18 6-6-6-6"/>',
+  back: '<path d="m12 19-7-7 7-7"/><path d="M19 12H5"/>',
+  x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>'
+});
 const icon = (name, cls = '') => `<svg viewBox="0 0 24 24" class="ico ${cls}" aria-hidden="true">${ICON_PATHS[name] || ''}</svg>`;
 document.querySelectorAll('[data-icon]').forEach((el) => {
   el.outerHTML = icon(el.dataset.icon, el.dataset.icon === 'arrow' ? 'ico-sm' : '');
@@ -230,11 +262,43 @@ function photoUrl(key) {
   return `${CFG.SUPABASE_URL}/storage/v1/object/public/${CFG.PHOTO_BUCKET}/${key.split('/').map(encodeURIComponent).join('/')}`;
 }
 
-function roadAccess(category) {
-  const c = String(category || '').toLowerCase();
-  if (/building|store|popular|legend|lore/.test(c)) return ['Easy access', 'bg-accent text-accentfg'];
-  if (/non-vehicle/.test(c)) return ['Walk-in only', 'bg-infoweak text-infoink'];
-  return ['Rough roads likely', 'bg-warnweak text-warnink'];
+// Road access badge: same rules, wording and colors as the Glide guide.
+// Anything not listed is treated as "rough" until the road has been verified.
+const ROAD = {
+  easy:  { label: 'Easy access', detail: 'Reachable by any vehicle.', tone: 'bg-accent text-accentfg', icon: 'car' },
+  walk:  { label: 'Walk-in only', detail: 'No vehicle access. Plan to hike in.', tone: 'bg-warn text-black', icon: 'feet' },
+  rough: { label: 'Rough roads likely', detail: 'Road not verified. Plan for unpaved, rough roads. High clearance or 4WD recommended.', tone: 'bg-[#B42318] text-white', icon: 'truck' }
+};
+const ROAD_BY_CATEGORY = {
+  'Buildings and stores': 'easy', 'Open Stores': 'easy', 'Popular locations': 'easy',
+  'Legends/lore': 'easy', 'Non-vehicle trails': 'walk'
+};
+const roadInfo = (l) => ROAD[ROAD_BY_CATEGORY[l.category] || 'rough'];
+
+// Friendly place-type names and short links (same as the Glide guide: /camp, /swimming, ...)
+const CATEGORY_LABELS = {
+  'Buildings and stores': 'Buildings & stores', 'Dead end trails': 'Dead-end trails',
+  'Established campsites': 'Campsites', 'Legends/lore': 'Legends & lore',
+  'Mud holes/trails': 'Mud holes & trails', 'Rocks/Flex': 'Rocks & flex'
+};
+const catLabel = (c) => CATEGORY_LABELS[c] || c;
+const CATEGORY_SLUGS = {
+  'Buildings and stores': 'buildings', 'Caves': 'caves', 'Dead end trails': 'dead-ends',
+  'Established campsites': 'camp', 'Forgotten grounds': 'forgotten', 'Frog ponds': 'frogs',
+  'Legends/lore': 'legends', 'Mud holes/trails': 'mud', 'Non-vehicle trails': 'hiking',
+  'Popular locations': 'popular', 'Rappelling bluffs': 'bluffs', 'Rocks/Flex': 'rocks',
+  'Scenic views': 'views', 'Swimming holes': 'swimming', 'Unmarked trails': 'unmarked',
+  'Yardage fields': 'yardage'
+};
+const catSlug = (c) => CATEGORY_SLUGS[c] || toSlug(c);
+const catBySlug = (s) => state.cats.find((c) => catSlug(c.name) === s || toSlug(c.name) === s);
+
+const fmtMi = (n) => (Number(n) < 10 ? Number(n).toFixed(1) : String(Math.round(Number(n)))) + ' mi';
+
+function locErrText(reason) {
+  if (reason === 'timeout') return 'Your phone took too long to find your location. Make sure Location is turned on, then try again.';
+  if (reason === 'position_unavailable') return 'Your phone couldn’t find your location. Make sure Location is turned on, then try again.';
+  return 'We couldn’t get your location. Try again.';
 }
 
 // Photo tile with a 4:3 shape, like Glide's Media component
@@ -392,7 +456,10 @@ async function handleCheckoutReturn() {
   if (status === 'cancelled') { logEvent('checkout_cancelled'); toast('Checkout cancelled. You were not charged.'); return; }
   if (status === 'success' && sid) {
     const r = await checkoutApi('complete', { sessionId: sid });
-    if (r.ok) { logEvent('checkout_complete', r.locationId); toast('Payment received. GPS unlocked!'); }
+    if (r.ok) {
+      logEvent('checkout_complete', r.locationId); toast('Payment received. GPS unlocked!');
+      if (r.locationId != null) { state.confirmed = r.locationId; location.hash = '#/p/' + r.locationId; }
+    }
     else toast(r.error || 'Could not confirm payment yet. Reopen the app in a minute.');
   }
 }
@@ -436,11 +503,11 @@ async function loadData() {
   state.ready = true;
 }
 
-function getPos() {
+function getPos(high = true) {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) return reject({ code: 0 });
     navigator.geolocation.getCurrentPosition((p) => resolve(p.coords), reject,
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 });
+      { enableHighAccuracy: high, timeout: high ? 15000 : 20000, maximumAge: high ? 60000 : 300000 });
   });
 }
 
@@ -461,16 +528,18 @@ async function roadMilesFor(ids) {
 async function findMe() {
   state.locStatus = 'loading'; render();
   const where = location.hash.startsWith('#/c/') ? 'category' : 'near_page';
-  const category = where === 'category' ? (state.cats.find((c) => toSlug(c.name) === decodeURIComponent(location.hash.split('/')[2] || '')) || {}).name : (state.nearType || null);
+  const category = where === 'category' ? (catBySlug(decodeURIComponent(location.hash.split('/')[2] || '')) || {}).name : (state.nearType || null);
   logEvent('near_me_click', null, { from: where, ...(category ? { category } : {}) });
   let c;
   try {
-    c = await getPos();
+    // If precise GPS is slow or unavailable, try once more with the phone's quicker, rougher fix
+    c = await getPos().catch((e) => { if (e && e.code === 1) throw e; return getPos(false); });
   } catch (e) {
     const code = e && e.code;
     if (code === 1) logEvent('near_me_permission_denied', null, { inAppBrowser });
     else logEvent('near_me_location_unavailable', null, { reason: code === 3 ? 'timeout' : code === 2 ? 'position_unavailable' : 'unsupported', inAppBrowser });
     state.locStatus = code === 1 ? 'denied' : 'error';
+    state.locReason = code === 3 ? 'timeout' : code === 2 ? 'position_unavailable' : null;
     return render();
   }
   logEvent('near_me_location_ready');
@@ -499,22 +568,28 @@ async function findMe() {
   render();
 }
 
-// ================= VIEW PIECES =================
-function badge(text, cls) { return `<span class="inline-flex items-center rounded-md px-2 py-0.5 text-sm font-semibold ${cls}">${esc(text)}</span>`; }
+// Extra view state: road-mile lookups, which card asked for distance, install card, payment confirmation
+Object.assign(state, { roadBusy: {}, roadFail: {}, cardAsk: null, locReason: null, steps: false, installed: false, confirmed: null });
 
-// Driving miles when we have them; otherwise straight-line miles with a button for driving miles
-function distanceBadges(l) {
-  const d = state.distances && state.distances[l.id];
-  if (d == null) return '';
-  const road = state.road[l.id];
-  if (road != null) return badge('Driving ≈ ' + road + ' mi', 'bg-okweak text-okink');
-  return badge('Straight line ≈ ' + d + ' mi', 'bg-inset text-secondary') +
-    `<button data-act="road" data-id="${l.id}" class="inline-flex items-center rounded-md border border-line bg-raised px-2 py-0.5 text-sm font-semibold text-primary">Driving miles</button>`;
-}
+// ================= VIEW PIECES =================
+// Buttons: same shapes and sizes as the Glide guide
+const btnBase = 'cursor-pointer inline-flex items-center justify-center whitespace-nowrap rounded-lg text-sm font-semibold shrink-0 transition-all disabled:opacity-50 disabled:pointer-events-none';
+const btnPrimary = `${btnBase} h-9 gap-2 px-4 bg-accent text-accentfg hover:bg-accenthover`;
+const btnPrimarySm = `${btnBase} h-8 gap-1.5 px-3 bg-accent text-accentfg hover:bg-accenthover`;
+const btnPrimaryLg = `${btnBase} h-10 gap-2 px-5 bg-accent text-accentfg hover:bg-accenthover`;
+const btnSecondary = `${btnBase} h-9 gap-2 px-4 bg-inset text-primary hover:bg-line`;
+const btnTertiary = `${btnBase} h-9 gap-2 px-4 border border-line bg-page text-primary hover:bg-inset`;
+
+const eyebrow = (text) => `<p class="mb-3 t-xs font-semibold uppercase tracking-[0.12em] text-secondary">${esc(text)}</p>`;
 
 function accessBadge(l) {
-  if (isFree(l)) return badge('Free', 'bg-okweak text-okink');
-  return l.unlocked ? badge('Unlocked', 'bg-okweak text-okink') : badge('Paid', 'bg-warnweak text-warnink');
+  const free = isFree(l);
+  return `<span class="inline-flex w-fit max-w-full items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 t-xs font-medium ${free ? 'bg-okweak text-okink' : 'bg-infoweak text-infoink'}">${icon(free ? 'unlock' : 'lock', 'ico-xs')}<span class="truncate">${free ? 'Free access' : 'Paid access'}</span></span>`;
+}
+
+function roadBadge(l) {
+  const r = roadInfo(l);
+  return `<span class="inline-flex w-fit max-w-full items-center gap-1 whitespace-nowrap rounded-full px-3 py-1 t-sm font-semibold ${r.tone}">${icon(r.icon, 'ico-sm')}<span class="truncate">${r.label}</span></span>`;
 }
 
 function excerpt(text, len = 116) {
@@ -522,42 +597,87 @@ function excerpt(text, len = 116) {
   return v.length > len ? v.slice(0, len).trim() + '…' : v;
 }
 
+// The Distance button on every card: straight-line miles first, one more tap for road miles
+function distanceUi(l) {
+  const id = l.id, asked = String(state.cardAsk) === String(id);
+  const d = state.distances ? state.distances[id] : null;
+  const road = state.road[id];
+  if (!state.distances) {
+    if (state.locStatus === 'loading') return { label: asked ? 'Finding location…' : 'Distance', hint: '', busy: asked };
+    if (asked && state.locStatus === 'denied') return { label: 'Distance', hint: 'Allow location in your browser, then tap Distance again.' };
+    if (asked && state.locStatus === 'error') return { label: 'Distance', hint: 'We couldn’t get your location. Tap Distance to try again.' };
+    return { label: 'Distance', hint: '' };
+  }
+  if (typeof road === 'number') return { label: `${fmtMi(road)} by road`, hint: '' };
+  if (state.roadBusy[id]) return { label: 'Calculating…', hint: '', busy: true };
+  if (d == null) return { label: 'Unavailable', hint: '' };
+  if (road === null) return { label: 'No road route', hint: `No road route found. Straight line: ${fmtMi(d)}.` };
+  return { label: `≈ ${fmtMi(d)}`, hint: state.roadFail[id] ? 'Couldn’t get road miles. Tap to retry.' : 'Straight line. Tap for road miles.' };
+}
+
 function cardHtml(l) {
   const ph = state.photos[l.id]?.[0];
-  const [rt, rc] = roadAccess(l.category);
+  const du = distanceUi(l);
   return `
-  <article class="flex min-w-0 flex-col gap-4">
-    <a href="#/p/${l.id}" class="block">${media(ph ? photoUrl(ph.object_key) : '', l.name + ' field photo', 'pin')}</a>
-    <div class="min-w-0 space-y-2">
-      <div class="flex flex-wrap items-center gap-2">${accessBadge(l)}${badge(rt, rc)}${distanceBadges(l)}</div>
-      ${hasCoords(l) ? `<span class="inline-flex items-center gap-1 t-xs text-secondary">${icon('pin', 'ico-sm')} GPS: <span class="select-text">${Number(l.latitude).toFixed(5)}, ${Number(l.longitude).toFixed(5)}</span></span>` : ''}
+  <article class="flex min-w-0 select-none flex-col gap-4">
+    <a href="#/p/${l.id}" aria-label="Open ${esc(l.name)} details" class="block min-w-0 overflow-hidden rounded-lg hover:opacity-90">${media(ph ? photoUrl(ph.object_key) : '', ph ? l.name + ' field photo' : '', 'pin')}</a>
+    <div class="min-w-0 space-y-3">
+      <div class="min-w-0 space-y-2">
+        <div class="flex flex-wrap items-center gap-2">${accessBadge(l)}${roadBadge(l)}</div>
+        ${hasCoords(l) ? `<span class="inline-flex items-center gap-1 t-xs text-secondary">${icon('pin', 'ico-xs')}<span>GPS:</span><span class="select-text" title="Long-press the coordinates to copy them">${Number(l.latitude).toFixed(5)}, ${Number(l.longitude).toFixed(5)}</span></span>` : ''}
+      </div>
       <a href="#/p/${l.id}" class="block min-w-0">
-        <h3 class="truncate text-base font-semibold text-primary">${esc(l.name)}</h3>
+        <h3 class="truncate t-base font-semibold text-primary">${esc(l.name)}</h3>
         <p class="t-sm text-secondary">${esc(excerpt(l.description))}</p>
       </a>
+    </div>
+    <div class="grid grid-cols-2 items-end gap-3">
+      <div class="min-w-0">
+        <button type="button" data-act="dist" data-id="${l.id}" aria-label="Show distance to ${esc(l.name)}" class="${btnPrimarySm}" ${du.busy ? 'disabled' : ''}>${icon('nav', 'ico-sm')}${esc(du.label)}</button>
+        ${du.hint ? `<p class="mt-2 t-xs text-secondary" role="status">${esc(du.hint)}</p>` : ''}
+      </div>
     </div>
   </article>`;
 }
 
-function locNotice() {
-  const s = state.locStatus;
-  if (s === 'loading') return `<p class="t-sm text-secondary my-3">Finding your location…</p>`;
-  if (s === 'denied') return `<p class="t-sm bg-errweak text-errink rounded-lg p-3 my-3">Location permission was blocked. Allow location for this site in Chrome settings, then tap Try again.</p>`;
-  if (s === 'error') return `<p class="t-sm bg-errweak text-errink rounded-lg p-3 my-3">Couldn't get your location. Check that GPS is on, then tap Try again.</p>`;
-  return '';
+const cardGrid = (items) => `<div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">${items.map(cardHtml).join('')}</div>`;
+const showMore = (total, shown) => total > shown ? `<div class="text-center"><button type="button" data-act="more" class="${btnSecondary}">Show more places</button></div>` : '';
+
+// Shown only inside the Facebook, Messenger and Instagram browsers, where location often doesn't work
+function inAppTip(cls = 'mx-auto max-w-md t-sm text-secondary') {
+  return inAppBrowser ? `<p class="${cls}">Opened from Facebook or Instagram? Location often doesn’t work there. Tap the menu (⋮ or •••) and choose “Open in browser”, then try again.</p>` : '';
 }
 
-const btnPrimary = 'inline-flex items-center justify-center gap-2 rounded-lg bg-accent text-accentfg font-semibold px-4 py-2.5';
-const btnSecondary = 'inline-flex items-center justify-center gap-2 rounded-lg bg-raised border border-line text-primary font-semibold px-4 py-2.5';
+function locMessage(idleText) {
+  const s = state.locStatus;
+  if (s === 'loading') return 'Finding your location…';
+  if (s === 'denied') return 'Location access was blocked. Allow it in your browser, then try again.';
+  if (s === 'error') return locErrText(state.locReason);
+  return idleText;
+}
+
+// Logo with its dark background removed, the same way the Glide guide draws it
+function logoSvg(matrix) {
+  return `
+  <header class="-mx-4 flex justify-center pt-2 sm:mx-0">
+    <svg viewBox="100 100 800 800" class="aspect-square w-full max-w-[38rem] contrast-150 brightness-90" role="img" aria-label="Local America logo">
+      <defs>
+        <filter id="logo-bg-off" color-interpolation-filters="sRGB">
+          <feColorMatrix type="matrix" values="${matrix}"/>
+          <feMorphology operator="dilate" radius="1.5"/>
+        </filter>
+      </defs>
+      <image href="${esc(CFG.LOGO_URL)}" x="0" y="0" width="1000" height="1000" preserveAspectRatio="xMidYMid meet" filter="url(#logo-bg-off)"/>
+    </svg>
+  </header>`;
+}
 
 // ================= SCREENS =================
 function viewHome() {
   const total = state.locs.length;
   return `
   <div class="space-y-8">
-    <header class="-mx-4 flex justify-center pt-2 sm:mx-0">
-      <img src="${esc(CFG.LOGO_URL)}" alt="Local America logo" class="logo aspect-square w-full max-w-[38rem] object-contain" onerror="this.style.display='none'">
-    </header>
+    ${logoSvg('0 0 0 0 0.106 0 0 0 0 0.137 0 0 0 0 0.118 6 6 6 0 -4.2')}
     <h1 class="-mt-10 text-center text-5xl font-bold text-primary">The Ozarks</h1>
     <aside class="py-3 t-sm text-secondary"><p>All locations are situated on public land and are fully accessible to the general public.</p></aside>
 
@@ -565,12 +685,12 @@ function viewHome() {
     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
       ${state.cats.map((c) => `
         <article class="flex min-w-0 flex-col gap-3">
-          <a href="#/c/${toSlug(c.name)}" class="block">${media(c.photo ? photoUrl(c.photo) : '', c.photoOf ? `${c.photoOf} in ${c.name}` : '', categoryIcon(c.name))}</a>
-          <a href="#/c/${toSlug(c.name)}" class="flex min-w-0 items-start justify-between gap-4">
+          <a href="#/c/${catSlug(c.name)}" aria-label="Browse ${esc(catLabel(c.name))}" class="block overflow-hidden rounded-lg hover:opacity-90">${media(c.photo ? photoUrl(c.photo) : '', c.photoOf ? `${c.photoOf} in ${catLabel(c.name)} field photo` : '', categoryIcon(c.name))}</a>
+          <a href="#/c/${catSlug(c.name)}" class="flex min-w-0 items-start justify-between gap-4">
             <div class="flex min-w-0 items-start gap-4">
               <span class="mt-0.5 shrink-0 text-primary">${icon(categoryIcon(c.name))}</span>
               <div class="min-w-0">
-                <h3 class="truncate text-base font-semibold text-primary">${esc(c.name)}</h3>
+                <h3 class="truncate t-base font-semibold text-primary">${esc(catLabel(c.name))}</h3>
                 <p class="mt-1 t-sm text-secondary">${esc(CATEGORY_DESCRIPTIONS[c.name] || 'Field-collected locations in this group')}</p>
               </div>
             </div>
@@ -579,152 +699,334 @@ function viewHome() {
         </article>`).join('')}
     </div>` : `
     <div class="py-10 text-center">
-      <p class="text-base font-semibold text-primary">No place types are available yet.</p>
+      <p class="t-base font-semibold text-primary">No place types are available yet.</p>
       <p class="mt-2 t-sm text-secondary">The guide has no field records to browse.</p>
     </div>`}
 
     <div class="py-3 t-sm text-secondary">${total} ${total === 1 ? 'field record' : 'field records'}</div>
 
-    <aside class="flex flex-col gap-2 py-3 t-sm text-secondary sm:flex-row sm:items-center sm:justify-between">
-      <div class="flex min-w-0 items-start gap-2"><span class="mt-1">${icon('shield', 'ico-sm')}</span><p>Outdoor travel involves real risk. Verify conditions, access, and coordinates before you go.</p></div>
-      <a href="#/safety" class="inline-flex shrink-0 items-center gap-1 font-medium text-primary underline underline-offset-2">Safety &amp; Terms ${icon('arrow', 'ico-sm')}</a>
+    <aside aria-label="Safety notice" class="flex flex-col gap-2 py-3 t-sm text-secondary sm:flex-row sm:items-center sm:justify-between">
+      <div class="flex min-w-0 items-start gap-2"><span class="mt-1.5 shrink-0">${icon('shield', 'ico-sm')}</span><p class="min-w-0">Outdoor travel involves real risk. Verify conditions, access, and coordinates before you go.</p></div>
+      <a href="#/safety" class="inline-flex shrink-0 items-center gap-1 font-medium text-primary underline underline-offset-2 hover:no-underline">Safety &amp; Terms ${icon('arrow', 'ico-sm')}</a>
     </aside>
   </div>`;
 }
 
-function viewCategory(slugName) {
-  const cat = state.cats.find((c) => toSlug(c.name) === slugName);
-  if (!cat) { location.hash = '#/'; return ''; }
-  let items = state.locs.filter((l) => l.category === cat.name);
-  const nearOn = state.catNear && state.distances;
-  if (nearOn) {
+// One place type (cat given) or every place (cat = null)
+function viewList(cat) {
+  const label = cat ? catLabel(cat.name) : '';
+  let items = cat ? state.locs.filter((l) => l.category === cat.name) : state.locs.slice();
+  const nearOn = !!cat && state.catNear;
+  const ready = state.locStatus === 'ready' && !!state.distances;
+  if (nearOn && ready) {
     items = items.filter((l) => (state.distances[l.id] ?? Infinity) <= CFG.NEAR_MILES)
                  .sort((a, b) => state.distances[a.id] - state.distances[b.id]);
   }
   const shown = items.slice(0, state.shown);
+  const scope = [nearOn ? `Within ${CFG.NEAR_MILES}-mile radius` : '', label].filter(Boolean).join(' · ');
+  const nearMsg = ready
+    ? (nearOn ? `Showing ${label.toLowerCase()} within a ${CFG.NEAR_MILES}-mile straight-line radius. Local America doesn’t store your location.`
+              : 'Find nearby places in this category. Local America doesn’t store your location.')
+    : locMessage('Use your location to find places in this category. Local America doesn’t store your location.');
+  const loading = state.locStatus === 'loading';
+
+  let body;
+  if (nearOn && !ready) {
+    body = `
+    <div class="space-y-2 text-center">
+      <p class="t-sm text-infoink">${esc(locMessage('Finding your location…'))}</p>
+      ${loading ? '' : inAppTip()}
+      ${loading ? '' : `<button type="button" data-act="cat-near-on" class="${btnSecondary} mt-3">Try again</button>`}
+    </div>`;
+  } else if (items.length) {
+    body = cardGrid(shown) + showMore(items.length, shown.length);
+  } else {
+    body = `
+    <div class="py-10 text-center">
+      <p class="t-base font-semibold text-primary">${cat ? 'No places match those filters.' : 'No places are available yet.'}</p>
+      <p class="mt-2 t-sm text-secondary">${cat ? 'Try a broader search or view every field record.' : 'The guide has no field records to show.'}</p>
+      ${cat ? `<a href="#/places" class="mt-4 inline-flex t-sm font-medium text-okink underline">Browse all places</a>` : ''}
+    </div>`;
+  }
+
   return `
-  <a href="#/" class="t-sm font-medium text-primary underline underline-offset-2">← All place types</a>
-  <div class="mt-3 flex items-center gap-3">
-    <span class="text-primary">${icon(categoryIcon(cat.name))}</span>
-    <h1 class="text-3xl font-bold text-primary">${esc(cat.name)}</h1>
-  </div>
-  <p class="t-sm text-secondary mt-1">${items.length} place${items.length === 1 ? '' : 's'}${nearOn ? ` within ${CFG.NEAR_MILES} miles` : ''}</p>
-  <div class="my-5">
-    ${nearOn
-      ? `<button data-act="cat-near-off" class="${btnSecondary} w-full sm:w-auto">Show all ${esc(cat.name)}</button>`
-      : `<button data-act="cat-near-on" class="${btnPrimary} w-full sm:w-auto">${icon('nav', 'ico-sm')} Near me (${CFG.NEAR_MILES} mi)</button>`}
-  </div>
-  ${locNotice()}
-  ${state.locStatus === 'denied' || state.locStatus === 'error' ? `<button data-act="cat-near-on" class="${btnPrimary} mb-4">Try again</button>` : ''}
-  ${items.length ? `<div class="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">${shown.map(cardHtml).join('')}</div>`
-    : `<div class="text-center py-10"><p class="text-secondary">No places found.</p><a href="#/" class="underline text-primary">Browse all places</a></div>`}
-  ${items.length > shown.length ? `<button data-act="more" class="${btnSecondary} w-full mt-6">Show more places</button>` : ''}`;
+  <div class="space-y-8">
+    <header class="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
+      <div class="min-w-0 flex-1 p-4">
+        ${eyebrow('Local America')}
+        <h1 class="text-4xl font-medium tracking-tight text-primary">${esc(scope || 'Choose your next starting point.')}</h1>
+        ${scope ? '' : `<p class="mt-3 max-w-2xl t-sm text-secondary">Use this base camp to browse places by name, type, or field note.</p>`}
+      </div>
+    </header>
+
+    ${cat ? `
+    <section class="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between" aria-label="${esc(label)} distance filter">
+      <div class="min-w-0">
+        <h2 class="t-base font-semibold text-primary">Near me</h2>
+        <p class="mt-1 t-sm text-secondary" aria-live="polite">${esc(nearMsg)}</p>
+        ${ready ? '' : inAppTip('mt-2 t-sm text-secondary')}
+      </div>
+      <button type="button" data-act="${nearOn ? 'cat-near-off' : 'cat-near-on'}" class="${nearOn ? btnSecondary : btnPrimary}" ${loading ? 'disabled' : ''}>${icon('pin', 'ico-sm')}${nearOn ? `Show all ${esc(label)}` : 'Near me'}</button>
+    </section>` : ''}
+
+    ${body}
+  </div>`;
 }
 
 function viewNear() {
-  let items = state.locs.slice();
-  if (state.nearType) items = items.filter((l) => l.category === state.nearType);
-  const ready = state.locStatus === 'ready' && state.distances;
-  if (ready) {
-    items = items.filter((l) => state.distances[l.id] != null)
-                 .sort((a, b) => state.distances[a.id] - state.distances[b.id]);
+  const ready = state.locStatus === 'ready' && !!state.distances;
+  const header = `
+    <header class="min-w-0 p-4">
+      ${eyebrow('Local America')}
+      <h1 class="text-4xl font-medium tracking-tight text-primary">Near me</h1>
+      <p class="mt-3 max-w-2xl t-sm text-secondary">Every place in the guide, closest first. The nearest ${CFG.ROAD_NEAREST} show driving miles. The rest show straight-line miles, and you can tap any distance to get its driving miles. Local America doesn’t store your location.</p>
+    </header>`;
+
+  if (!ready) {
+    const s = state.locStatus;
+    return `
+    <div class="space-y-8">
+      ${header}
+      <section class="space-y-4 text-center" aria-live="polite">
+        <p class="t-sm text-infoink">${esc(locMessage('Share your location to see every place, closest first.'))}</p>
+        ${inAppTip()}
+        ${s === 'loading' ? '' : `<button type="button" data-act="find" class="${btnPrimary}">${icon('nav', 'ico-sm')}${s === 'denied' || s === 'error' ? 'Try again' : 'Find places near me'}</button>`}
+      </section>
+    </div>`;
   }
+
+  let items = state.nearType ? state.locs.filter((l) => l.category === state.nearType) : state.locs.slice();
+  items = items.filter((l) => state.distances[l.id] != null).sort((a, b) => state.distances[a.id] - state.distances[b.id]);
+  // Once road miles arrive, the closest few are ordered by the real drive
+  const miles = (l) => (typeof state.road[l.id] === 'number' ? state.road[l.id] : state.distances[l.id]);
+  const top = items.slice(0, CFG.ROAD_NEAREST).sort((a, b) => miles(a) - miles(b));
+  items = top.concat(items.slice(CFG.ROAD_NEAREST));
   const shown = items.slice(0, state.shown);
+  const types = state.cats.map((c) => c.name).sort((a, b) => catLabel(a).localeCompare(catLabel(b)));
+
   return `
-  <h1 class="text-3xl font-bold text-primary">Near Me</h1>
-  <p class="t-sm text-secondary mt-1 mb-5">Find places closest to where you are standing. Straight-line miles are shown for every place. Driving miles are shown for the closest ${CFG.ROAD_NEAREST} in the chosen type, or tap Driving miles on any card.</p>
-  <div class="flex flex-col sm:flex-row gap-2 mb-2">
-    <select id="nearType" class="flex-1 rounded-lg border border-line bg-raised px-3 py-2.5 text-base">
-      <option value="">All place types</option>
-      ${state.cats.map((c) => `<option value="${esc(c.name)}" ${state.nearType === c.name ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}
-    </select>
-    <button data-act="find" class="${btnPrimary}">${icon('nav', 'ico-sm')} ${ready ? 'Refresh' : 'Find places near me'}</button>
-  </div>
-  ${locNotice()}
-  ${ready ? `<div class="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3 mt-5">${shown.map(cardHtml).join('')}</div>
-    ${items.length > shown.length ? `<button data-act="more" class="${btnSecondary} w-full mt-6">Show more places</button>` : ''}`
-    : `<p class="text-center t-sm text-secondary mt-10">Tap “Find places near me” to see the closest places first.</p>`}`;
+  <div class="space-y-8">
+    ${header}
+    <section class="space-y-2 px-4">
+      <label for="nearType" class="block text-sm font-medium text-primary">Place type</label>
+      <select id="nearType" class="h-9 w-full max-w-sm rounded-lg border border-line bg-raised px-3 text-sm text-primary">
+        <option value="">All place types</option>
+        ${types.map((c) => `<option value="${esc(c)}" ${state.nearType === c ? 'selected' : ''}>${esc(catLabel(c))}</option>`).join('')}
+      </select>
+    </section>
+    ${items.length ? cardGrid(shown) + showMore(items.length, shown.length)
+      : `<p class="py-10 text-center t-sm text-secondary">No places are available in this type yet.</p>`}
+  </div>`;
 }
 
 function viewPlace(id) {
   const l = state.locs.find((x) => String(x.id) === String(id));
-  if (!l) return `<p class="py-10 text-center">Place not found. <a class="underline" href="#/">Go home</a></p>`;
-  const photos = state.photos[l.id] || [];
-  const [rt, rc] = roadAccess(l.category);
-  const maps = hasCoords(l) ? `https://www.google.com/maps/search/?api=1&query=${l.latitude},${l.longitude}` : '';
-  const coords = hasCoords(l) ? `${Number(l.latitude).toFixed(5)}, ${Number(l.longitude).toFixed(5)}` : '';
+  if (!l) {
+    return `<div class="text-center"><p class="t-sm text-errink">We couldn’t load the field records.</p><a href="#/places" class="mt-3 inline-block t-sm font-medium text-errink underline">Browse all places</a></div>`;
+  }
+  const photos = (state.photos[l.id] || []).map((p) => photoUrl(p.object_key));
+  const road = roadInfo(l);
+  const gps = hasCoords(l);
+  const coords = gps ? `${Number(l.latitude).toFixed(5)}, ${Number(l.longitude).toFixed(5)}` : '';
+  const maps = gps ? `https://www.google.com/maps/search/?api=1&query=${l.latitude},${l.longitude}` : '';
   const busyHere = String(state.busy) === String(l.id);
+  // A free place whose coordinates show openly, used as the "here's what you get" example
+  const sample = state.locs.find((x) => x.name === 'Popular Location #2' && isFree(x) && hasCoords(x));
+
   return `
-  <a href="#/c/${toSlug(l.category)}" class="t-sm font-medium text-primary underline underline-offset-2">← ${esc(l.category)}</a>
-
-  ${photos.length ? `<div class="mt-4">${media(photoUrl(photos[0].object_key), l.name + ' field photo', 'pin')}</div>` : ''}
-
-  <div class="flex flex-wrap gap-2 mt-4">${accessBadge(l)}${badge(rt, rc)}${distanceBadges(l)}</div>
-  <h1 class="text-3xl font-bold text-primary mt-2">${esc(l.name)}</h1>
-  <p class="t-sm text-secondary">${esc(l.category)}</p>
-
-  ${Number(l.source_id) === 121 ? `<div class="mt-4 rounded-lg bg-errweak text-errink t-sm p-3"><b>Private-land warning.</b> Do not trespass. Respect all posted signs and property lines.</div>` : ''}
-
-  ${hasCoords(l) ? `
-  <section class="mt-5 rounded-lg bg-raised border border-line p-4">
-    <div class="t-xs font-semibold text-secondary uppercase tracking-wide">GPS coordinates</div>
-    <div class="font-mono text-lg mt-1 select-text">${coords}</div>
-    <div class="flex gap-2 mt-3">
-      <button data-act="copy" data-text="${coords}" class="${btnSecondary} flex-1">Copy</button>
-      <a data-act="maps" data-id="${l.id}" href="${maps}" target="_blank" rel="noopener" class="${btnPrimary} flex-1">Open in Maps</a>
+  <article class="mx-auto max-w-3xl space-y-8">
+    <div class="space-y-4">
+      <nav class="flex items-center gap-2 t-sm text-secondary" aria-label="Breadcrumb">
+        <a href="#/places" class="inline-flex items-center gap-2 hover:text-primary">${icon('back', 'ico-sm')} Places</a>
+        <span aria-hidden="true">/</span>
+        <span class="truncate text-secondary">${esc(l.name)}</span>
+      </nav>
+      <header class="space-y-4">
+        <div class="flex flex-wrap items-center gap-3">${accessBadge(l)}${roadBadge(l)}</div>
+        <h1 class="text-4xl font-medium tracking-tight text-primary">${esc(l.name)}</h1>
+        ${gps ? `<div class="flex flex-wrap items-center gap-x-5 gap-y-2 t-sm text-secondary"><span class="inline-flex items-center gap-2"><span class="text-primary">${icon('pin', 'ico-sm')}</span><span class="select-text">${coords}</span></span></div>` : ''}
+      </header>
     </div>
-  </section>` : `
-  <section class="mt-5 rounded-lg bg-warnweak p-4 text-warnink">
-    <div class="flex items-center gap-2 font-semibold">${icon('lock', 'ico-sm')} GPS is locked for this place</div>
-    <p class="t-sm mt-1">Unlock the exact coordinates for this place with a one-time ${CFG.UNLOCK_PRICE} purchase. Free places show their coordinates openly.</p>
-    <button data-act="unlock" data-id="${l.id}" class="${btnPrimary} w-full mt-3" ${state.busy ? 'disabled' : ''}>${icon('lock', 'ico-sm')} ${busyHere ? 'Opening secure checkout…' : `Unlock GPS – ${CFG.UNLOCK_PRICE}`}</button>
-    <p class="t-xs mt-2">Secure payment by Stripe. Your unlock is saved on this phone and browser.</p>
-  </section>`}
 
-  <section class="mt-6">
-    <h2 class="text-lg font-semibold text-primary mb-1">Field notes</h2>
-    <p class="t-sm text-secondary whitespace-pre-line">${l.description ? esc(l.description) : 'Field notes are still being added for this location.'}</p>
-  </section>
+    ${Number(l.source_id) === 121 ? `
+    <div class="flex items-start gap-3 rounded-lg border border-warnink bg-warnweak p-4 text-warnink" role="alert">
+      <span class="mt-0.5 shrink-0">${icon('alert')}</span>
+      <div class="space-y-1">
+        <p class="text-lg font-semibold">Private land</p>
+        <p class="t-base leading-7">The Mays Mansion is on private land. Please don’t go onto the property. It can be seen from the road.</p>
+      </div>
+    </div>` : ''}
 
-  ${photos.length > 1 ? `
-  <section class="mt-6">
-    <h2 class="text-lg font-semibold text-primary mb-2">Photos</h2>
-    <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
-      ${photos.map((p) => `<img loading="lazy" src="${esc(photoUrl(p.object_key))}" alt="${esc(l.name)}" data-act="lb-open" data-src="${esc(photoUrl(p.object_key))}" class="aspect-[4/3] w-full object-cover rounded-lg bg-inset">`).join('')}
-    </div>
-  </section>` : ''}
+    ${gps && String(state.confirmed) === String(l.id) ? `
+    <div class="flex items-start gap-3 t-sm text-okink" role="status">
+      <span class="mt-1.5 shrink-0">${icon('check', 'ico-sm')}</span>
+      <p>Payment confirmed. GPS for ${esc(l.name)} is unlocked. The coordinates are shown above.</p>
+    </div>` : ''}
 
-  <a href="#/" class="${btnSecondary} w-full mt-8">Back to all places</a>`;
+    <section>
+      <h2 class="text-2xl font-medium text-primary">Field notes</h2>
+      <p class="mt-4 whitespace-pre-line t-base leading-8 text-secondary">${l.description && l.description.trim() ? esc(l.description.trim()) : 'No field notes have been added for this location yet.'}</p>
+    </section>
+
+    ${photos.length ? `
+    <section>
+      <div class="grid grid-cols-2 gap-4">
+        ${photos.map((src, i) => `<button type="button" data-act="pv-open" data-id="${l.id}" data-i="${i}" aria-label="Enlarge photo ${i + 1}" class="block overflow-hidden rounded-lg hover:opacity-90"><div class="aspect-[4/3] w-full bg-inset"><img loading="lazy" src="${esc(src)}" alt="${esc(l.name)} field photo" class="h-full w-full object-cover"></div></button>`).join('')}
+      </div>
+    </section>` : ''}
+
+    ${!gps ? `
+    <section>
+      <h2 class="text-lg font-semibold text-primary">Unlock this location’s GPS</h2>
+      <p class="mt-2 t-sm text-secondary"><span class="font-medium text-primary">${road.label}.</span> ${road.detail}</p>
+      <p class="mt-2 t-sm text-secondary">The photos and field notes above are free. For ${CFG.UNLOCK_PRICE} you get this spot’s exact GPS coordinates and a button that opens it in Google Maps, so you can navigate straight to it.</p>
+      <p class="mt-2 t-sm text-secondary">One-time payment. No subscription, and it never expires.</p>
+      ${sample ? `<p class="mt-2 t-sm text-secondary">Here’s what you get: <a href="#/p/${sample.id}" class="font-medium text-primary underline underline-offset-2 hover:no-underline">${esc(sample.name)}</a> is a free place, and its coordinates are shown openly: <span class="font-mono text-primary">${Number(sample.latitude).toFixed(5)}, ${Number(sample.longitude).toFixed(5)}</span></p>` : ''}
+      <div class="mt-4">
+        <button type="button" data-act="unlock" data-id="${l.id}" class="${btnPrimary}" ${state.busy ? 'disabled' : ''}>${busyHere ? 'Opening secure checkout…' : `Unlock GPS for ${CFG.UNLOCK_PRICE}`}</button>
+      </div>
+      <p class="mt-3 t-xs text-secondary">Your purchase is saved in the browser you pay in. If you opened this guide from Facebook, open it in your regular browser first so your unlock is there next time. Payments are processed by Stripe.</p>
+    </section>` : `
+    <section>
+      <p class="t-xs text-secondary">Coordinates</p>
+      <p class="mt-2 font-mono t-sm text-primary select-text">${l.latitude}, ${l.longitude}</p>
+      <a data-act="maps" data-id="${l.id}" href="${maps}" target="_blank" rel="noopener" class="mt-4 inline-flex items-center t-sm font-medium text-primary hover:underline">Open in Maps <span class="ml-2 inline-flex">${icon('external', 'ico-sm')}</span></a>
+    </section>`}
+
+    <a href="#/places" class="${btnTertiary}">${icon('back', 'ico-sm')} Back to all places</a>
+  </article>`;
 }
 
 function viewAbout() {
+  const n = state.locs.length, m = state.cats.length;
+  const principles = [
+    ['pin', 'Coordinates by access', `Free locations show GPS publicly. Unlock one paid location’s GPS for ${CFG.UNLOCK_PRICE}, a one-time payment with no subscription that never expires. No account needed. Your purchase is saved on this device.`],
+    ['book', 'Field notes', 'Descriptions preserve the practical observations attached to each location.'],
+    ['compass', 'Explore responsibly', 'Use the guide as a starting point and prepare for changing trail and road conditions.']
+  ];
+  const contactBtn = 'inline-flex items-center gap-2 rounded-md border border-linestrong px-4 py-2 t-sm font-medium text-primary hover:underline';
   return `
-  <h1 class="text-3xl font-bold text-primary">About Local America</h1>
-  <p class="mt-2 t-sm text-secondary">A field guide to hard-to-find places across the Ozarks, with photos, field notes, and GPS coordinates so you can find them yourself.</p>
-  <div class="mt-5 space-y-3">
-    <div class="rounded-lg bg-raised border border-line p-4"><b>Public land only.</b><p class="t-sm text-secondary mt-0.5">Every place listed is on public land. Never enter private property.</p></div>
-    <div class="rounded-lg bg-raised border border-line p-4"><b>Free and paid places.</b><p class="t-sm text-secondary mt-0.5">Many places show their GPS openly. Some are paid and keep GPS locked until unlocked.</p></div>
-    <div class="rounded-lg bg-raised border border-line p-4"><b>Leave no trace.</b><p class="t-sm text-secondary mt-0.5">Take only photos. Leave everything exactly as you found it.</p></div>
-  </div>
-  <p class="mt-5 t-sm text-secondary">${state.locs.length} places across ${state.cats.length} place types.</p>
-  <a href="#/safety" class="${btnPrimary} w-full mt-5">Safety &amp; Terms</a>`;
+  <div class="mx-auto max-w-3xl space-y-10">
+    ${logoSvg('0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 6 6 6 0 -4.2')}
+    <section class="space-y-3">
+      <h2 class="text-2xl font-medium text-primary">Our mission</h2>
+      <p class="t-sm text-secondary">Local America helps anyone find the closest place to get outside today, whether that’s a swimming hole, a campsite, a cave, a bluff, or a muddy trail for the truck. It isn’t a trip planner. It’s built for the spur-of-the-moment “let’s go” outing.</p>
+      <p class="t-sm text-secondary">We start in the Mark Twain National Forest region and will grow to other areas over time. We ask everyone to explore safely and responsibly: leave no trash, and don’t make new trails.</p>
+    </section>
+    <section class="grid grid-cols-1 gap-4 md:grid-cols-3">
+      ${principles.map((p) => `
+      <div class="py-2">
+        <div class="text-primary">${icon(p[0])}</div>
+        <h2 class="mt-4 t-base font-semibold text-primary">${p[1]}</h2>
+        <p class="mt-2 t-sm text-secondary">${p[2]}</p>
+      </div>`).join('')}
+    </section>
+    <section>
+      <div class="flex gap-3">
+        <span class="mt-0.5 shrink-0 text-primary">${icon('shield')}</span>
+        <div>
+          <h2 class="t-base font-semibold text-primary">Use good judgment in the field</h2>
+          <p class="mt-2 t-sm text-secondary">Conditions, access, private property boundaries, closures, and wildlife risks can change. Confirm current rules before visiting, and do not enter closed or unsafe areas.</p>
+          <a href="#/safety" class="mt-4 inline-flex items-center gap-2 t-sm font-medium text-primary underline underline-offset-4 hover:no-underline">Read the full Safety &amp; Terms notice ${icon('arrow', 'ico-sm')}</a>
+        </div>
+      </div>
+    </section>
+    <section class="space-y-3">
+      <h2 class="text-2xl font-medium text-primary">What is included</h2>
+      <p class="t-sm text-secondary">Local America currently includes ${n} ${n === 1 ? 'record' : 'records'} grouped into ${m} place ${m === 1 ? 'type' : 'types'}. Each record retains its original field-log status and may link to a folder of photos.</p>
+      <p class="t-sm text-secondary">The source data is maintained separately from this browsing experience, so this starting point can keep growing as more field records are reviewed.</p>
+    </section>
+    <section id="contact" class="space-y-3">
+      <h2 class="text-2xl font-medium text-primary">Contact</h2>
+      <p class="t-sm text-secondary">Questions, corrections, or a spot we should know about? Reach out.</p>
+      <div class="flex flex-col gap-3 sm:flex-row">
+        <a href="mailto:${CFG.CONTACT_EMAIL}" class="${contactBtn}">${icon('mail', 'ico-sm')} Email us</a>
+        <a href="${CFG.FACEBOOK_URL}" target="_blank" rel="noopener noreferrer" class="${contactBtn}">${icon('message', 'ico-sm')} Message us on Facebook</a>
+      </div>
+      <p class="t-sm text-secondary">${CFG.CONTACT_EMAIL}</p>
+    </section>
+  </div>`;
 }
 
 function viewSafety() {
-  const items = [
-    ['Coordinates are approximate', 'GPS coordinates get you close but may be off by a distance. Use your own judgment on the ground.'],
-    ['Roads and terrain', 'Many places need rough roads or hiking. Check conditions, weather, and your vehicle before you go.'],
-    ['Public land and private property', 'Stay on public land, obey all signs and closures, and never cross private property lines.'],
-    ['Your responsibility', 'You travel at your own risk. Tell someone where you are going and carry water, a map, and a charged phone.'],
-    ['Leave it better', 'Pack out all trash, do not damage structures, and do not remove anything.']
+  const sections = [
+    ['1. Informational purposes only', 'Local America provides field notes, GPS coordinates, maps, route suggestions, and links to media for general informational and entertainment purposes only. Information may be incomplete, inaccurate, outdated, or affected by changing conditions. No guarantee is made about accuracy, completeness, safety, access, or reliability.'],
+    ['2. Outdoor activities involve serious risk', 'Off-roading, four-wheeling, hiking, camping, swimming, caving, and other outdoor activities can result in property damage, serious injury, or death. By using this Service, you knowingly and voluntarily accept the risks connected with these activities and with traveling to any location listed here.'],
+    ['3. Verify everything before you travel', 'GPS readings can vary because of weather, terrain, device hardware, and signal conditions. Never rely only on this Service for navigation. Check current official forestry maps, closures, access rules, trail and road conditions, and weather. Carry appropriate navigation, communication, recovery, and emergency supplies. Evaluate conditions in person before proceeding.'],
+    ['4. Respect boundaries and access rules', 'This Service does not grant permission, a license, or a right to enter any property. Land ownership, public and private boundaries, closures, and access regulations can change. Obey posted signs and all applicable federal, state, and local laws. You are responsible for avoiding trespass and for any fines, citations, or legal consequences related to your conduct.'],
+    ['5. Responsibility and limitation of liability', 'To the fullest extent permitted by law, the creator, owners, and developers of this Service are not responsible for injury, death, loss, damage, accidents, vehicle damage, property damage, emergency or rescue costs, fines, citations, or other consequences arising directly or indirectly from use of, or reliance on, the information in this Service. You are solely responsible for your own safety and the safety of your passengers and companions.']
   ];
   return `
-  <a href="#/about" class="t-sm font-medium text-primary underline underline-offset-2">← About</a>
-  <h1 class="text-3xl font-bold text-primary mt-3">Safety &amp; Terms</h1>
-  <ol class="mt-5 space-y-3">
-    ${items.map((it, i) => `<li class="rounded-lg bg-raised border border-line p-4"><b>${i + 1}. ${it[0]}</b><p class="t-sm text-secondary mt-0.5">${it[1]}</p></li>`).join('')}
-  </ol>
-  <p class="t-xs text-secondary mt-5">By using this guide you acknowledge and accept these terms.</p>`;
+  <article class="mx-auto max-w-3xl space-y-8 text-primary">
+    <nav class="flex items-center gap-2 t-sm text-secondary" aria-label="Breadcrumb">
+      <a href="#/about" class="inline-flex items-center gap-2 text-secondary hover:text-primary">${icon('back', 'ico-sm')} About</a>
+      <span aria-hidden="true">/</span>
+      <span class="truncate text-secondary">Safety &amp; Terms</span>
+    </nav>
+    <header class="space-y-4">
+      <p class="t-xs font-semibold uppercase tracking-[0.12em] text-secondary">Please read before using location data</p>
+      <h1 class="text-4xl font-medium tracking-tight text-primary">Safety &amp; Terms of Use</h1>
+      <p class="t-base leading-8 text-secondary">This notice explains the limits of this guide and your responsibility when deciding whether and how to visit a listed location.</p>
+    </header>
+    <section>
+      <div class="flex items-start gap-3">
+        <span class="mt-0.5 shrink-0 text-warnink">${icon('shield')}</span>
+        <div class="space-y-2 t-sm text-warnink">
+          <p class="font-semibold">Use this guide at your own risk.</p>
+          <p>Conditions, access, and location data can change. Confirm current information with official sources and use your own judgment before entering any area or starting any activity.</p>
+        </div>
+      </div>
+    </section>
+    <div class="space-y-6">
+      ${sections.map((s) => `
+      <section class="space-y-3">
+        <h2 class="text-2xl font-medium text-primary">${s[0]}</h2>
+        <p class="t-base leading-8 text-secondary">${s[1]}</p>
+      </section>`).join('')}
+    </div>
+    <section class="space-y-3 border-t border-line pt-6">
+      <h2 class="text-2xl font-medium text-primary">Your acknowledgment</h2>
+      <p class="mt-3 t-base leading-8 text-secondary">By accessing or using this Service, you acknowledge that you have read and understood this notice and agree to use the information at your own risk. If you do not agree, do not use the Service.</p>
+      <p class="mt-4 t-sm text-secondary">This notice is general information, not legal advice. Consider having a licensed attorney review it for your specific situation.</p>
+    </section>
+    <a href="#/" class="inline-flex items-center gap-2 t-sm font-medium text-primary hover:underline">${icon('back', 'ico-sm')} Return to the map</a>
+  </article>`;
+}
+
+// ================= ADD TO HOME SCREEN CARD (footer of every page) =================
+function renderInstall() {
+  const box = $('#installCard');
+  if (!box) return;
+  if (isStandalone || state.installed) { box.innerHTML = ''; return; }
+  const android = /Android/i.test(ua);
+  const ios = /iPhone|iPad|iPod/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  let inner;
+  if (inAppBrowser) {
+    inner = `
+      <div class="mt-3">
+        <p class="t-sm text-secondary">Open this page in your phone’s browser to add it to your home screen.</p>
+        ${android ? `<div class="mt-3"><button type="button" data-act="open-browser" class="${btnPrimaryLg}">${icon('external', 'ico-sm')}Open in browser</button></div>` : ''}
+        <p class="mt-3 t-sm text-secondary">${android ? 'If nothing happens, tap' : 'Tap'} the menu (⋮ or •••) and choose “Open in browser”.</p>
+      </div>`;
+  } else {
+    const steps = ios
+      ? `<li>Tap the Share button <span class="inline-flex align-text-bottom">${icon('share', 'ico-sm')}</span> at the bottom (or top) of Safari.</li><li>Scroll down and tap “Add to Home Screen”.</li><li>Tap “Add”.</li>`
+      : `<li>Tap the menu (⋮) in your browser.</li><li>Tap “Add to Home screen” (or “Install app”).</li><li>Tap “Add” or “Install”.</li>`;
+    inner = `
+      <div class="mt-3"><button type="button" data-act="install" class="${btnPrimaryLg}">${icon('plus', 'ico-sm')}Add to Home Screen</button></div>
+      ${state.steps && !state.installEvent ? `<ol class="mt-3 list-decimal space-y-1 pl-5 t-sm text-secondary">${steps}</ol>` : ''}`;
+  }
+  box.innerHTML = `
+  <section aria-label="Add to home screen" class="mt-4 rounded-xl border border-line bg-raised p-4 text-primary">
+    <div class="flex items-start gap-3">
+      <span class="mt-1 shrink-0 text-secondary">${icon('phone', 'ico-md')}</span>
+      <div class="min-w-0 flex-1">
+        <p class="t-base font-semibold">Keep Local America on your phone</p>
+        <p class="mt-1 t-sm text-secondary">Add it to your home screen and open the guide like any other app.</p>
+        ${inner}
+      </div>
+    </div>
+  </section>`;
 }
 
 // ================= ROUTER =================
@@ -732,18 +1034,23 @@ let lastRouteKey = '';
 function render() {
   const view = $('#view');
   if (state.error) {
-    view.innerHTML = `<div class="rounded-lg bg-errweak text-errink p-4 t-sm"><b>Something needs attention</b><p class="mt-1">${esc(state.error)}</p></div>`;
+    view.innerHTML = `<div class="text-center"><p class="t-sm text-errink">We couldn’t load the field records.</p><button type="button" data-act="reload" class="mt-3 t-sm font-medium text-errink underline">Try again</button></div>`;
     return;
   }
-  if (!state.ready) { view.innerHTML = `<p class="text-center text-secondary py-16">Loading places…</p>`; return; }
+  if (!state.ready) { view.innerHTML = `<div class="py-8 text-center t-sm text-secondary">Loading field records…</div>`; return; }
 
   const [, a, b] = (location.hash.slice(1) || '/').split('/');
   const key = `${a || ''}/${b || ''}`;
   const wasCatNear = state.catNear;
-  if (key !== lastRouteKey) { state.shown = CFG.PAGE_SIZE; if (a !== 'c') state.catNear = false; }
+  if (key !== lastRouteKey) { state.shown = CFG.PAGE_SIZE; state.cardAsk = null; state.catNear = false; }
 
   let html;
-  if (a === 'c' && b) html = viewCategory(decodeURIComponent(b));
+  if (a === 'c' && b) {
+    const cat = catBySlug(decodeURIComponent(b));
+    if (!cat) { location.hash = '#/'; return; }
+    html = viewList(cat);
+  }
+  else if (a === 'places') html = viewList(null);
   else if (a === 'near') html = viewNear();
   else if (a === 'p' && b) html = viewPlace(b);
   else if (a === 'about') html = viewAbout();
@@ -751,8 +1058,8 @@ function render() {
   else html = viewHome();
   view.innerHTML = html;
 
-  // Active tab = underlined, like the Glide nav
-  const active = a === 'near' ? 'near' : (a === 'about' || a === 'safety') ? 'about' : 'home';
+  // Active tab = underlined, like the Glide nav (no tab is underlined on place and place-type pages)
+  const active = !a ? 'home' : a === 'near' ? 'near' : (a === 'about' || a === 'safety') ? 'about' : '';
   document.querySelectorAll('[data-nav]').forEach((el) => {
     const on = el.dataset.nav === active;
     el.classList.toggle('underline', on);
@@ -763,39 +1070,154 @@ function render() {
   if (key !== lastRouteKey) {
     const cameFrom = lastRouteKey;
     lastRouteKey = key; window.scrollTo(0, 0);
+    if (a === 'about' && b === 'contact') { const c = document.getElementById('contact'); if (c) c.scrollIntoView(); }
     if (a === 'p' && b) {
       // Note when the place was opened from a Near me list, so the Traffic page can see if Near me leads anywhere
       const meta = cameFrom === 'near/' && state.distances ? { source: 'near_me' }
         : cameFrom.startsWith('c/') && wasCatNear ? { source: 'near_me_category' } : {};
       logEvent('place_view', Number(b), meta);
     } else if (a === 'c' && b) {
-      const cat = state.cats.find((c) => toSlug(c.name) === decodeURIComponent(b));
+      const cat = catBySlug(decodeURIComponent(b));
       logEvent('category_view', null, cat ? { category: cat.name } : {});
     }
   }
 }
 
+// ================= PHOTO VIEWER (pinch, scroll or double-tap to zoom; drag to look around) =================
+const pv = { photos: [], i: 0, alt: '', scale: 1, x: 0, y: 0, pts: new Map(),
+  g: { startDist: 1, startScale: 1, downX: 0, downY: 0, panX: 0, panY: 0, moved: false, lastTap: 0 } };
+
+function pvSet(scale, x, y) {
+  const img = $('#pvImg'), stage = $('#pvStage');
+  const s = Math.min(5, Math.max(1, scale));
+  if (s === 1) { x = 0; y = 0; }
+  else {
+    const lx = Math.max(0, (img.offsetWidth * s - stage.clientWidth) / 2);
+    const ly = Math.max(0, (img.offsetHeight * s - stage.clientHeight) / 2);
+    x = Math.min(lx, Math.max(-lx, x)); y = Math.min(ly, Math.max(-ly, y));
+  }
+  pv.scale = s; pv.x = x; pv.y = y;
+  img.style.transform = `translate(${x}px, ${y}px) scale(${s})`;
+  img.style.cursor = s > 1 ? 'grab' : 'zoom-in';
+}
+function pvShow() {
+  const many = pv.photos.length > 1, img = $('#pvImg');
+  img.src = pv.photos[pv.i]; img.alt = pv.alt;
+  pv.pts.clear(); pvSet(1, 0, 0);
+  $('#pvPrev').classList.toggle('hidden', !many);
+  $('#pvNext').classList.toggle('hidden', !many);
+  $('#pvCap').textContent = (many ? `${pv.i + 1} of ${pv.photos.length} · ` : '') + 'Pinch or scroll to zoom, drag to look around';
+}
+function pvOpen(photos, i, alt) {
+  if (!photos.length) return;
+  pv.photos = photos; pv.i = Math.min(Math.max(0, i || 0), photos.length - 1); pv.alt = alt;
+  $('#pv').classList.remove('hidden'); document.body.style.overflow = 'hidden';
+  pvShow();
+}
+function pvClose() { $('#pv').classList.add('hidden'); document.body.style.overflow = ''; $('#pvImg').removeAttribute('src'); }
+function pvGo(step) { pv.i = (pv.i + step + pv.photos.length) % pv.photos.length; pvShow(); }
+const pvOpenNow = () => !$('#pv').classList.contains('hidden');
+
+(function wirePhotoViewer() {
+  const stage = $('#pvStage'), g = pv.g;
+  const dist = () => { const [a, b] = Array.from(pv.pts.values()); return Math.hypot(a.x - b.x, a.y - b.y); };
+  stage.addEventListener('pointerdown', (e) => {
+    try { stage.setPointerCapture(e.pointerId); } catch (err) { /* fine */ }
+    pv.pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pv.pts.size === 1) { g.moved = false; g.downX = e.clientX; g.downY = e.clientY; g.panX = pv.x; g.panY = pv.y; }
+    else if (pv.pts.size === 2) { g.startDist = dist() || 1; g.startScale = pv.scale; g.moved = true; }
+  });
+  stage.addEventListener('pointermove', (e) => {
+    if (!pv.pts.has(e.pointerId)) return;
+    pv.pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pv.pts.size === 2) pvSet((g.startScale * dist()) / g.startDist, pv.x, pv.y);
+    else if (pv.pts.size === 1) {
+      const dx = e.clientX - g.downX, dy = e.clientY - g.downY;
+      if (Math.hypot(dx, dy) > 6) g.moved = true;
+      if (pv.scale > 1) pvSet(pv.scale, g.panX + dx, g.panY + dy);
+    }
+  });
+  const end = (e) => {
+    if (!pv.pts.has(e.pointerId)) return;
+    pv.pts.delete(e.pointerId);
+    if (pv.pts.size === 1) {
+      // One finger left after a pinch: keep panning from where it is now
+      const [rest] = Array.from(pv.pts.values());
+      g.downX = rest.x; g.downY = rest.y; g.panX = pv.x; g.panY = pv.y;
+      return;
+    }
+    if (pv.pts.size > 0 || g.moved || e.type === 'pointercancel') return;
+    // A plain tap: outside the photo closes, a double tap on the photo zooms
+    const r = $('#pvImg').getBoundingClientRect();
+    const onImage = e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+    if (!onImage) return pvClose();
+    const now = Date.now();
+    if (now - g.lastTap < 320) { g.lastTap = 0; pv.scale > 1 ? pvSet(1, 0, 0) : pvSet(2.5, 0, 0); }
+    else g.lastTap = now;
+  };
+  stage.addEventListener('pointerup', end);
+  stage.addEventListener('pointercancel', end);
+  stage.addEventListener('wheel', (e) => { e.preventDefault(); pvSet(pv.scale * (e.deltaY < 0 ? 1.15 : 1 / 1.15), pv.x, pv.y); }, { passive: false });
+  window.addEventListener('keydown', (e) => {
+    if (!pvOpenNow()) return;
+    if (e.key === 'Escape') pvClose();
+    else if (e.key === 'ArrowLeft' && pv.photos.length > 1) pvGo(-1);
+    else if (e.key === 'ArrowRight' && pv.photos.length > 1) pvGo(1);
+  });
+})();
+
 // ================= EVENTS =================
 document.addEventListener('click', async (e) => {
   const el = e.target.closest('[data-act]'); if (!el) return;
   const act = el.dataset.act;
-  if (act === 'lb-close') { if (e.target === el || el.tagName === 'BUTTON') $('#lb').classList.add('hidden'); return; }
-  if (act === 'lb-open') { $('#lbImg').src = el.dataset.src; $('#lb').classList.remove('hidden'); return; }
+  if (act === 'pv-close') return pvClose();
+  if (act === 'pv-prev') return pvGo(-1);
+  if (act === 'pv-next') return pvGo(1);
+  if (act === 'pv-in') return pvSet(pv.scale * 1.5, pv.x, pv.y);
+  if (act === 'pv-out') return pvSet(pv.scale / 1.5, pv.x, pv.y);
+  if (act === 'pv-open') {
+    const l = state.locs.find((x) => String(x.id) === String(el.dataset.id));
+    if (!l) return;
+    return pvOpen((state.photos[l.id] || []).map((p) => photoUrl(p.object_key)), Number(el.dataset.i), `${l.name} field photo`);
+  }
+  if (act === 'reload') return location.reload();
   if (act === 'unlock') return startUnlock(Number(el.dataset.id));
   if (act === 'find') return findMe();
   if (act === 'cat-near-on') { state.catNear = true; state.shown = CFG.PAGE_SIZE; return state.distances ? render() : findMe(); }
   if (act === 'cat-near-off') { state.catNear = false; state.shown = CFG.PAGE_SIZE; return render(); }
   if (act === 'more') { state.shown += CFG.PAGE_SIZE; return render(); }
-  if (act === 'road') { await roadMilesFor([Number(el.dataset.id)]); return render(); }
+  if (act === 'dist') {
+    const id = Number(el.dataset.id);
+    // First tap: find the phone and show straight-line miles on every card
+    if (!state.distances) { state.cardAsk = id; return findMe(); }
+    // Next tap: ask for road miles for this one place
+    if (typeof state.road[id] === 'number' || state.road[id] === null || state.distances[id] == null || state.roadBusy[id]) return;
+    state.roadBusy[id] = true; delete state.roadFail[id]; render();
+    await roadMilesFor([id]);
+    delete state.roadBusy[id];
+    if (state.road[id] === undefined) state.roadFail[id] = true;
+    return render();
+  }
   if (act === 'maps') { logEvent('open_in_maps', Number(el.dataset.id)); return; }
-  if (act === 'copy') {
-    try { await navigator.clipboard.writeText(el.dataset.text); toast('Coordinates copied'); }
-    catch (err) { toast('Press and hold the numbers to copy'); }
+  if (act === 'open-browser') {
+    // Asks Android to open this exact page in the phone's default browser.
+    // Facebook's browser may ignore it, so the menu tip stays underneath.
+    const { host, pathname, search, hash } = location;
+    location.href = `intent://${host}${pathname}${search}${hash}#Intent;scheme=https;action=android.intent.action.VIEW;end`;
     return;
   }
-  if (act === 'install' && state.installEvent) {
-    state.installEvent.prompt(); await state.installEvent.userChoice;
-    state.installEvent = null; $('#installCard').classList.add('hidden');
+  if (act === 'install') {
+    if (state.installEvent) {
+      try {
+        state.installEvent.prompt();
+        const choice = await state.installEvent.userChoice;
+        if (choice && choice.outcome === 'accepted') state.installed = true;
+      } catch (err) { state.steps = true; }
+      state.installEvent = null;
+    } else {
+      state.steps = !state.steps;
+    }
+    return renderInstall();
   }
 });
 
@@ -809,10 +1231,11 @@ window.addEventListener('hashchange', render);
 window.addEventListener('pageshow', (e) => { if (e.persisted && state.busy) { state.busy = null; render(); } });
 
 window.addEventListener('beforeinstallprompt', (e) => {
-  e.preventDefault(); state.installEvent = e; $('#installCard').classList.remove('hidden');
+  e.preventDefault(); state.installEvent = e; renderInstall();
   try { if (!sessionStorage.getItem('la_ip')) { sessionStorage.setItem('la_ip', '1'); logEvent('install_prompt_shown'); } } catch (err) { /* fine */ }
 });
-window.addEventListener('appinstalled', () => { $('#installCard').classList.add('hidden'); toast('App installed'); logEvent('app_installed'); });
+window.addEventListener('appinstalled', () => { state.installed = true; state.installEvent = null; renderInstall(); toast('App installed'); logEvent('app_installed'); });
+renderInstall();
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));

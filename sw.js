@@ -1,5 +1,5 @@
 // Local America service worker: app shell cached, data always fresh
-const CACHE = 'local-america-v3';
+const CACHE = 'local-america-v4';
 const SHELL = ['./', './index.html', './manifest.json', './pixel.js'];
 
 self.addEventListener('install', (event) => {
