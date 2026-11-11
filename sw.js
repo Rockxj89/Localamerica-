@@ -1,6 +1,6 @@
 // Local America service worker: app shell cached, data always fresh
-const CACHE = 'local-america-v4';
-const SHELL = ['./', './index.html', './manifest.json', './pixel.js'];
+const CACHE = 'local-america-v5';
+const SHELL = ['./', './index.html', './manifest.json', './pixel.js', './logo.svg', './icon.svg', './icon-maskable.svg'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));

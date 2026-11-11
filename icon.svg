@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+<defs>
+<clipPath id="pe"><path d="M400 440 L303 263 A110 110 0 1 1 497 263 Z"/></clipPath>
+<mask id="me"><rect x="0" y="0" width="800" height="600" fill="#fff"/><circle cx="400" cy="210" r="42" fill="#000"/></mask>
+</defs>
+<rect width="512" height="512" fill="#0D1322"/>
+<g transform="translate(256 256) scale(1.12) translate(-400 -270)">
+<polygon points="400,186 406,202 423,202.5 409.5,213.3 414.4,230 400,220.2 385.6,230 390.5,213.3 377,202.5 394,202" fill="#FFFFFF"/>
+<path d="M400 440 L303 263 A110 110 0 1 1 497 263 Z" fill="#2C3F7A" mask="url(#me)"/>
+<g clip-path="url(#pe)" fill="none" stroke-width="18">
+<path d="M270 302 Q335 276 400 302 T530 302" stroke="#D0393F"/>
+<path d="M270 342 Q335 316 400 342 T530 342" stroke="#FFFFFF"/>
+<path d="M270 382 Q335 356 400 382 T530 382" stroke="#6F8FDA"/>
+</g>
+</g>
+</svg>
