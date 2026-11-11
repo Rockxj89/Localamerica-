@@ -208,7 +208,7 @@ const CFG = {
   NEAR_MILES: 75,
   ROAD_NEAREST: 10,
   PAGE_SIZE: 24,
-  // Near me lists start with just the closest 5; "Show 5 more" adds 5 at a time
+  // Near me lists show only the closest 5 (no "show more")
   NEAR_PAGE_SIZE: 5
 };
 
@@ -371,7 +371,7 @@ const state = {
   ready: false, error: null,
   locs: [], photos: {}, cats: [],
   userPos: null, distances: null, road: {}, locStatus: 'idle',
-  catNear: false, nearType: '', shown: CFG.PAGE_SIZE, nearShown: CFG.NEAR_PAGE_SIZE, installEvent: null,
+  catNear: false, nearType: '', shown: CFG.PAGE_SIZE, installEvent: null,
   busy: null
 };
 
@@ -705,7 +705,7 @@ function cardHtml(l) {
 }
 
 const cardGrid = (items) => `<div class="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-4">${items.map(cardHtml).join('')}</div>`;
-const showMore = (total, shown, act = 'more', label = 'Show more places') => total > shown ? `<div class="text-center"><button type="button" data-act="${act}" class="${btnSecondary}">${label}</button></div>` : '';
+const showMore = (total, shown) => total > shown ? `<div class="text-center"><button type="button" data-act="more" class="${btnSecondary}">Show more places</button></div>` : '';
 
 // Shown only inside the Facebook, Messenger and Instagram browsers, where location often doesn't work
 function inAppTip(cls = 'mx-auto max-w-md t-sm text-secondary') {
@@ -794,13 +794,15 @@ function viewList(cat) {
   const nearOn = !!cat && state.catNear;
   const ready = state.locStatus === 'ready' && !!state.distances;
   if (nearOn && ready) {
+    // Near me inside a place type: only the closest 5 within the radius, no "show more"
     items = items.filter((l) => (state.distances[l.id] ?? Infinity) <= CFG.NEAR_MILES)
-                 .sort((a, b) => state.distances[a.id] - state.distances[b.id]);
+                 .sort((a, b) => state.distances[a.id] - state.distances[b.id])
+                 .slice(0, CFG.NEAR_PAGE_SIZE);
   }
   const shown = items.slice(0, state.shown);
   const scope = [nearOn ? `Within ${CFG.NEAR_MILES}-mile radius` : '', label].filter(Boolean).join(' · ');
   const nearMsg = ready
-    ? (nearOn ? `Showing the closest ${label.toLowerCase()} within a ${CFG.NEAR_MILES}-mile straight-line radius. Local America doesn’t store your location.`
+    ? (nearOn ? `Showing the closest ${CFG.NEAR_PAGE_SIZE} ${label.toLowerCase()} within a ${CFG.NEAR_MILES}-mile straight-line radius. Local America doesn’t store your location.`
               : 'Find nearby places in this category. Local America doesn’t store your location.')
     : locMessage('Use your location to find places in this category. Local America doesn’t store your location.');
   const loading = state.locStatus === 'loading';
@@ -814,7 +816,7 @@ function viewList(cat) {
       ${loading ? '' : `<button type="button" data-act="cat-near-on" class="${btnSecondary} mt-3">Try again</button>`}
     </div>`;
   } else if (items.length) {
-    body = cardGrid(shown) + showMore(items.length, shown.length, 'more', nearOn ? `Show ${CFG.NEAR_PAGE_SIZE} more places` : 'Show more places');
+    body = cardGrid(shown) + (nearOn ? '' : showMore(items.length, shown.length));
   } else {
     body = `
     <div class="py-10 text-center">
@@ -876,7 +878,7 @@ function viewNear() {
   const miles = (l) => (typeof state.road[l.id] === 'number' ? state.road[l.id] : state.distances[l.id]);
   const top = items.slice(0, CFG.ROAD_NEAREST).sort((a, b) => miles(a) - miles(b));
   items = top.concat(items.slice(CFG.ROAD_NEAREST));
-  const shown = items.slice(0, state.nearShown);
+  const shown = items.slice(0, CFG.NEAR_PAGE_SIZE);
   const types = state.cats.map((c) => c.name).sort((a, b) => catLabel(a).localeCompare(catLabel(b)));
   const typeName = state.nearType ? catLabel(state.nearType).toLowerCase() : 'places';
 
@@ -891,7 +893,7 @@ function viewNear() {
       </select>
       <p class="t-xs text-secondary" aria-live="polite">Showing the closest ${shown.length} ${esc(typeName)}.</p>
     </section>
-    ${items.length ? cardGrid(shown) + showMore(items.length, shown.length, 'more-near', `Show ${CFG.NEAR_PAGE_SIZE} more places`)
+    ${items.length ? cardGrid(shown)
       : `<p class="py-10 text-center t-sm text-secondary">No places are available in this type yet.</p>`}
   </div>`;
 }
@@ -1129,7 +1131,7 @@ function render() {
   const [, a, b] = (location.hash.slice(1) || '/').split('/');
   const key = `${a || ''}/${b || ''}`;
   const wasCatNear = state.catNear;
-  if (key !== lastRouteKey) { state.shown = CFG.PAGE_SIZE; state.nearShown = CFG.NEAR_PAGE_SIZE; state.cardAsk = null; state.catNear = false; }
+  if (key !== lastRouteKey) { state.shown = CFG.PAGE_SIZE; state.cardAsk = null; state.catNear = false; }
 
   let html;
   if (a === 'c' && b) {
@@ -1269,11 +1271,10 @@ document.addEventListener('click', async (e) => {
   }
   if (act === 'reload') return location.reload();
   if (act === 'unlock') return startUnlock(Number(el.dataset.id));
-  if (act === 'find') { state.nearShown = CFG.NEAR_PAGE_SIZE; return findMe(); }
-  if (act === 'cat-near-on') { state.catNear = true; state.shown = CFG.NEAR_PAGE_SIZE; return state.distances ? render() : findMe(); }
+  if (act === 'find') return findMe();
+  if (act === 'cat-near-on') { state.catNear = true; state.shown = CFG.PAGE_SIZE; return state.distances ? render() : findMe(); }
   if (act === 'cat-near-off') { state.catNear = false; state.shown = CFG.PAGE_SIZE; return render(); }
-  if (act === 'more') { state.shown += state.catNear ? CFG.NEAR_PAGE_SIZE : CFG.PAGE_SIZE; return render(); }
-  if (act === 'more-near') { state.nearShown += CFG.NEAR_PAGE_SIZE; return render(); }
+  if (act === 'more') { state.shown += CFG.PAGE_SIZE; return render(); }
   if (act === 'dist') {
     const id = Number(el.dataset.id);
     // First tap: find the phone and show straight-line miles on every card
@@ -1310,7 +1311,7 @@ document.addEventListener('click', async (e) => {
 });
 
 document.addEventListener('change', (e) => {
-  if (e.target.id === 'nearType') { state.nearType = e.target.value; state.nearShown = CFG.NEAR_PAGE_SIZE; render(); }
+  if (e.target.id === 'nearType') { state.nearType = e.target.value; render(); }
 });
 
 window.addEventListener('hashchange', render);
