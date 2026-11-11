@@ -37,7 +37,9 @@
       okweak: '#E3F0E4', okink: '#1D5B2E',
       infoweak: '#E2EDF3', infoink: '#1F4B66',
       warnweak: '#F5EDD7', warnink: '#6A4A0E',
-      errweak: '#F6E2DF', errink: '#8A2A20'
+      errweak: '#F6E2DF', errink: '#8A2A20',
+      // Colored words for the access and road labels (no highlighted background)
+      freeblue: '#1D5FA8', paidgreen: '#15803D', roadred: '#C0271C'
     }
   } } };
 </script>
@@ -315,12 +317,13 @@ function photoUrl(key) {
   return `${CFG.SUPABASE_URL}/storage/v1/object/public/${CFG.PHOTO_BUCKET}/${key.split('/').map(encodeURIComponent).join('/')}`;
 }
 
-// Road access badge: same rules, wording and colors as the Glide guide.
+// Road access badge: same rules and wording as the Glide guide.
+// The label is colored words (no highlighted background): green, brown, red.
 // Anything not listed is treated as "rough" until the road has been verified.
 const ROAD = {
-  easy:  { label: 'Easy access', detail: 'Reachable by any vehicle.', tone: 'bg-okweak text-okink ring-okink/15', icon: 'car' },
-  walk:  { label: 'Walk-in only', detail: 'No vehicle access. Plan to hike in.', tone: 'bg-warnweak text-warnink ring-warnink/20', icon: 'feet' },
-  rough: { label: 'Rough roads likely', detail: 'Road not verified. Plan for unpaved, rough roads. High clearance or 4WD recommended.', tone: 'bg-errweak text-errink ring-errink/15', icon: 'truck' }
+  easy:  { label: 'Easy access', detail: 'Reachable by any vehicle.', tone: 'text-okink', icon: 'car' },
+  walk:  { label: 'Walk-in only', detail: 'No vehicle access. Plan to hike in.', tone: 'text-warnink', icon: 'feet' },
+  rough: { label: 'Rough roads likely', detail: 'Road not verified. Plan for unpaved, rough roads. High clearance or 4WD recommended.', tone: 'text-roadred', icon: 'truck' }
 };
 const ROAD_BY_CATEGORY = {
   'Buildings and stores': 'easy', 'Open Stores': 'easy', 'Popular locations': 'easy',
@@ -635,16 +638,18 @@ const btnTertiary = `${btnBase} h-11 gap-2 px-5 bg-white text-primary shadow-car
 
 const eyebrow = (text) => `<p class="mb-3 t-xs font-semibold uppercase tracking-[0.12em] text-secondary">${esc(text)}</p>`;
 
+// Access label: colored words only, no highlighted pill. Free = blue, Paid = green.
 function accessBadge(l, compact = false) {
   const free = isFree(l);
-  const sz = compact ? 'px-2 py-0.5 text-[13px] font-medium leading-tight' : 'whitespace-nowrap px-2.5 py-1 t-xs font-medium';
-  return `<span class="inline-flex w-fit max-w-full items-center gap-1 rounded-full ${sz} ring-1 ring-inset ${free ? 'bg-okweak text-okink ring-okink/15' : 'bg-infoweak text-infoink ring-infoink/15'}">${icon(free ? 'unlock' : 'lock', 'ico-xs')}<span class="${compact ? '' : 'truncate'}">${free ? 'Free access' : 'Paid access'}</span></span>`;
+  const sz = compact ? 'text-[13px] font-semibold leading-tight' : 'whitespace-nowrap t-xs font-semibold';
+  return `<span class="inline-flex w-fit max-w-full items-center gap-1 ${sz} ${free ? 'text-freeblue' : 'text-paidgreen'}">${icon(free ? 'unlock' : 'lock', 'ico-xs')}<span class="${compact ? '' : 'truncate'}">${free ? 'Free access' : 'Paid access'}</span></span>`;
 }
 
+// Road label: colored words only, no highlighted pill.
 function roadBadge(l, compact = false) {
   const r = roadInfo(l);
-  const sz = compact ? 'px-2 py-0.5 text-[13px] font-semibold leading-tight' : 'whitespace-nowrap px-2.5 py-1 t-xs font-semibold';
-  return `<span class="inline-flex w-fit max-w-full items-center gap-1 rounded-full ${sz} ring-1 ring-inset ${r.tone}">${icon(r.icon, compact ? 'ico-xs' : 'ico-sm')}<span class="${compact ? '' : 'truncate'}">${r.label}</span></span>`;
+  const sz = compact ? 'text-[13px] font-semibold leading-tight' : 'whitespace-nowrap t-xs font-semibold';
+  return `<span class="inline-flex w-fit max-w-full items-center gap-1 ${sz} ${r.tone}">${icon(r.icon, compact ? 'ico-xs' : 'ico-sm')}<span class="${compact ? '' : 'truncate'}">${r.label}</span></span>`;
 }
 
 function excerpt(text, len = 116) {
@@ -910,7 +915,7 @@ function viewPlace(id) {
         <span class="truncate text-secondary">${esc(l.name)}</span>
       </nav>
       <header class="space-y-4">
-        <div class="flex flex-wrap items-center gap-2">${accessBadge(l)}${roadBadge(l)}</div>
+        <div class="flex flex-wrap items-center gap-x-4 gap-y-2">${accessBadge(l)}${roadBadge(l)}</div>
         <h1 class="font-display text-[length:var(--fs-h1)] font-semibold leading-[1.1] tracking-[-0.02em] text-primary">${esc(l.name)}</h1>
         ${gps ? `<div class="flex flex-wrap items-center gap-x-5 gap-y-2 t-sm text-secondary"><span class="inline-flex items-center gap-2"><span class="text-primary">${icon('pin', 'ico-sm')}</span><span class="select-text">${coords}</span></span></div>` : ''}
       </header>
@@ -972,44 +977,37 @@ function viewPlace(id) {
 function viewAbout() {
   const n = state.locs.length, m = state.cats.length;
   const principles = [
-    ['pin', 'Coordinates by access', `Free locations show GPS publicly. Unlock one paid location’s GPS for ${CFG.UNLOCK_PRICE}, a one-time payment with no subscription that never expires. No account needed. Your purchase is saved on this device.`],
-    ['book', 'Field notes', 'Descriptions preserve the practical observations attached to each location.'],
-    ['compass', 'Explore responsibly', 'Use the guide as a starting point and prepare for changing trail and road conditions.']
+    ['Coordinates by access', `Free locations show GPS publicly. Unlock one paid location’s GPS for ${CFG.UNLOCK_PRICE}, a one-time payment with no subscription that never expires. No account needed. Your purchase is saved on this device.`],
+    ['Field notes', 'Descriptions preserve the practical observations attached to each location.'],
+    ['Explore responsibly', 'Use the guide as a starting point and prepare for changing trail and road conditions.']
   ];
+  const h2 = 'font-display text-[length:var(--fs-h2)] font-semibold leading-[1.2] tracking-[-0.015em] text-primary';
   const contactBtn = 'lift press inline-flex h-11 items-center gap-2 rounded-full bg-white px-5 text-base font-semibold text-primary shadow-card';
   return `
   <div class="mx-auto max-w-3xl space-y-12">
     ${logoSvg('0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 6 6 6 0 -4.2')}
     <section class="space-y-3">
-      <h2 class="font-display text-[length:var(--fs-h2)] font-semibold leading-[1.2] tracking-[-0.015em] text-primary">Our mission</h2>
+      <h2 class="${h2}">Our mission</h2>
       <p class="t-sm text-secondary">Local America helps anyone find the closest place to get outside today, whether that’s a swimming hole, a campsite, a cave, a bluff, or a muddy trail for the truck. It isn’t a trip planner. It’s built for the spur-of-the-moment “let’s go” outing.</p>
       <p class="t-sm text-secondary">We start in the Mark Twain National Forest region and will grow to other areas over time. We ask everyone to explore safely and responsibly: leave no trash, and don’t make new trails.</p>
     </section>
-    <section class="grid grid-cols-1 gap-4 md:grid-cols-3 md:gap-5">
-      ${principles.map((p) => `
-      <div class="rounded-card bg-white p-5 shadow-card">
-        <span class="grid h-11 w-11 place-items-center rounded-full bg-accent/10 text-accenthover">${icon(p[0])}</span>
-        <h2 class="mt-4 t-base font-semibold tracking-[-0.01em] text-primary">${p[1]}</h2>
-        <p class="mt-2 t-sm text-secondary">${p[2]}</p>
-      </div>`).join('')}
-    </section>
-    <section class="rounded-card bg-inset p-5 sm:p-6">
-      <div class="flex gap-4">
-        <span class="mt-0.5 shrink-0 text-primary">${icon('shield')}</span>
-        <div>
-          <h2 class="t-base font-semibold text-primary">Use good judgment in the field</h2>
-          <p class="mt-2 t-sm text-secondary">Conditions, access, private property boundaries, closures, and wildlife risks can change. Confirm current rules before visiting, and do not enter closed or unsafe areas.</p>
-          <a href="#/safety" class="mt-4 inline-flex items-center gap-2 t-sm font-medium text-primary underline decoration-black/20 underline-offset-4 hover:decoration-current">Read the full Safety &amp; Terms notice ${icon('arrow', 'ico-sm')}</a>
-        </div>
-      </div>
+    ${principles.map((p) => `
+    <section class="space-y-3">
+      <h2 class="${h2}">${p[0]}</h2>
+      <p class="t-sm text-secondary">${p[1]}</p>
+    </section>`).join('')}
+    <section class="space-y-3">
+      <h2 class="${h2}">Use good judgment in the field</h2>
+      <p class="t-sm text-secondary">Conditions, access, private property boundaries, closures, and wildlife risks can change. Confirm current rules before visiting, and do not enter closed or unsafe areas.</p>
+      <a href="#/safety" class="inline-flex items-center gap-2 t-sm font-medium text-primary underline decoration-black/20 underline-offset-4 hover:decoration-current">Read the full Safety &amp; Terms notice ${icon('arrow', 'ico-sm')}</a>
     </section>
     <section class="space-y-3">
-      <h2 class="font-display text-[length:var(--fs-h2)] font-semibold leading-[1.2] tracking-[-0.015em] text-primary">What is included</h2>
+      <h2 class="${h2}">What is included</h2>
       <p class="t-sm text-secondary">Local America currently includes ${n} ${n === 1 ? 'record' : 'records'} grouped into ${m} place ${m === 1 ? 'type' : 'types'}. Each record retains its original field-log status and may link to a folder of photos.</p>
       <p class="t-sm text-secondary">The source data is maintained separately from this browsing experience, so this starting point can keep growing as more field records are reviewed.</p>
     </section>
     <section id="contact" class="space-y-3">
-      <h2 class="font-display text-[length:var(--fs-h2)] font-semibold leading-[1.2] tracking-[-0.015em] text-primary">Contact</h2>
+      <h2 class="${h2}">Contact</h2>
       <p class="t-sm text-secondary">Questions, corrections, or a spot we should know about? Reach out.</p>
       <div class="flex flex-col gap-3 sm:flex-row">
         <a href="mailto:${CFG.CONTACT_EMAIL}" class="${contactBtn}">${icon('mail', 'ico-sm')} Email us</a>
