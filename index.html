@@ -207,7 +207,9 @@ const CFG = {
   FACEBOOK_URL: 'https://www.facebook.com/share/1QRkXzhmJo/',
   NEAR_MILES: 75,
   ROAD_NEAREST: 10,
-  PAGE_SIZE: 24
+  PAGE_SIZE: 24,
+  // Near me lists start with just the closest 5; "Show 5 more" adds 5 at a time
+  NEAR_PAGE_SIZE: 5
 };
 
 // ================= ICONS (same set as the Glide guide) =================
@@ -369,7 +371,7 @@ const state = {
   ready: false, error: null,
   locs: [], photos: {}, cats: [],
   userPos: null, distances: null, road: {}, locStatus: 'idle',
-  catNear: false, nearType: '', shown: CFG.PAGE_SIZE, installEvent: null,
+  catNear: false, nearType: '', shown: CFG.PAGE_SIZE, nearShown: CFG.NEAR_PAGE_SIZE, installEvent: null,
   busy: null
 };
 
@@ -703,7 +705,7 @@ function cardHtml(l) {
 }
 
 const cardGrid = (items) => `<div class="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-4">${items.map(cardHtml).join('')}</div>`;
-const showMore = (total, shown) => total > shown ? `<div class="text-center"><button type="button" data-act="more" class="${btnSecondary}">Show more places</button></div>` : '';
+const showMore = (total, shown, act = 'more', label = 'Show more places') => total > shown ? `<div class="text-center"><button type="button" data-act="${act}" class="${btnSecondary}">${label}</button></div>` : '';
 
 // Shown only inside the Facebook, Messenger and Instagram browsers, where location often doesn't work
 function inAppTip(cls = 'mx-auto max-w-md t-sm text-secondary') {
@@ -798,7 +800,7 @@ function viewList(cat) {
   const shown = items.slice(0, state.shown);
   const scope = [nearOn ? `Within ${CFG.NEAR_MILES}-mile radius` : '', label].filter(Boolean).join(' · ');
   const nearMsg = ready
-    ? (nearOn ? `Showing ${label.toLowerCase()} within a ${CFG.NEAR_MILES}-mile straight-line radius. Local America doesn’t store your location.`
+    ? (nearOn ? `Showing the closest ${label.toLowerCase()} within a ${CFG.NEAR_MILES}-mile straight-line radius. Local America doesn’t store your location.`
               : 'Find nearby places in this category. Local America doesn’t store your location.')
     : locMessage('Use your location to find places in this category. Local America doesn’t store your location.');
   const loading = state.locStatus === 'loading';
@@ -812,7 +814,7 @@ function viewList(cat) {
       ${loading ? '' : `<button type="button" data-act="cat-near-on" class="${btnSecondary} mt-3">Try again</button>`}
     </div>`;
   } else if (items.length) {
-    body = cardGrid(shown) + showMore(items.length, shown.length);
+    body = cardGrid(shown) + showMore(items.length, shown.length, 'more', nearOn ? `Show ${CFG.NEAR_PAGE_SIZE} more places` : 'Show more places');
   } else {
     body = `
     <div class="py-10 text-center">
@@ -852,7 +854,7 @@ function viewNear() {
     <header class="min-w-0">
       ${eyebrow('Local America')}
       <h1 class="font-display text-[length:var(--fs-h1)] font-semibold leading-[1.1] tracking-[-0.02em] text-primary">Near me</h1>
-      <p class="mt-3 max-w-2xl t-sm text-secondary">Every place in the guide, closest first. The nearest ${CFG.ROAD_NEAREST} show driving miles. The rest show straight-line miles, and you can tap any distance to get its driving miles. Local America doesn’t store your location.</p>
+      <p class="mt-3 max-w-2xl t-sm text-secondary">The ${CFG.NEAR_PAGE_SIZE} closest places to you. Pick a place type to see the ${CFG.NEAR_PAGE_SIZE} closest of that kind. The closest places show driving miles, and you can tap any distance to get its driving miles. Local America doesn’t store your location.</p>
     </header>`;
 
   if (!ready) {
@@ -861,7 +863,7 @@ function viewNear() {
     <div class="space-y-8">
       ${header}
       <section class="space-y-4 text-center" aria-live="polite">
-        <p class="t-sm text-infoink">${esc(locMessage('Share your location to see every place, closest first.'))}</p>
+        <p class="t-sm text-infoink">${esc(locMessage(`Share your location to see the ${CFG.NEAR_PAGE_SIZE} closest places.`))}</p>
         ${inAppTip()}
         ${s === 'loading' ? '' : `<button type="button" data-act="find" class="${btnPrimary}">${icon('nav', 'ico-sm')}${s === 'denied' || s === 'error' ? 'Try again' : 'Find places near me'}</button>`}
       </section>
@@ -874,20 +876,22 @@ function viewNear() {
   const miles = (l) => (typeof state.road[l.id] === 'number' ? state.road[l.id] : state.distances[l.id]);
   const top = items.slice(0, CFG.ROAD_NEAREST).sort((a, b) => miles(a) - miles(b));
   items = top.concat(items.slice(CFG.ROAD_NEAREST));
-  const shown = items.slice(0, state.shown);
+  const shown = items.slice(0, state.nearShown);
   const types = state.cats.map((c) => c.name).sort((a, b) => catLabel(a).localeCompare(catLabel(b)));
+  const typeName = state.nearType ? catLabel(state.nearType).toLowerCase() : 'places';
 
   return `
   <div class="space-y-8">
     ${header}
     <section class="space-y-2">
-      <label for="nearType" class="block t-sm font-medium text-primary">Place type</label>
-      <select id="nearType" class="h-11 w-full max-w-sm rounded-xl bg-white px-3 text-base text-primary shadow-card">
+      <label for="nearType" class="block t-sm font-medium text-primary">Pick a place type</label>
+      <select id="nearType" class="h-12 w-full max-w-sm rounded-xl bg-white px-3 text-base text-primary shadow-card">
         <option value="">All place types</option>
         ${types.map((c) => `<option value="${esc(c)}" ${state.nearType === c ? 'selected' : ''}>${esc(catLabel(c))}</option>`).join('')}
       </select>
+      <p class="t-xs text-secondary" aria-live="polite">Showing the closest ${shown.length} ${esc(typeName)}.</p>
     </section>
-    ${items.length ? cardGrid(shown) + showMore(items.length, shown.length)
+    ${items.length ? cardGrid(shown) + showMore(items.length, shown.length, 'more-near', `Show ${CFG.NEAR_PAGE_SIZE} more places`)
       : `<p class="py-10 text-center t-sm text-secondary">No places are available in this type yet.</p>`}
   </div>`;
 }
@@ -1125,7 +1129,7 @@ function render() {
   const [, a, b] = (location.hash.slice(1) || '/').split('/');
   const key = `${a || ''}/${b || ''}`;
   const wasCatNear = state.catNear;
-  if (key !== lastRouteKey) { state.shown = CFG.PAGE_SIZE; state.cardAsk = null; state.catNear = false; }
+  if (key !== lastRouteKey) { state.shown = CFG.PAGE_SIZE; state.nearShown = CFG.NEAR_PAGE_SIZE; state.cardAsk = null; state.catNear = false; }
 
   let html;
   if (a === 'c' && b) {
@@ -1265,10 +1269,11 @@ document.addEventListener('click', async (e) => {
   }
   if (act === 'reload') return location.reload();
   if (act === 'unlock') return startUnlock(Number(el.dataset.id));
-  if (act === 'find') return findMe();
-  if (act === 'cat-near-on') { state.catNear = true; state.shown = CFG.PAGE_SIZE; return state.distances ? render() : findMe(); }
+  if (act === 'find') { state.nearShown = CFG.NEAR_PAGE_SIZE; return findMe(); }
+  if (act === 'cat-near-on') { state.catNear = true; state.shown = CFG.NEAR_PAGE_SIZE; return state.distances ? render() : findMe(); }
   if (act === 'cat-near-off') { state.catNear = false; state.shown = CFG.PAGE_SIZE; return render(); }
-  if (act === 'more') { state.shown += CFG.PAGE_SIZE; return render(); }
+  if (act === 'more') { state.shown += state.catNear ? CFG.NEAR_PAGE_SIZE : CFG.PAGE_SIZE; return render(); }
+  if (act === 'more-near') { state.nearShown += CFG.NEAR_PAGE_SIZE; return render(); }
   if (act === 'dist') {
     const id = Number(el.dataset.id);
     // First tap: find the phone and show straight-line miles on every card
@@ -1305,7 +1310,7 @@ document.addEventListener('click', async (e) => {
 });
 
 document.addEventListener('change', (e) => {
-  if (e.target.id === 'nearType') { state.nearType = e.target.value; state.shown = CFG.PAGE_SIZE; render(); }
+  if (e.target.id === 'nearType') { state.nearType = e.target.value; state.nearShown = CFG.NEAR_PAGE_SIZE; render(); }
 });
 
 window.addEventListener('hashchange', render);
