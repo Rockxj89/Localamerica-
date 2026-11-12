@@ -6,6 +6,19 @@
 <meta name="theme-color" content="#f7f9fa">
 <meta name="mobile-web-app-capable" content="yes">
 <title>Local America</title>
+<meta name="description" content="A field guide to hard-to-find public-land places across the Ozarks.">
+<!-- Link preview (Facebook, Messenger, texts): shows the logo when the link is shared -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Local America">
+<meta property="og:title" content="Local America">
+<meta property="og:description" content="A field guide to hard-to-find public-land places across the Ozarks.">
+<meta property="og:url" content="https://localamerica.vercel.app/">
+<meta property="og:image" content="https://localamerica.vercel.app/Notes_261110_202947_da0.jpg">
+<meta property="og:image:width" content="512">
+<meta property="og:image:height" content="512">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Local America">
+<meta name="twitter:image" content="https://localamerica.vercel.app/Notes_261110_202947_da0.jpg">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/jpeg" href="Notes_261110_202947_da0.jpg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -1078,6 +1091,7 @@ function render() {
     </div>`;
     return;
   }
+
   const [, a, b] = (location.hash.slice(1) || '/').split('/');
   const key = `${a || ''}/${b || ''}`;
   const wasCatNear = state.catNear;
