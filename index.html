@@ -123,7 +123,7 @@
   a:focus-visible, button:focus-visible, select:focus-visible { outline: 2px solid #15803D; outline-offset: 2px; }
   .navlink[aria-current="page"] { background: rgb(21 128 61 / .12); color: #166534; }
   /* Pages whose title would land on the flag start just below it */
-  #view[data-page="list"], #view[data-page="p"], #view[data-page="safety"] { padding-top: calc(var(--flag-clear) - 1.5rem); }
+  #view[data-page="list"], #view[data-page="p"], #view[data-page="safety"], #view[data-page="privacy"] { padding-top: calc(var(--flag-clear) - 1.5rem); }
   .view-enter { animation: view-in var(--dur-slow) var(--ease-out); }
   @keyframes view-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
   .skel { background: linear-gradient(90deg, rgb(27 35 30 / .06) 25%, rgb(27 35 30 / .11) 37%, rgb(27 35 30 / .06) 63%); background-size: 400% 100%; animation: shimmer 1.6s ease infinite; }
@@ -169,6 +169,7 @@
         <p>Use this guide as a starting point, never as your only navigation source.</p>
         <div class="flex flex-wrap items-center gap-x-6 gap-y-2">
           <a href="#/about/contact" class="inline-flex items-center gap-2 font-medium text-primary underline decoration-black/20 underline-offset-4 hover:decoration-current">Contact</a>
+          <a href="#/privacy" class="inline-flex items-center gap-2 font-medium text-primary underline decoration-black/20 underline-offset-4 hover:decoration-current">Privacy</a>
           <a href="#/safety" class="inline-flex items-center gap-2 font-medium text-primary underline decoration-black/20 underline-offset-4 hover:decoration-current">Read Safety &amp; Terms <span data-icon="arrow" class="contents"></span></a>
         </div>
       </div>
@@ -1035,6 +1036,41 @@ function viewSafety() {
   </article>`;
 }
 
+// Plain-language privacy page (linked from the footer of every page)
+function viewPrivacy() {
+  const sections = [
+    ['What the guide records', 'Local America records basic usage events so the owner can see how the guide is used. These include opening the app, viewing a place or place type, tapping Near me, and the purchase steps. Each record can include the kind of event, the place it was about, the browser and device type (for example, Safari on iPhone), the website you came from if your browser shares it (such as Facebook), and random codes for your browser and visit. Records do not include your name or email address.'],
+    ['Your location', 'Near me asks your phone for its location. Your browser asks for permission first, and you can say no. Your location is sent to our database only to work out how far away each place is. The guide does not save your location, and the coordinates are never shown to other visitors.'],
+    ['Meta (Facebook) Pixel', 'The guide uses the Meta Pixel, which reports page views and key steps, such as viewing a place or starting checkout, to Meta. Meta uses this to measure ads and may use it to show ads. Meta may set its own cookies to do this. You can adjust ad settings in your Facebook account, or block the pixel with a browser privacy or ad-blocking tool. Meta’s own privacy policy explains what it does with this information.'],
+    ['Payments', 'Paid GPS unlocks are processed by Stripe through Stripe Checkout. Local America never sees or stores your card number. Stripe handles payment details under its own privacy policy. After you pay, a random code is saved in your browser so the unlock works on that device. Only a scrambled version of that code is kept on our side. Clearing your browser data removes the saved unlock.'],
+    ['Stored items in your browser', 'The guide saves a few items in your browser: a random visitor code, a random unlock code, and a visit code that lasts until you close the tab. These help the guide remember your unlock and count visits without using your name.'],
+    ['Private owner pages', 'The Traffic and Card Maker pages are private and used only by the owner. They require signing in with a Google account, and the data on them is shown only to the owner.'],
+    ['Your choices', `You can turn off location access in your phone or browser settings, block the Meta Pixel with a privacy tool, or clear your browser data to remove the saved items above. For questions about this page or your information, email ${CFG.CONTACT_EMAIL}.`],
+    ['Changes to this page', 'If the way the guide collects information changes, this page will be updated. Last updated November 12, 2026.']
+  ];
+  return `
+  <article class="mx-auto max-w-3xl space-y-8 text-primary">
+    <nav class="flex items-center gap-2 t-sm text-secondary" aria-label="Breadcrumb">
+      <a href="#/about" class="inline-flex items-center gap-2 text-secondary hover:text-primary">${icon('back', 'ico-sm')} About</a>
+      <span aria-hidden="true">/</span>
+      <span class="truncate text-secondary">Privacy</span>
+    </nav>
+    <header class="space-y-4">
+      <p class="t-xs font-semibold uppercase tracking-[0.12em] text-secondary">Plain-language summary</p>
+      <h1 class="font-display text-[length:var(--fs-h1)] font-semibold leading-[1.1] tracking-[-0.02em] text-primary">Privacy</h1>
+      <p class="t-base leading-8 text-secondary">This page explains what Local America collects, why, and what you can do about it. It is general information, not legal advice.</p>
+    </header>
+    <div class="divide-y divide-black/5 rounded-card bg-white shadow-card">
+      ${sections.map((s) => `
+      <section class="space-y-3 p-5 sm:p-6">
+        <h2 class="font-display text-[length:var(--fs-h2)] font-semibold leading-[1.2] tracking-[-0.015em] text-primary">${s[0]}</h2>
+        <p class="t-base leading-8 text-secondary">${s[1]}</p>
+      </section>`).join('')}
+    </div>
+    <a href="#/" class="${btnTertiary}">${icon('back', 'ico-sm')} Return to the map</a>
+  </article>`;
+}
+
 // ================= ADD TO HOME SCREEN CARD (footer of every page) =================
 function renderInstall() {
   const box = $('#installCard');
@@ -1111,12 +1147,13 @@ function render() {
   else if (a === 'p' && b) html = viewPlace(b);
   else if (a === 'about') html = viewAbout();
   else if (a === 'safety') html = viewSafety();
+  else if (a === 'privacy') html = viewPrivacy();
   else html = viewHome();
   view.dataset.page = (a === 'c' || a === 'places') ? 'list' : (a || 'home');
   view.innerHTML = html;
 
   // Active tab = soft green pill (no tab is lit on place and place-type pages)
-  const active = !a ? 'home' : (a === 'about' || a === 'safety') ? 'about' : '';
+  const active = !a ? 'home' : (a === 'about' || a === 'safety' || a === 'privacy') ? 'about' : '';
   document.querySelectorAll('[data-nav]').forEach((el) => {
     if (el.dataset.nav === active) el.setAttribute('aria-current', 'page');
     else el.removeAttribute('aria-current');
