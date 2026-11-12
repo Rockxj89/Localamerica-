@@ -57,6 +57,57 @@ const CFG = {
   BUCKET: 'poi-photos'
 };
 
+// ================= POST LINKS (plain category addresses for Facebook posts) =================
+const SITE = 'https://localamerica.vercel.app';
+// [category name in the database, name shown here, short link]
+const LINKS = [
+  ['Established campsites', 'Campsites', 'camp'],
+  ['Swimming holes', 'Swimming holes', 'swimming'],
+  ['Caves', 'Caves', 'caves'],
+  ['Scenic views', 'Scenic views', 'views'],
+  ['Rappelling bluffs', 'Rappelling bluffs', 'bluffs'],
+  ['Forgotten grounds', 'Forgotten grounds', 'forgotten'],
+  ['Frog ponds', 'Frog ponds', 'frogs'],
+  ['Legends/lore', 'Legends & lore', 'legends'],
+  ['Buildings and stores', 'Buildings & stores', 'buildings'],
+  ['Dead end trails', 'Dead-end trails', 'dead-ends'],
+  ['Mud holes/trails', 'Mud holes & trails', 'mud'],
+  ['Non-vehicle trails', 'Hiking (non-vehicle) trails', 'hiking'],
+  ['Popular locations', 'Popular locations', 'popular'],
+  ['Rocks/Flex', 'Rocks & flex', 'rocks'],
+  ['Unmarked trails', 'Unmarked trails', 'unmarked'],
+  ['Yardage fields', 'Yardage fields', 'yardage']
+];
+function linkFor(category) {
+  const l = LINKS.find((x) => x[0] === category);
+  return l ? { label: l[1], url: `${SITE}/${l[2]}` } : null;
+}
+function linkRow(label, url) {
+  return `
+  <div class="flex items-center gap-3 rounded-lg border border-line bg-white p-3">
+    <div class="min-w-0 flex-1">
+      <p class="font-semibold leading-tight">${esc(label)}</p>
+      <p class="mt-0.5 break-all text-sm text-secondary select-all">${esc(url)}</p>
+    </div>
+    <button data-copy="${esc(url)}" class="shrink-0 rounded-full bg-accent px-4 py-2 text-sm font-semibold text-accentfg">Copy</button>
+  </div>`;
+}
+async function copyLink(btn) {
+  const url = btn.dataset.copy;
+  let ok = false;
+  try { await navigator.clipboard.writeText(url); ok = true; } catch (e) {
+    // Older phones: copy through a hidden text box
+    const ta = document.createElement('textarea');
+    ta.value = url; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try { ok = document.execCommand('copy'); } catch (e2) { ok = false; }
+    ta.remove();
+  }
+  btn.textContent = ok ? 'Copied!' : 'Hold the link to copy';
+  clearTimeout(btn._t);
+  btn._t = setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
+}
+
 // Same sign-in as the Traffic page, so signing in on one signs you in on the other.
 const sb = supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_KEY, {
   auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: 'pkce', storageKey: 'la-traffic-auth' }
@@ -275,7 +326,7 @@ function paintPreview(busyText) {
 // ================= PAGES =================
 function tabs() {
   const t = (id, label) => `<button data-tab="${id}" class="flex-1 rounded-full px-3 py-2 text-sm font-semibold ${state.tab === id ? 'bg-accent text-accentfg' : 'border border-line bg-white text-primary'}">${label}</button>`;
-  return `<div class="flex gap-2">${t('make', 'Make a card')}${t('recent', 'Recent Cards')}</div>`;
+  return `<div class="flex gap-2">${t('make', 'Make a card')}${t('recent', 'Recent Cards')}${t('links', 'Links')}</div>`;
 }
 
 function viewMake() {
@@ -284,6 +335,7 @@ function viewMake() {
   const reusing = state.reuse && made;
   const canDownload = photo && !state.busy && (!made || reusing);
   const label = reusing ? 'Download again' : made ? 'Already made' : 'Download PNG card';
+  const postLink = loc ? linkFor(loc.category) : null;
   return `
   <h2 class="mt-5 text-xl font-bold">Make a location card</h2>
   <div class="mt-4 grid grid-cols-1 gap-6 md:grid-cols-2">
@@ -304,6 +356,10 @@ function viewMake() {
         ${loc.latitude !== null && loc.longitude !== null ? `<p class="text-sm text-secondary">GPS: ${Number(loc.latitude).toFixed(5)}, ${Number(loc.longitude).toFixed(5)}</p>` : ''}
         ${free ? `<span class="inline-block rounded px-2 py-0.5 text-xs font-semibold bg-okweak text-okink">Free access</span>` : `<span class="inline-block rounded px-2 py-0.5 text-xs font-semibold bg-infoweak text-infoink">Card maker only</span>`}
       </div>
+      ${postLink ? `<div class="space-y-1.5">
+        <h3 class="text-lg font-semibold">Link for your post</h3>
+        ${linkRow(postLink.label, postLink.url)}
+      </div>` : ''}
       ${!loc.photos.length ? `<p class="text-sm text-warnink">This location has no imported photo yet, so it cannot be exported as a picture card.</p>` : ''}
       ${made ? `<div class="space-y-2 rounded-lg bg-okweak p-3 text-sm text-okink"><b>Already made</b>
         <p>You made this exact card on ${esc(new Date(made.created_at).toLocaleDateString())}. It will not be added twice.</p>
@@ -332,13 +388,23 @@ function viewRecent() {
   : `<div class="card mt-4 text-sm text-secondary"><b class="block text-primary">No cards made yet</b>Make a location card and it will be saved here.</div>`}`;
 }
 
+function viewLinks() {
+  return `
+  <h2 class="mt-5 text-xl font-bold">Links for posts</h2>
+  <p class="mt-1 text-sm text-secondary">Tap Copy, then paste the link into your Facebook post or ad. Each link opens that category in the app.</p>
+  <div class="mt-4 space-y-2">
+    ${linkRow('Home page', SITE + '/')}
+    ${LINKS.map((l) => linkRow(l[1], `${SITE}/${l[2]}`)).join('')}
+  </div>`;
+}
+
 function render() {
   $('#signOutBtn').classList.remove('hidden');
   const v = $('#view');
   if (state.error) { v.innerHTML = `<div class="rounded-lg bg-errweak p-4 text-sm text-errink"><b>Could not load.</b><p class="mt-1">${esc(state.error)}</p><button id="retryBtn" class="mt-3 rounded-full bg-white px-3 py-1.5 font-semibold text-primary">Try again</button></div>`; $('#retryBtn').onclick = load; return; }
   if (state.loading && !state.locations.length) { v.innerHTML = `<p class="py-16 text-center text-secondary">Loading locations…</p>`; return; }
   if (!state.locations.length) { v.innerHTML = `<p class="py-16 text-center text-secondary">No locations available.</p>`; return; }
-  v.innerHTML = tabs() + (state.tab === 'make' ? viewMake() : viewRecent());
+  v.innerHTML = tabs() + (state.tab === 'make' ? viewMake() : state.tab === 'recent' ? viewRecent() : viewLinks());
   if (state.tab === 'make') refreshPreview();
 }
 
@@ -373,6 +439,8 @@ document.addEventListener('change', (e) => {
   if (e.target.id === 'selFormat') { state.format = e.target.value; state.reuse = false; state.downloadError = ''; render(); }
 });
 document.addEventListener('click', (e) => {
+  const cp = e.target.closest('[data-copy]');
+  if (cp) return copyLink(cp);
   const tab = e.target.closest('[data-tab]');
   if (tab) { state.tab = tab.dataset.tab; state.downloadError = ''; return render(); }
   const card = e.target.closest('[data-card]');
