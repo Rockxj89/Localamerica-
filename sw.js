@@ -22,6 +22,9 @@ self.addEventListener('fetch', (event) => {
   // Never cache Supabase data, auth, or storage: always go to the network
   if (url.hostname.endsWith('supabase.co')) return;
 
+  // Resized photos from Vercel: the browser's own cache handles these
+  if (url.pathname.startsWith('/_vercel/')) return;
+
   // Never cache Meta pixel traffic: every tracking hit must reach Facebook
   if (url.hostname.endsWith('facebook.com') || url.hostname.endsWith('facebook.net')) return;
 

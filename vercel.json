@@ -7,5 +7,17 @@
   ],
   "functions": {
     "api/category.js": { "includeFiles": "index.html" }
+  },
+  "images": {
+    "sizes": [640, 1080, 1600],
+    "formats": ["image/webp"],
+    "minimumCacheTTL": 2678400,
+    "remotePatterns": [
+      {
+        "protocol": "https",
+        "hostname": "ycdlxdijrlfsxvxksyrq.supabase.co",
+        "pathname": "/storage/v1/object/public/poi-photos/**"
+      }
+    ]
   }
 }

@@ -332,6 +332,20 @@ function photoUrl(key) {
   return `${CFG.SUPABASE_URL}/storage/v1/object/public/${CFG.PHOTO_BUCKET}/${key.split('/').map(encodeURIComponent).join('/')}`;
 }
 
+// Smaller copy of a photo (640, 1080 or 1600 pixels wide), made and cached by Vercel,
+// so pages load fast on weak signal. The originals in Supabase are never changed.
+function sizedUrl(key, w) {
+  const src = photoUrl(key);
+  if (!src || !/^https:\/\//i.test(src) || /^(localhost|127\.0\.0\.1)$/.test(location.hostname)) return src;
+  return `/_vercel/image?url=${encodeURIComponent(src)}&w=${w}&q=70`;
+}
+
+// If a smaller copy can't load, show the full-size photo instead
+document.addEventListener('error', (e) => {
+  const img = e.target;
+  if (img && img.tagName === 'IMG' && img.dataset.full && img.getAttribute('src') !== img.dataset.full) img.src = img.dataset.full;
+}, true);
+
 // Road access badge: same rules and wording as the Glide guide.
 // The label is colored words (no highlighted background): green, brown, red.
 // Anything not listed is treated as "rough" until the road has been verified.
@@ -695,12 +709,13 @@ const btnTile = `${btnBase.replace('whitespace-nowrap', '')} min-h-11 w-full gap
 function cardHtml(l) {
   const ph = state.photos[l.id]?.[0];
   const du = distanceUi(l);
-  const src = ph ? photoUrl(ph.object_key) : '';
+  const src = ph ? sizedUrl(ph.object_key, 640) : '';
+  const full = ph ? photoUrl(ph.object_key) : '';
   return `
   <article class="lift flex min-w-0 select-none flex-col overflow-hidden rounded-tile bg-white shadow-card">
     <a href="#/p/${l.id}" aria-label="Open ${esc(l.name)} details" class="relative block aspect-[4/5] min-w-0 overflow-hidden bg-inset md:aspect-[3/2]">
       ${src
-        ? `<img loading="lazy" src="${esc(src)}" alt="${esc(l.name)} field photo" class="img-zoom absolute inset-0 h-full w-full object-cover">`
+        ? `<img loading="lazy" src="${esc(src)}" data-full="${esc(full)}" alt="${esc(l.name)} field photo" class="img-zoom absolute inset-0 h-full w-full object-cover">`
         : `<div class="absolute inset-0 flex items-center justify-center text-tertiary">${icon('pin')}</div>`}
       <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
       <h3 class="absolute inset-x-0 bottom-0 line-clamp-2 p-3 font-display text-lg font-semibold leading-tight tracking-[-0.01em] text-white md:p-4 md:text-xl">${esc(l.name)}</h3>
@@ -758,12 +773,13 @@ function viewHome() {
   const tile = (c, i) => {
     const wide = i === 0 || (lastWide && i === cats.length - 1);
     const desc = CATEGORY_DESCRIPTIONS[c.name] || 'Field-collected locations in this group';
-    const src = c.photo ? photoUrl(c.photo) : '';
+    const src = c.photo ? sizedUrl(c.photo, wide ? 1080 : 640) : '';
+    const full = c.photo ? photoUrl(c.photo) : '';
     const alt = c.photoOf ? `${c.photoOf} in ${catLabel(c.name)} field photo` : '';
     return `
       <a href="#/c/${catSlug(c.name)}" aria-label="Browse ${esc(catLabel(c.name))}" class="lift press relative block overflow-hidden rounded-tile bg-inset shadow-card ${wide ? 'col-span-2 aspect-[16/10] md:col-span-1 md:aspect-[3/2]' : 'aspect-[4/5] md:aspect-[3/2]'}">
         ${src
-          ? `<img loading="lazy" src="${esc(src)}" alt="${esc(alt)}" class="img-zoom absolute inset-0 h-full w-full object-cover">`
+          ? `<img loading="lazy" src="${esc(src)}" data-full="${esc(full)}" alt="${esc(alt)}" class="img-zoom absolute inset-0 h-full w-full object-cover">`
           : `<div class="absolute inset-0 flex items-center justify-center text-tertiary">${icon(categoryIcon(c.name))}</div>`}
         <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-transparent"></div>
         <div class="absolute inset-x-0 bottom-0 p-3.5 text-white md:p-4">
@@ -868,7 +884,7 @@ function viewPlace(id) {
   if (!l) {
     return `<div class="text-center"><p class="t-sm text-errink">We couldn’t load the field records.</p><a href="#/places" class="mt-3 inline-block t-sm font-medium text-errink underline">Browse all places</a></div>`;
   }
-  const photos = (state.photos[l.id] || []).map((p) => photoUrl(p.object_key));
+  const keys = (state.photos[l.id] || []).map((p) => p.object_key);
   const road = roadInfo(l);
   const gps = hasCoords(l);
   const coords = gps ? `${Number(l.latitude).toFixed(5)}, ${Number(l.longitude).toFixed(5)}` : '';
@@ -907,10 +923,10 @@ function viewPlace(id) {
       <p>Payment confirmed. GPS for ${esc(l.name)} is unlocked. The coordinates are shown above.</p>
     </div>` : ''}
 
-    ${photos.length ? `
+    ${keys.length ? `
     <section>
       <div class="grid grid-cols-2 gap-3">
-        ${photos.map((src, i) => `<button type="button" data-act="pv-open" data-id="${l.id}" data-i="${i}" aria-label="Enlarge photo ${i + 1}" class="lift press block overflow-hidden rounded-tile bg-inset shadow-card ${i === 0 ? 'col-span-2' : ''}"><div class="${i === 0 ? 'aspect-[16/10]' : 'aspect-[4/3]'} w-full"><img loading="lazy" src="${esc(src)}" alt="${esc(l.name)} field photo" class="img-zoom h-full w-full object-cover"></div></button>`).join('')}
+        ${keys.map((k, i) => `<button type="button" data-act="pv-open" data-id="${l.id}" data-i="${i}" aria-label="Enlarge photo ${i + 1}" class="lift press block overflow-hidden rounded-tile bg-inset shadow-card ${i === 0 ? 'col-span-2' : ''}"><div class="${i === 0 ? 'aspect-[16/10]' : 'aspect-[4/3]'} w-full"><img loading="lazy" src="${esc(sizedUrl(k, i === 0 ? 1080 : 640))}" data-full="${esc(photoUrl(k))}" alt="${esc(l.name)} field photo" class="img-zoom h-full w-full object-cover"></div></button>`).join('')}
       </div>
     </section>` : ''}
 
@@ -1176,7 +1192,7 @@ function render() {
 }
 
 // ================= PHOTO VIEWER (pinch, scroll or double-tap to zoom; drag to look around) =================
-const pv = { photos: [], i: 0, alt: '', scale: 1, x: 0, y: 0, pts: new Map(),
+const pv = { photos: [], full: [], i: 0, alt: '', scale: 1, x: 0, y: 0, pts: new Map(),
   g: { startDist: 1, startScale: 1, downX: 0, downY: 0, panX: 0, panY: 0, moved: false, lastTap: 0 } };
 
 function pvSet(scale, x, y) {
@@ -1194,15 +1210,16 @@ function pvSet(scale, x, y) {
 }
 function pvShow() {
   const many = pv.photos.length > 1, img = $('#pvImg');
+  img.dataset.full = pv.full[pv.i] || '';
   img.src = pv.photos[pv.i]; img.alt = pv.alt;
   pv.pts.clear(); pvSet(1, 0, 0);
   $('#pvPrev').classList.toggle('hidden', !many);
   $('#pvNext').classList.toggle('hidden', !many);
   $('#pvCap').textContent = (many ? `${pv.i + 1} of ${pv.photos.length} · ` : '') + 'Pinch or scroll to zoom, drag to look around';
 }
-function pvOpen(photos, i, alt) {
+function pvOpen(photos, i, alt, full = []) {
   if (!photos.length) return;
-  pv.photos = photos; pv.i = Math.min(Math.max(0, i || 0), photos.length - 1); pv.alt = alt;
+  pv.photos = photos; pv.full = full; pv.i = Math.min(Math.max(0, i || 0), photos.length - 1); pv.alt = alt;
   $('#pv').classList.remove('hidden'); document.body.style.overflow = 'hidden';
   pvShow();
 }
@@ -1270,7 +1287,8 @@ document.addEventListener('click', async (e) => {
   if (act === 'pv-open') {
     const l = state.locs.find((x) => String(x.id) === String(el.dataset.id));
     if (!l) return;
-    return pvOpen((state.photos[l.id] || []).map((p) => photoUrl(p.object_key)), Number(el.dataset.i), `${l.name} field photo`);
+    const keys = (state.photos[l.id] || []).map((p) => p.object_key);
+    return pvOpen(keys.map((k) => sizedUrl(k, 1600)), Number(el.dataset.i), `${l.name} field photo`, keys.map((k) => photoUrl(k)));
   }
   if (act === 'reload') return location.reload();
   if (act === 'unlock') return startUnlock(Number(el.dataset.id));
