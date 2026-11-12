@@ -234,7 +234,7 @@ const ICON_PATHS = {
   tent: '<path d="M3.5 21 14 3"/><path d="M20.5 21 10 3"/><path d="M15.5 21 12 15l-3.5 6"/><path d="M2 21h20"/>',
   mountain: '<path d="m8 3 4 8 5-5 5 15H2L8 3z"/>',
   tree: '<path d="m17 14 3 3.3a1 1 0 0 1-.7 1.7H4.7a1 1 0 0 1-.7-1.7L7 14h-.3a1 1 0 0 1-.7-1.7L9 9h-.2A1 1 0 0 1 8 7.3L12 3l4 4.3a1 1 0 0 1-.8 1.7H15l3 3.3a1 1 0 0 1-.7 1.7H17Z"/><path d="M12 22v-3"/>',
-  feet: '<path d="M4 16v-2.38C4 11.5 2.97 10.5 3 8c.03-2.72 1.49-6 4.5-6C9.37 2 10 3.8 10 5.5c0 3.11-2 5.66-2 8.68V16a2 2 0 1 1-4 0Z"/><path d="M20 20v-2.38c0-2.12 1.030-3.12 1-5.62-.03-2.72-1.49-6-4.5-6C14.63 6 14 7.8 14 9.5c0 3.11 2 5.66 2 8.68V20a2 2 0 1 0 4 0Z"/><path d="M16 17h4"/><path d="M4 13h4"/>',
+  feet: '<path d="M4 16v-2.38C4 11.5 2.97 10.5 3 8c.03-2.72 1.49-6 4.5-6C9.37 2 10 3.8 10 5.5c0 3.11-2 5.66-2 8.68V16a2 2 0 1 1-4 0Z"/><path d="M20 20v-2.38c0-2.12 1.030-3.12 1-5.620-.03-2.72-1.49-6-4.5-6C14.63 6 14 7.8 14 9.5c0 3.11 2 5.66 2 8.68V20a2 2 0 1 0 4 0Z"/><path d="M16 17h4"/><path d="M4 13h4"/>',
   landmark: '<line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/>',
   compass: '<circle cx="12" cy="12" r="10"/><path d="m16.24 7.76-2.12 6.36-6.36 2.12 2.12-6.36 6.36-2.12z"/>',
   pin: '<path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/>',
@@ -1060,7 +1060,6 @@ function viewPrivacy() {
     ['Meta (Facebook) Pixel', 'The guide uses the Meta Pixel, which reports page views and key steps, such as viewing a place or starting checkout, to Meta. Meta uses this to measure ads and may use it to show ads. Meta may set its own cookies to do this. You can adjust ad settings in your Facebook account, or block the pixel with a browser privacy or ad-blocking tool. Meta’s own privacy policy explains what it does with this information.'],
     ['Payments', 'Paid GPS unlocks are processed by Stripe through Stripe Checkout. Local America never sees or stores your card number. Stripe handles payment details under its own privacy policy. After you pay, a random code is saved in your browser so the unlock works on that device. Only a scrambled version of that code is kept on our side. Clearing your browser data removes the saved unlock.'],
     ['Stored items in your browser', 'The guide saves a few items in your browser: a random visitor code, a random unlock code, and a visit code that lasts until you close the tab. These help the guide remember your unlock and count visits without using your name.'],
-    ['Private owner pages', 'The Traffic and Card Maker pages are private and used only by the owner. They require signing in with a Google account, and the data on them is shown only to the owner.'],
     ['Your choices', `You can turn off location access in your phone or browser settings, block the Meta Pixel with a privacy tool, or clear your browser data to remove the saved items above. For questions about this page or your information, email ${CFG.CONTACT_EMAIL}.`],
     ['Changes to this page', 'If the way the guide collects information changes, this page will be updated. Last updated November 12, 2026.']
   ];
