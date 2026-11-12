@@ -9,6 +9,11 @@
   var inFrame = false;
   try { inFrame = window.top !== window.self; } catch (e) { inFrame = true; }
 
+  // The owner's own browser (marked when signing in on the Traffic page) is never sent to Meta.
+  function isOwner() {
+    try { return localStorage.getItem('la_owner') === '1'; } catch (e) { return false; }
+  }
+
   function start() {
     if (window.fbq) return;
     /* Standard Meta base code */
@@ -22,7 +27,7 @@
 
   function track(name, params) {
     try {
-      if (inFrame) return;
+      if (inFrame || isOwner()) return;
       start();
       if (params) window.fbq('track', name, params);
       else window.fbq('track', name);
