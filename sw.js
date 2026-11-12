@@ -25,8 +25,9 @@ self.addEventListener('fetch', (event) => {
   // Never cache Meta pixel traffic: every tracking hit must reach Facebook
   if (url.hostname.endsWith('facebook.com') || url.hostname.endsWith('facebook.net')) return;
 
-  // The private traffic page is never cached (and never saved in place of the guide)
+  // The private traffic and card maker pages are never cached (and never saved in place of the guide)
   if (url.pathname.endsWith('/traffic.html') || url.pathname.endsWith('/traffic')) return;
+  if (url.pathname.endsWith('/cards.html') || url.pathname.endsWith('/cards')) return;
 
   // Page loads: network first, fall back to the cached shell when offline
   if (req.mode === 'navigate') {
