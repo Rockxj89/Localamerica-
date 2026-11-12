@@ -7,6 +7,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <title>Local America</title>
 <link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/jpeg" href="Notes_261110_202947_da0.jpg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap" rel="stylesheet">
@@ -199,8 +200,8 @@ const CFG = {
   ROAD_URL: 'https://ycdlxdijrlfsxvxksyrq.supabase.co/functions/v1/road-distances',
   UNLOCK_PRICE: '$4.99',
   PHOTO_BUCKET: 'poi-photos',
-  // Logo is still loaded from the Glide app for now; move it into this repo later.
-  LOGO_URL: 'https://p256a925d-mtnf-poi-guide--localamerica25.glideos.app/assets/cb6960f0f9b568b3cc06d2ca684f3ff76142f6f0b5fc5a2158c3dad1e605a405/IMG_20250808_184722_225.webp',
+  // The original Local America logo, stored in this repo (no longer loaded from the Glide app).
+  LOGO_URL: 'Notes_261110_202947_da0.jpg',
   CONTACT_EMAIL: 'Localamerica25@gmail.com',
   FACEBOOK_URL: 'https://www.facebook.com/share/1QRkXzhmJo/',
   NEAR_MILES: 75,
@@ -1077,7 +1078,6 @@ function render() {
     </div>`;
     return;
   }
-
   const [, a, b] = (location.hash.slice(1) || '/').split('/');
   const key = `${a || ''}/${b || ''}`;
   const wasCatNear = state.catNear;
