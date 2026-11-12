@@ -69,7 +69,9 @@ const CFG = {
   SUPABASE_URL: 'https://ycdlxdijrlfsxvxksyrq.supabase.co',
   SUPABASE_KEY: 'sb_publishable_2ExdXbNtW9HpuOGAq1Oa7g_gPdONH_s',
   TZ: 'America/Chicago',
-  PRICE: 4.99
+  PRICE: 4.99,
+  // Spreadsheet maker, loaded only when Export everything is tapped
+  XLSX_URL: 'https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js'
 };
 const PERIODS = [
   { days: 1, label: 'Today' },
@@ -92,7 +94,8 @@ const pct = (a, b) => (b ? Math.round((a / b) * 100) : 0);
 
 const state = {
   days: (() => { try { const v = localStorage.getItem('la-traffic-days'); return v === 'all' ? null : (Number(v) || 30); } catch (e) { return 30; } })(),
-  data: null, loading: false, error: null, user: null, picks: {}
+  data: null, months: null, loading: false, error: null, user: null, picks: {},
+  exporting: false, exportMsg: '', exportErr: false
 };
 
 // ================= SIGN IN =================
@@ -143,7 +146,11 @@ function friendlyAuthError(err) {
 // ================= DATA =================
 async function load() {
   state.loading = true; state.error = null; render();
-  const { data, error } = await sb.rpc('traffic_summary', { p_days: state.days });
+  const [res, mres] = await Promise.all([
+    sb.rpc('traffic_summary', { p_days: state.days }),
+    sb.rpc('traffic_months')
+  ]);
+  const { data, error } = res;
   state.loading = false;
   if (error) {
     if (error.code === '42501' || /not_allowed/.test(error.message)) {
@@ -154,7 +161,90 @@ async function load() {
     state.error = error.message || 'Could not load traffic.';
   } else {
     state.data = data;
+    state.months = mres && !mres.error ? mres.data : null;
   }
+  render();
+}
+
+// ================= EXPORT EVERYTHING =================
+function loadXLSX() {
+  if (window.XLSX) return Promise.resolve(window.XLSX);
+  return new Promise((ok, bad) => {
+    const s = document.createElement('script');
+    s.src = CFG.XLSX_URL;
+    s.onload = () => (window.XLSX ? ok(window.XLSX) : bad(new Error('The spreadsheet tool did not load. Try again.')));
+    s.onerror = () => bad(new Error('The spreadsheet tool did not load. Check your connection and try again.'));
+    document.head.appendChild(s);
+  });
+}
+
+async function exportAll() {
+  if (state.exporting) return;
+  state.exporting = true; state.exportMsg = ''; state.exportErr = false; render();
+  try {
+    const [X, res] = await Promise.all([loadXLSX(), sb.rpc('traffic_export')]);
+    if (res.error) throw new Error(res.error.message || 'Could not get the data.');
+    const d = res.data || {}, s = d.summary || {};
+    const events = d.events || [], purchases = d.purchases || [];
+    const wb = X.utils.book_new();
+    const sheet = (name, head, rows, widths) => {
+      const ws = X.utils.aoa_to_sheet([head, ...rows]);
+      if (widths) ws['!cols'] = widths.map((w) => ({ wch: w }));
+      X.utils.book_append_sheet(wb, ws, name);
+    };
+
+    // 1. Month by month (bots left out)
+    sheet('By month',
+      ['Month', 'Visits', 'Place views', 'Near me taps', 'Unlock taps', 'Checkouts started', 'Sales', 'Revenue ($)'],
+      (s.months || []).map((m) => [m.label, m.visits, m.place_views, m.near_me_taps, m.unlock_taps, m.checkouts, m.sales, Number(m.revenue || 0)]),
+      [16, 8, 12, 13, 12, 17, 7, 12]);
+
+    // 2. Every place, all time (bots left out)
+    sheet('Places',
+      ['Place', 'Category', 'Free or paid', 'Views', 'Unlock taps', 'Checkouts started', 'Sales'],
+      (s.places || []).map((p) => [p.name, p.category, p.access, p.views, p.unlock_taps, p.checkouts, p.sales]),
+      [28, 22, 12, 8, 12, 17, 7]);
+
+    // 3. Where visitors came from, all time (visits, bots left out)
+    const people = events.filter((e) => !e.bot);
+    const opens = people.filter((e) => e.event === 'app_open');
+    const bySite = {};
+    opens.forEach((e) => { const k = e.came_from || 'Direct or unknown'; bySite[k] = (bySite[k] || 0) + 1; });
+    sheet('Where visitors came from', ['Site', 'Visits'],
+      Object.entries(bySite).sort((a, b) => b[1] - a[1]), [32, 8]);
+
+    // 4. Busy days and times, all time (visits, Central time, bots left out)
+    const byDay = Array(7).fill(0), byHour = Array(24).fill(0);
+    opens.forEach((e) => {
+      const t = e.time_central || '';
+      const [y, mo, dd] = t.slice(0, 10).split('-').map(Number);
+      const h = Number(t.slice(11, 13));
+      if (y) byDay[new Date(y, mo - 1, dd).getDay()]++;
+      if (!Number.isNaN(h)) byHour[h]++;
+    });
+    sheet('Busy times', ['Day or hour (Central)', 'Visits'],
+      [...DAYS.map((n, i) => [n, byDay[i]]), ['', ''], ...byHour.map((n, h) => [hourName(h), n])], [22, 8]);
+
+    // 5. Every recorded event, bots included and marked
+    sheet('All events',
+      ['Time (Central)', 'Event', 'Place', 'Category', 'Free or paid', 'Browser', 'Came from', 'Visitor type', 'Bot', 'Visit ID', 'Details'],
+      events.map((e) => [e.time_central, e.event, e.place || '', e.category || '', e.access || '', e.browser || '', e.came_from || '', e.visitor_class || '', e.bot ? 'Yes' : 'No', e.visit_id || '', e.details || '']),
+      [20, 26, 24, 20, 12, 22, 26, 13, 6, 18, 40]);
+
+    // 6. Purchases
+    sheet('Purchases',
+      ['Started (Central)', 'Paid (Central)', 'Place', 'Type', 'Status', 'Stripe checkout session'],
+      purchases.map((p) => [p.created_central || '', p.paid_central || '', p.place || '', p.type || '', p.status || '', p.stripe_checkout_session || '']),
+      [20, 20, 24, 10, 10, 40]);
+
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: CFG.TZ });
+    X.writeFile(wb, `local-america-traffic-${today}.xlsx`);
+    state.exportMsg = `Downloaded: ${fmt(events.length)} events, ${fmt(purchases.length)} purchases.`;
+  } catch (err) {
+    state.exportErr = true;
+    state.exportMsg = (err && err.message) || 'Export had a problem. Please try again.';
+  }
+  state.exporting = false;
   render();
 }
 
@@ -284,6 +374,13 @@ function render() {
 
   // ---- Headline tiles
   let html = chips + (state.loading ? `<p class="mt-2 text-xs text-tertiary">Updating…</p>` : `<p class="mt-2 text-xs text-tertiary">Updated ${esc(when(d.generated_at))} · Central time · bots left out</p>`);
+
+  // ---- Export everything (all data, any time, one spreadsheet)
+  html += `<div class="mt-4 flex flex-wrap items-center gap-3">
+    <button id="exportBtn" class="rounded-lg bg-accent px-4 py-2.5 font-semibold text-accentfg disabled:opacity-60" ${state.exporting ? 'disabled' : ''}>${state.exporting ? 'Preparing…' : 'Export everything'}</button>
+    ${state.exportMsg ? `<span class="text-sm ${state.exportErr ? 'text-errink' : 'text-secondary'}">${esc(state.exportMsg)}</span>` : ''}
+  </div>`;
+
   html += `<div class="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
     ${tile('Visits', fmt(t.visits), delta(t.visits, prev.visits))}
     ${tile('Visits today', fmt(t.today))}
@@ -317,6 +414,13 @@ function render() {
     ${t.checkout_cancelled ? `<p class="text-sm text-secondary">${fmt(t.checkout_cancelled)} pressed Back on the Stripe page.</p>` : ''}
     </div>`);
 
+  // ---- By month (always every month, not tied to the period buttons)
+  const months = (state.months && state.months.months) || [];
+  html += section('By month', 'Every month since tracking began, bots left out. The period buttons above don\'t change this.',
+    table(['Month', 'Visits', 'Place views', 'Unlock taps', 'Checkouts', 'Sales'],
+      months.map((m) => [esc(m.label), fmt(m.visits), fmt(m.place_views), fmt(m.unlock_taps), fmt(m.checkouts), `${fmt(m.sales)} <span class="text-tertiary">· ${money(m.revenue)}</span>`]),
+      'No months yet.'));
+
   // ---- Best time to post
   const hours = d.hours || [], wk = d.weekdays || [];
   const bestH = hours.reduce((a, b) => (b.visits > a.visits ? b : a), hours[0] || { visits: 0 });
@@ -347,9 +451,11 @@ function render() {
       'No place views yet.'));
 
   // ---- Paid places people tried to unlock
-  html += section('Paid places people tried to unlock', 'Good candidates for a Facebook post or card.',
-    table(['Place', 'Views', 'Unlock taps', 'Checkouts'],
-      (d.unlock_places || []).map((p) => [esc(p.name), fmt(p.views), fmt(p.unlock_taps), fmt(p.checkouts)]),
+  const salesByPlace = {};
+  ((state.months && state.months.places) || []).forEach((p) => { salesByPlace[p.name] = p.sales; });
+  html += section('Paid places people tried to unlock', 'Good candidates for a Facebook post or card. Sales are all time.',
+    table(['Place', 'Views', 'Unlock taps', 'Checkouts', 'Sales'],
+      (d.unlock_places || []).map((p) => [esc(p.name), fmt(p.views), fmt(p.unlock_taps), fmt(p.checkouts), fmt(salesByPlace[p.name])]),
       'No one has tapped Unlock GPS in this period.'));
 
   // ---- Categories
@@ -400,6 +506,7 @@ function render() {
 
 // ================= EVENTS =================
 document.addEventListener('click', (e) => {
+  if (e.target.closest('#exportBtn')) return exportAll();
   const chip = e.target.closest('[data-days]');
   if (chip) {
     state.days = chip.dataset.days === 'all' ? null : Number(chip.dataset.days);
@@ -422,7 +529,7 @@ document.addEventListener('mouseover', (e) => {
   if (item && tip) tip.textContent = item.tip;
 });
 $('#refreshBtn').onclick = () => load();
-$('#signOutBtn').onclick = async () => { await sb.auth.signOut(); state.data = null; viewSignIn(); };
+$('#signOutBtn').onclick = async () => { await sb.auth.signOut(); state.data = null; state.months = null; viewSignIn(); };
 
 // ================= START =================
 (async function start() {
