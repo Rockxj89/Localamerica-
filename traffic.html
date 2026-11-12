@@ -98,6 +98,21 @@ const state = {
   exporting: false, exportMsg: '', exportErr: false
 };
 
+// ================= OWNER'S OWN BROWSER =================
+// Once the owner is signed in here, this browser is left out of the traffic counts
+// and the Meta pixel everywhere on the site. It uses the same visitor code as the guide.
+async function markOwnerBrowser() {
+  try {
+    let v = localStorage.getItem('la_vid');
+    if (!/^[a-z0-9-]{16,40}$/.test(v || '')) {
+      v = crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2) + Date.now();
+      localStorage.setItem('la_vid', v);
+    }
+    const { error } = await sb.rpc('register_owner_browser', { p_vid: v });
+    if (!error) localStorage.setItem('la_owner', '1');
+  } catch (e) { /* never block the Traffic page */ }
+}
+
 // ================= SIGN IN =================
 function viewSignIn(msg) {
   $('#refreshBtn').classList.add('hidden');
@@ -162,6 +177,7 @@ async function load() {
   } else {
     state.data = data;
     state.months = mres && !mres.error ? mres.data : null;
+    markOwnerBrowser();
   }
   render();
 }
