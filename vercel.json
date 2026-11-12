@@ -1,0 +1,11 @@
+{
+  "rewrites": [
+    {
+      "source": "/:slug(camp|swimming|caves|views|bluffs|forgotten|frogs|legends|buildings|dead-ends|mud|hiking|popular|rocks|unmarked|yardage)",
+      "destination": "/api/category?c=:slug"
+    }
+  ],
+  "functions": {
+    "api/category.js": { "includeFiles": "index.html" }
+  }
+}
