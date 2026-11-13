@@ -572,7 +572,9 @@ async function loadData() {
   ]);
   if (l.error) throw new Error('Could not load places: ' + l.error.message);
   if (p.error) throw new Error('Could not load photos: ' + p.error.message);
-  state.locs = l.data || [];
+  // Grouped by place type, then number order inside each type (Camp #2 before Camp #10); places without a number go last, A to Z
+  const placeNum = (n) => { const m = /(\d+)\s*$/.exec(n || ''); return m ? +m[1] : Infinity; };
+  state.locs = (l.data || []).sort((a, b) => (a.category || '').localeCompare(b.category || '') || (placeNum(a.name) - placeNum(b.name)) || (a.name || '').localeCompare(b.name || ''));
   state.photos = {};
   (p.data || []).forEach((ph) => { (state.photos[ph.location_id] ||= []).push(ph); });
 
