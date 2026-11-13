@@ -119,7 +119,7 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<'
 const state = {
   tab: 'make', user: null, loading: false, error: null,
   locations: [], cards: [],
-  locationId: '', photoId: '', format: 'square', reuse: false,
+  locationId: '', photoId: '', format: 'square', position: 'middle', reuse: false,
   previewUrl: '', previewError: '', busy: false, downloadError: ''
 };
 let renderToken = 0;
@@ -209,10 +209,12 @@ function loadPhoto(url) {
     img.src = url;
   });
 }
-function drawCover(ctx, img, w, h) {
+// position: 'top', 'middle' or 'bottom' — which part of the photo to keep when it is cropped
+function drawCover(ctx, img, w, h, position) {
   const scale = Math.max(w / img.width, h / img.height);
   const sw = w / scale, sh = h / scale;
-  ctx.drawImage(img, (img.width - sw) / 2, (img.height - sh) / 2, sw, sh, 0, 0, w, h);
+  const f = position === 'top' ? 0 : position === 'bottom' ? 1 : 0.5;
+  ctx.drawImage(img, (img.width - sw) * f, (img.height - sh) * f, sw, sh, 0, 0, w, h);
 }
 function wrapText(ctx, text, maxWidth, maxLines) {
   const words = text.trim().split(/\s+/).filter(Boolean);
@@ -232,7 +234,7 @@ function wrapText(ctx, text, maxWidth, maxLines) {
   }
   return lines;
 }
-async function renderCard(loc, photo, format) {
+async function renderCard(loc, photo, format, position) {
   const sq = format === 'square';
   const width = 1080, height = sq ? 1080 : 1920, photoHeight = sq ? 610 : 1010;
   const img = await loadPhoto(photoSrc(photo.path));
@@ -242,7 +244,7 @@ async function renderCard(loc, photo, format) {
   if (!ctx) throw new Error('Your browser could not prepare the card image.');
   ctx.fillStyle = CARD_GREEN; ctx.fillRect(0, 0, width, height);
   ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
-  drawCover(ctx, img, width, photoHeight);
+  drawCover(ctx, img, width, photoHeight, position);
 
   const inset = sq ? 66 : 82;
   const avail = width - inset * 2;
@@ -299,7 +301,7 @@ async function refreshPreview() {
   if (!loc || !photo) { paintPreview(); return; }
   paintPreview('Preparing the card preview…');
   try {
-    const blob = await renderCard(loc, photo, state.format);
+    const blob = await renderCard(loc, photo, state.format, state.position);
     if (token !== renderToken) return;
     state.previewUrl = URL.createObjectURL(blob);
   } catch (e) {
@@ -344,6 +346,12 @@ function viewMake() {
         <select id="selLoc">${state.locations.map((l) => `<option value="${l.id}" ${String(l.id) === state.locationId ? 'selected' : ''}>${esc(l.name)} · ${esc(l.category)}</option>`).join('')}</select></div>
       ${loc.photos.length ? `<div class="space-y-1.5"><label for="selPhoto" class="text-sm font-semibold">Photo</label>
         <select id="selPhoto">${loc.photos.map((p, i) => `<option value="${p.id}" ${photo && String(p.id) === String(photo.id) ? 'selected' : ''}>Photo ${i + 1} · ${esc(p.filename)}</option>`).join('')}</select></div>` : ''}
+      ${loc.photos.length ? `<div class="space-y-1.5"><label for="selPos" class="text-sm font-semibold">Photo position</label>
+        <select id="selPos">
+          <option value="top" ${state.position === 'top' ? 'selected' : ''}>Top</option>
+          <option value="middle" ${state.position === 'middle' ? 'selected' : ''}>Middle</option>
+          <option value="bottom" ${state.position === 'bottom' ? 'selected' : ''}>Bottom</option>
+        </select></div>` : ''}
       <div class="space-y-1.5"><label for="selFormat" class="text-sm font-semibold">Social format</label>
         <select id="selFormat">
           <option value="square" ${state.format === 'square' ? 'selected' : ''}>Square post · 1080 × 1080</option>
@@ -416,7 +424,7 @@ async function download() {
   if (made && !reusing) return;
   state.busy = true; state.downloadError = ''; render();
   try {
-    const blob = await renderCard(loc, photo, state.format);
+    const blob = await renderCard(loc, photo, state.format, state.position);
     if (!made) {
       const { data, error } = await sb.rpc('card_maker_save', { p_location: loc.id, p_photo: photo.id, p_format: state.format });
       if (isDenied(error)) return notAllowed();
@@ -434,8 +442,9 @@ async function download() {
 }
 
 document.addEventListener('change', (e) => {
-  if (e.target.id === 'selLoc') { state.locationId = e.target.value; state.photoId = ''; state.reuse = false; state.downloadError = ''; render(); }
-  if (e.target.id === 'selPhoto') { state.photoId = e.target.value; state.reuse = false; state.downloadError = ''; render(); }
+  if (e.target.id === 'selLoc') { state.locationId = e.target.value; state.photoId = ''; state.position = 'middle'; state.reuse = false; state.downloadError = ''; render(); }
+  if (e.target.id === 'selPhoto') { state.photoId = e.target.value; state.position = 'middle'; state.reuse = false; state.downloadError = ''; render(); }
+  if (e.target.id === 'selPos') { state.position = e.target.value; state.downloadError = ''; render(); }
   if (e.target.id === 'selFormat') { state.format = e.target.value; state.reuse = false; state.downloadError = ''; render(); }
 });
 document.addEventListener('click', (e) => {
