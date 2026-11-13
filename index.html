@@ -211,7 +211,6 @@ const CFG = {
   SUPABASE_URL: 'https://ycdlxdijrlfsxvxksyrq.supabase.co',
   SUPABASE_KEY: 'sb_publishable_2ExdXbNtW9HpuOGAq1Oa7g_gPdONH_s',
   CHECKOUT_URL: 'https://ycdlxdijrlfsxvxksyrq.supabase.co/functions/v1/checkout',
-  ROAD_URL: 'https://ycdlxdijrlfsxvxksyrq.supabase.co/functions/v1/road-distances',
   UNLOCK_PRICE: '$4.99',
   PHOTO_BUCKET: 'poi-photos',
   // The original Local America logo, stored in this repo (no longer loaded from the Glide app).
@@ -219,10 +218,9 @@ const CFG = {
   CONTACT_EMAIL: 'Localamerica25@gmail.com',
   FACEBOOK_URL: 'https://www.facebook.com/share/1QRkXzhmJo/',
   NEAR_MILES: 75,
-  ROAD_NEAREST: 10,
   PAGE_SIZE: 24,
-  // Near me inside a place type shows only the closest 5 (no "show more")
-  NEAR_PAGE_SIZE: 5
+  // Near me inside a place type shows only the closest 10 (no "show more")
+  NEAR_PAGE_SIZE: 10
 };
 
 // ================= ICONS (same set as the Glide guide) =================
@@ -238,7 +236,7 @@ const ICON_PATHS = {
   landmark: '<line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/>',
   compass: '<circle cx="12" cy="12" r="10"/><path d="m16.24 7.76-2.12 6.36-6.36 2.12 2.12-6.36 6.36-2.12z"/>',
   pin: '<path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/>',
-  shield: '<path d="M20 13c0 5-3.5 7.5-7.66 8.950a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="M12 8v4"/><path d="M12 16h.01"/>',
+  shield: '<path d="M20 13c0 5-3.5 7.5-7.66 8.950a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.810 17 5 19 5a1 1 0 0 1 1 1z"/><path d="M12 8v4"/><path d="M12 16h.01"/>',
   arrow: '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
   lock: '<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>'
 };
@@ -397,7 +395,7 @@ function media(src, alt, iconName, aspect = 'aspect-[16/10]') {
 const state = {
   ready: false, error: null,
   locs: [], photos: {}, cats: [],
-  userPos: null, distances: null, road: {}, locStatus: 'idle',
+  distances: null, locStatus: 'idle',
   catNear: false, shown: CFG.PAGE_SIZE, installEvent: null,
   busy: null
 };
@@ -596,20 +594,6 @@ function getPos(high = true) {
   });
 }
 
-// Driving miles from the server. The server looks up coordinates itself, so GPS never reaches the browser.
-async function roadMilesFor(ids) {
-  if (!state.userPos || !ids.length) return;
-  try {
-    const res = await fetch(CFG.ROAD_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', apikey: CFG.SUPABASE_KEY },
-      body: JSON.stringify({ origin: state.userPos, ids })
-    });
-    const r = await res.json();
-    if (r && r.ok) Object.assign(state.road, r.miles || {});
-  } catch (e) { /* straight-line miles still show */ }
-}
-
 async function findMe() {
   state.locStatus = 'loading'; render();
   const where = location.hash.startsWith('#/c/') ? 'category' : 'other_page';
@@ -629,20 +613,12 @@ async function findMe() {
   }
   logEvent('near_me_location_ready');
   try {
-    state.userPos = { lat: c.latitude, lng: c.longitude };
+    // Straight-line miles, worked out in our own database (no driving-miles lookup)
     const { data, error } = await sb.rpc('poi_distances', { user_lat: c.latitude, user_lng: c.longitude });
     if (error) throw error;
     state.distances = {};
     (data || []).forEach((r) => { state.distances[r.id] = r.miles; });
     state.locStatus = 'ready';
-    // Driving miles for the nearest 10 in the current place type (Glide's rule), fetched after the straight-line list shows
-    state.road = {};
-    const nearest = state.locs
-      .filter((l) => (!category || l.category === category) && state.distances[l.id] != null)
-      .sort((a, b) => state.distances[a.id] - state.distances[b.id])
-      .slice(0, CFG.ROAD_NEAREST)
-      .map((l) => l.id);
-    roadMilesFor(nearest).then(() => render());
     // How many places this person actually sees nearby (0 = they wanted something we don't have close by)
     const pool = state.locs.filter((l) => (!category || l.category === category) && state.distances[l.id] != null &&
       (where === 'category' ? state.distances[l.id] <= CFG.NEAR_MILES : true));
@@ -653,8 +629,8 @@ async function findMe() {
   render();
 }
 
-// Extra view state: road-mile lookups, which card asked for distance, install card, payment confirmation
-Object.assign(state, { roadBusy: {}, roadFail: {}, cardAsk: null, locReason: null, steps: false, installed: false, confirmed: null });
+// Extra view state: which card asked for distance, install card, payment confirmation
+Object.assign(state, { cardAsk: null, locReason: null, steps: false, installed: false, confirmed: null });
 
 // ================= VIEW PIECES =================
 // Buttons: same shapes and sizes as the Glide guide
@@ -686,22 +662,18 @@ function excerpt(text, len = 116) {
   return v.length > len ? v.slice(0, len).trim() + '…' : v;
 }
 
-// The Distance button on every card: straight-line miles first, one more tap for road miles
+// The Distance button on every card: straight-line miles only (not driving miles)
 function distanceUi(l) {
   const id = l.id, asked = String(state.cardAsk) === String(id);
   const d = state.distances ? state.distances[id] : null;
-  const road = state.road[id];
   if (!state.distances) {
     if (state.locStatus === 'loading') return { label: asked ? 'Finding location…' : 'Distance', hint: '', busy: asked };
     if (asked && state.locStatus === 'denied') return { label: 'Distance', hint: 'Allow location in your browser, then tap Distance again.' };
     if (asked && state.locStatus === 'error') return { label: 'Distance', hint: 'We couldn’t get your location. Tap Distance to try again.' };
     return { label: 'Distance', hint: '' };
   }
-  if (typeof road === 'number') return { label: `${fmtMi(road)} by road`, hint: '' };
-  if (state.roadBusy[id]) return { label: 'Calculating…', hint: '', busy: true };
   if (d == null) return { label: 'Unavailable', hint: '' };
-  if (road === null) return { label: 'No road route', hint: `No road route found. Straight line: ${fmtMi(d)}.` };
-  return { label: `≈ ${fmtMi(d)}`, hint: state.roadFail[id] ? 'Couldn’t get road miles. Tap to retry.' : 'Straight line. Tap for road miles.' };
+  return { label: `About ${fmtMi(d)} away`, hint: '(straight line)' };
 }
 
 const btnTile = `${btnBase.replace('whitespace-nowrap', '')} min-h-11 w-full gap-1.5 px-3 py-2 text-center leading-tight bg-accent text-accentfg shadow-btn hover:bg-accenthover`;
@@ -823,7 +795,7 @@ function viewList(cat) {
   const nearOn = !!cat && state.catNear;
   const ready = state.locStatus === 'ready' && !!state.distances;
   if (nearOn && ready) {
-    // Near me inside a place type: only the closest 5 within the radius, no "show more"
+    // Near me inside a place type: only the closest 10 within the radius, no "show more"
     items = items.filter((l) => (state.distances[l.id] ?? Infinity) <= CFG.NEAR_MILES)
                  .sort((a, b) => state.distances[a.id] - state.distances[b.id])
                  .slice(0, CFG.NEAR_PAGE_SIZE);
@@ -1295,16 +1267,9 @@ document.addEventListener('click', async (e) => {
   if (act === 'cat-near-off') { state.catNear = false; state.shown = CFG.PAGE_SIZE; return render(); }
   if (act === 'more') { state.shown += CFG.PAGE_SIZE; return render(); }
   if (act === 'dist') {
-    const id = Number(el.dataset.id);
     // First tap: find the phone and show straight-line miles on every card
-    if (!state.distances) { state.cardAsk = id; return findMe(); }
-    // Next tap: ask for road miles for this one place
-    if (typeof state.road[id] === 'number' || state.road[id] === null || state.distances[id] == null || state.roadBusy[id]) return;
-    state.roadBusy[id] = true; delete state.roadFail[id]; render();
-    await roadMilesFor([id]);
-    delete state.roadBusy[id];
-    if (state.road[id] === undefined) state.roadFail[id] = true;
-    return render();
+    if (!state.distances) { state.cardAsk = Number(el.dataset.id); return findMe(); }
+    return;
   }
   if (act === 'maps') { logEvent('open_in_maps', Number(el.dataset.id)); return; }
   if (act === 'open-browser') {
