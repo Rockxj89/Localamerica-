@@ -402,6 +402,7 @@ function viewLinks() {
   <p class="mt-1 text-sm text-secondary">Tap Copy, then paste the link into your Facebook post or ad. Each link opens that category in the app.</p>
   <div class="mt-4 space-y-2">
     ${linkRow('Home page', SITE + '/')}
+    ${linkRow('Privacy policy', SITE + '/#/privacy')}
     ${LINKS.map((l) => linkRow(l[1], `${SITE}/${l[2]}`)).join('')}
   </div>`;
 }
