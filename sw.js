@@ -1,5 +1,5 @@
 // Local America service worker: app shell cached, data always fresh
-const CACHE = 'local-america-v6';
+const CACHE = 'local-america-v7';
 const SHELL = ['./', './index.html', './manifest.json', './pixel.js'];
 
 self.addEventListener('install', (event) => {
@@ -32,11 +32,19 @@ self.addEventListener('fetch', (event) => {
   if (url.pathname.endsWith('/traffic.html') || url.pathname.endsWith('/traffic')) return;
   if (url.pathname.endsWith('/cards.html') || url.pathname.endsWith('/cards')) return;
 
-  // Page loads: network first, fall back to the cached shell when offline
+  // Google place pages, the page list and robots.txt: always fresh from the site, never saved in place of the guide
+  if (url.pathname.startsWith('/places/') || url.pathname === '/sitemap.xml' || url.pathname === '/robots.txt') return;
+
+  // Page loads: network first, fall back to the cached shell when offline.
+  // Only the guide itself is saved as the offline copy.
   if (req.mode === 'navigate') {
+    const isGuide = url.pathname === '/' || url.pathname === '/index.html';
     event.respondWith(
       fetch(req)
-        .then((res) => { const copy = res.clone(); caches.open(CACHE).then((c) => c.put('./index.html', copy)); return res; })
+        .then((res) => {
+          if (isGuide && res && res.ok) { const copy = res.clone(); caches.open(CACHE).then((c) => c.put('./index.html', copy)); }
+          return res;
+        })
         .catch(() => caches.match('./index.html'))
     );
     return;
