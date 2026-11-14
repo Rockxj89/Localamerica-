@@ -5,7 +5,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const SITE = 'https://localamerica.vercel.app';
+const SITE = 'https://localamerica.us';
 
 const CATS = {
   camp:        ['Campsites', 'Known places to set up camp on public land in the Ozarks and Mark Twain National Forest.'],
