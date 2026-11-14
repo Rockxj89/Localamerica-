@@ -504,6 +504,33 @@ function flushPendingEvents() {
   names.forEach((n) => window.addEventListener(n, done, { passive: true }));
 })();
 
+// ================= ERROR LOG (read on the private traffic.html page) =================
+// JavaScript errors in the visitor's browser are saved as "js_error" events, so a broken page shows up
+// on the Traffic page. Visitors see nothing. At most 10 per visit and each message only once.
+// Anything after a "?" in a web address, and any number that could be a coordinate, is removed first.
+// These events are never sent to the Meta pixel.
+(function watchForErrors() {
+  const seen = new Set();
+  let sent = 0;
+  const clean = (s, max) => String(s || '').replace(/\?[^\s'")]*/g, '').replace(/-?\d{1,3}\.\d{3,}/g, '#').replace(/\s+/g, ' ').trim().slice(0, max);
+  function report(message, file, line) {
+    try {
+      const msg = clean(message, 200) || 'Unknown error';
+      if (sent >= 10 || seen.has(msg)) return;
+      seen.add(msg); sent++;
+      const meta = { message: msg, page: clean(location.pathname + location.hash, 80) || '/' };
+      if (file) meta.file = clean(String(file).split('/').pop(), 60);
+      if (Number(line)) meta.line = Number(line);
+      logEvent('js_error', null, meta);
+    } catch (e) { /* error logging must never break the app */ }
+  }
+  window.addEventListener('error', (e) => { report(e.message, e.filename, e.lineno); });
+  window.addEventListener('unhandledrejection', (e) => {
+    const r = e.reason;
+    report('Unhandled promise: ' + (r && r.message ? r.message : String(r)), null, null);
+  });
+})();
+
 // ================= CHECKOUT (Stripe via Supabase function) =================
 async function checkoutApi(action, extra = {}) {
   if (!accessToken) return { ok: false, error: 'This browser cannot save purchases. Turn on site storage and try again.' };

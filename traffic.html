@@ -94,7 +94,7 @@ const pct = (a, b) => (b ? Math.round((a / b) * 100) : 0);
 
 const state = {
   days: (() => { try { const v = localStorage.getItem('la-traffic-days'); return v === 'all' ? null : (Number(v) || 30); } catch (e) { return 30; } })(),
-  data: null, months: null, loading: false, error: null, user: null, picks: {},
+  data: null, months: null, problems: null, loading: false, error: null, user: null, picks: {},
   exporting: false, exportMsg: '', exportErr: false
 };
 
@@ -161,9 +161,11 @@ function friendlyAuthError(err) {
 // ================= DATA =================
 async function load() {
   state.loading = true; state.error = null; render();
-  const [res, mres] = await Promise.all([
+  const [res, mres, pres] = await Promise.all([
     sb.rpc('traffic_summary', { p_days: state.days }),
-    sb.rpc('traffic_months')
+    sb.rpc('traffic_months'),
+    // Errors and GPS problems (owner only, same period as the buttons)
+    sb.rpc('traffic_problems', { p_days: state.days })
   ]);
   const { data, error } = res;
   state.loading = false;
@@ -177,6 +179,7 @@ async function load() {
   } else {
     state.data = data;
     state.months = mres && !mres.error ? mres.data : null;
+    state.problems = pres && !pres.error ? pres.data : null;
     markOwnerBrowser();
   }
   render();
@@ -492,6 +495,22 @@ function render() {
     ${hbars(fails, { empty: 'No location failures in this period.' })}
     ${nm.in_app_browser_fails ? `<p class="mt-2 text-sm text-secondary">${fmt(nm.in_app_browser_fails)} of these happened inside Facebook or Instagram's built-in browser, which often blocks GPS.</p>` : ''}`);
 
+  // ---- GPS problems: location failures by reason and by day (no visitor locations are ever stored)
+  const pr = state.problems;
+  if (pr) {
+    const byDate = {};
+    (pr.gps_daily || []).forEach((r) => { (byDate[r.date] ||= {})[r.reason] = r.n; });
+    const cols = ['permission_denied', 'timeout', 'position_unavailable', 'unsupported'];
+    const gpsRows = Object.keys(byDate).sort().reverse().map((dt) => {
+      const g = byDate[dt];
+      const other = Object.entries(g).filter(([k]) => !cols.includes(k)).reduce((a, [, n]) => a + n, 0);
+      const total = Object.values(g).reduce((a, n) => a + n, 0);
+      return [esc(shortDate(dt)), ...cols.map((c) => fmt(g[c])), fmt(other), `<b>${fmt(total)}</b>`];
+    });
+    html += section('GPS problems', `${fmt(pr.gps_total)} times location failed ${periodText}. Reasons are in "Why location failed" above. Newest day first.`,
+      table(['Day', 'Blocked', 'Too slow', 'No position', 'Not supported', 'Other', 'Total'], gpsRows, 'No location failures in this period.'));
+  }
+
   // ---- No results
   html += section('Searches that found nothing', 'Times Near me came back empty. A sign of where people want places you don\'t have yet.',
     table(['What happened', 'Category', 'Times'],
@@ -506,6 +525,17 @@ function render() {
     </div>
     <h3 class="mt-4 mb-2 text-sm font-semibold text-secondary">Phones and browsers</h3>
     ${hbars((d.browsers || []).map((b) => ({ label: b.browser, value: b.opens, dim: b.browser === 'Unknown browser' })))}`);
+
+  // ---- Errors: JavaScript errors from visitors' browsers (visitors never see these)
+  if (pr) {
+    const errDays = (pr.errors_daily || []).map((x) => [esc(shortDate(x.date)), fmt(x.n)]);
+    const errTop = (pr.errors_top || []).map((x) => [
+      `<div class="font-medium break-words">${esc(x.message)}</div><div class="text-xs text-tertiary">${esc(x.page || 'Unknown page')} · ${esc(x.browsers)} · last ${esc(when(x.last_seen))}</div>`,
+      fmt(x.times)]);
+    html += section('Errors', `${fmt(pr.errors_total)} errors in visitors' browsers ${periodText}. Each message counts once per visit. Newest day first.`,
+      table(['Day', 'Errors'], errDays, 'No errors in this period.') +
+      (errTop.length ? `<h3 class="mt-4 mb-2 text-sm font-semibold text-secondary">Most common errors</h3>${table(['Error', 'Times'], errTop)}` : ''));
+  }
 
   // ---- Recent visitors
   html += `<details class="mt-6"><summary class="flex items-center justify-between">
@@ -545,7 +575,7 @@ document.addEventListener('mouseover', (e) => {
   if (item && tip) tip.textContent = item.tip;
 });
 $('#refreshBtn').onclick = () => load();
-$('#signOutBtn').onclick = async () => { await sb.auth.signOut(); state.data = null; state.months = null; viewSignIn(); };
+$('#signOutBtn').onclick = async () => { await sb.auth.signOut(); state.data = null; state.months = null; state.problems = null; viewSignIn(); };
 
 // ================= START =================
 (async function start() {
