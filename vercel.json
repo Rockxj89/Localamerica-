@@ -3,6 +3,14 @@
     {
       "source": "/:slug(camp|swimming|caves|views|bluffs|forgotten|frogs|legends|buildings|dead-ends|mud|hiking|popular|rocks|unmarked|yardage)",
       "destination": "/api/category?c=:slug"
+    },
+    {
+      "source": "/places/:slug",
+      "destination": "/api/place?s=:slug"
+    },
+    {
+      "source": "/sitemap.xml",
+      "destination": "/api/sitemap"
     }
   ],
   "functions": {
