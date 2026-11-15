@@ -1111,33 +1111,25 @@ function viewPrivacy() {
   </article>`;
 }
 
-// ================= VIDEOS (Instagram Reels from @local_america, embedded, not copied) =================
-// The list lives in videos.json: [{ "code": "<the part after /reel/ in the Instagram link>" }, ...], newest first.
+// ================= VIDEOS (TikTok videos from @local_america, stored in the public "tiktok-videos" bucket) =================
+// The list lives in videos.json: [{ "file": "<filename in the bucket>" }, ...], newest first.
 const VIDEO_BATCH = 6;
+const VIDEO_BASE = 'https://ycdlxdijrlfsxvxksyrq.supabase.co/storage/v1/object/public/tiktok-videos/';
 const vid = { list: null, failed: false, shown: VIDEO_BATCH, loading: false };
-const safeCode = (c) => typeof c === 'string' && /^[A-Za-z0-9_-]{5,40}$/.test(c);
+const safeFile = (f) => typeof f === 'string' && /^[A-Za-z0-9_-]{5,80}\.mp4$/.test(f);
 function loadVideos() {
   if (vid.list || vid.loading) return;
   vid.loading = true;
   fetch('videos.json', { cache: 'no-cache' })
     .then((r) => r.ok ? r.json() : Promise.reject(new Error('videos ' + r.status)))
-    .then((d) => { vid.list = (Array.isArray(d) ? d : []).map((v) => v && v.code).filter(safeCode); })
+    .then((d) => { vid.list = (Array.isArray(d) ? d : []).map((v) => v && v.file).filter(safeFile); })
     .catch(() => { vid.failed = true; })
     .finally(() => { vid.loading = false; if ((location.hash.slice(1) || '/').split('/')[1] === 'videos') render(); });
 }
-const videoCard = (code) => `
+const videoCard = (file) => `
   <div class="min-w-0 overflow-hidden rounded-tile bg-white shadow-card">
-    <blockquote class="instagram-media" data-instgrm-permalink="https://www.instagram.com/reel/${code}/" data-instgrm-version="14" style="margin:0;min-width:0;width:100%;max-width:100%;border:0;">
-      <a href="https://www.instagram.com/reel/${code}/" target="_blank" rel="noopener" class="block p-5 t-sm font-medium text-primary underline">Watch on Instagram</a>
-    </blockquote>
+    <video class="aspect-[9/16] w-full bg-black object-contain" src="${VIDEO_BASE}${file}" controls playsinline preload="none"></video>
   </div>`;
-function embedVideos() {
-  if (window.instgrm && window.instgrm.Embeds) { window.instgrm.Embeds.process(); return; }
-  if (document.getElementById('ig-embed')) return;
-  const s = document.createElement('script');
-  s.id = 'ig-embed'; s.async = true; s.src = 'https://www.instagram.com/embed.js';
-  document.body.appendChild(s);
-}
 function moreVideos(btn) {
   const grid = document.getElementById('videoGrid');
   if (!grid || !vid.list) return;
@@ -1145,7 +1137,6 @@ function moreVideos(btn) {
   vid.shown += next.length;
   grid.insertAdjacentHTML('beforeend', next.map(videoCard).join(''));
   if (vid.shown >= vid.list.length && btn) btn.remove();
-  embedVideos();
 }
 function viewVideos() {
   loadVideos();
@@ -1160,7 +1151,7 @@ function viewVideos() {
   <section class="space-y-6 text-primary">
     <header class="space-y-3">
       <h1 class="font-display text-[length:var(--fs-h1)] font-semibold leading-[1.1] tracking-[-0.02em] text-primary">Videos</h1>
-      <p class="t-base leading-8 text-secondary">Videos from Local America on Instagram. <a href="https://www.instagram.com/local_america/" target="_blank" rel="noopener" class="font-medium text-primary underline underline-offset-2 hover:no-underline">@local_america</a></p>
+      <p class="t-base leading-8 text-secondary">Local America videos.</p>
     </header>
     ${body}
   </section>`;
@@ -1254,7 +1245,6 @@ function render() {
   view.dataset.page = (a === 'c' || a === 'places') ? 'list' : (a || 'home');
   view.innerHTML = html;
   syncMiniLogo(view.dataset.page);
-  if (a === 'videos' && vid.list && vid.list.length) embedVideos();
 
   // Active tab = soft green pill (no tab is lit on place and place-type pages)
   const active = !a ? 'home' : a === 'videos' ? 'videos' : (a === 'about' || a === 'safety' || a === 'privacy') ? 'about' : '';
