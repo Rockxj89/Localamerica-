@@ -158,6 +158,7 @@
       <a href="#/" class="font-display text-lg font-semibold tracking-[-0.01em] text-primary">Local America</a>
       <div class="flex items-center gap-1">
         <a data-nav="home"  href="#/"      class="navlink press rounded-full px-4 py-2 text-[15px] font-medium text-secondary">Home</a>
+        <a data-nav="videos" href="#/videos" class="navlink press rounded-full px-4 py-2 text-[15px] font-medium text-secondary">Videos</a>
         <a data-nav="about" href="#/about" class="navlink press rounded-full px-4 py-2 text-[15px] font-medium text-secondary">About</a>
       </div>
       <div></div>
@@ -196,10 +197,11 @@
   </footer>
 
   <!-- Phone nav: floating green pill at the bottom -->
-  <nav class="md:hidden fixed left-1/2 -translate-x-1/2 z-50 rounded-full bg-white/80 p-1.5 shadow-float backdrop-blur-xl backdrop-saturate-150 w-[13rem] max-w-[calc(100%-16px)]"
+  <nav class="md:hidden fixed left-1/2 -translate-x-1/2 z-50 rounded-full bg-white/80 p-1.5 shadow-float backdrop-blur-xl backdrop-saturate-150 w-[19rem] max-w-[calc(100%-16px)]"
        style="bottom: max(0.5rem, calc(env(safe-area-inset-bottom, 0px) - 13px));">
     <div class="flex items-center gap-1">
       <a data-nav="home"  href="#/"      class="navlink press flex-1 flex flex-col items-center gap-0.5 rounded-full px-2 py-1.5 text-xs font-semibold text-secondary"><span data-icon="house" class="contents"></span>Home</a>
+      <a data-nav="videos" href="#/videos" class="navlink press flex-1 flex flex-col items-center gap-0.5 rounded-full px-2 py-1.5 text-xs font-semibold text-secondary"><span data-icon="video" class="contents"></span>Videos</a>
       <a data-nav="about" href="#/about" class="navlink press flex-1 flex flex-col items-center gap-0.5 rounded-full px-2 py-1.5 text-xs font-semibold text-secondary"><span data-icon="book" class="contents"></span>About</a>
     </div>
   </nav>
@@ -274,7 +276,8 @@ Object.assign(ICON_PATHS, {
   left: '<path d="m15 18-6-6 6-6"/>',
   right: '<path d="m9 18 6-6-6-6"/>',
   back: '<path d="m12 19-7-7 7-7"/><path d="M19 12H5"/>',
-  x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>'
+  x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+  video: '<path d="m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5"/><rect x="2" y="6" width="14" height="12" rx="2"/>'
 });
 const icon = (name, cls = '') => `<svg viewBox="0 0 24 24" class="ico ${cls}" aria-hidden="true">${ICON_PATHS[name] || ''}</svg>`;
 document.querySelectorAll('[data-icon]').forEach((el) => {
@@ -1108,6 +1111,61 @@ function viewPrivacy() {
   </article>`;
 }
 
+// ================= VIDEOS (Instagram Reels from @local_america, embedded, not copied) =================
+// The list lives in videos.json: [{ "code": "<the part after /reel/ in the Instagram link>" }, ...], newest first.
+const VIDEO_BATCH = 6;
+const vid = { list: null, failed: false, shown: VIDEO_BATCH, loading: false };
+const safeCode = (c) => typeof c === 'string' && /^[A-Za-z0-9_-]{5,40}$/.test(c);
+function loadVideos() {
+  if (vid.list || vid.loading) return;
+  vid.loading = true;
+  fetch('videos.json', { cache: 'no-cache' })
+    .then((r) => r.ok ? r.json() : Promise.reject(new Error('videos ' + r.status)))
+    .then((d) => { vid.list = (Array.isArray(d) ? d : []).map((v) => v && v.code).filter(safeCode); })
+    .catch(() => { vid.failed = true; })
+    .finally(() => { vid.loading = false; if ((location.hash.slice(1) || '/').split('/')[1] === 'videos') render(); });
+}
+const videoCard = (code) => `
+  <div class="min-w-0 overflow-hidden rounded-tile bg-white shadow-card">
+    <blockquote class="instagram-media" data-instgrm-permalink="https://www.instagram.com/reel/${code}/" data-instgrm-version="14" style="margin:0;min-width:0;width:100%;max-width:100%;border:0;">
+      <a href="https://www.instagram.com/reel/${code}/" target="_blank" rel="noopener" class="block p-5 t-sm font-medium text-primary underline">Watch on Instagram</a>
+    </blockquote>
+  </div>`;
+function embedVideos() {
+  if (window.instgrm && window.instgrm.Embeds) { window.instgrm.Embeds.process(); return; }
+  if (document.getElementById('ig-embed')) return;
+  const s = document.createElement('script');
+  s.id = 'ig-embed'; s.async = true; s.src = 'https://www.instagram.com/embed.js';
+  document.body.appendChild(s);
+}
+function moreVideos(btn) {
+  const grid = document.getElementById('videoGrid');
+  if (!grid || !vid.list) return;
+  const next = vid.list.slice(vid.shown, vid.shown + VIDEO_BATCH);
+  vid.shown += next.length;
+  grid.insertAdjacentHTML('beforeend', next.map(videoCard).join(''));
+  if (vid.shown >= vid.list.length && btn) btn.remove();
+  embedVideos();
+}
+function viewVideos() {
+  loadVideos();
+  let body;
+  if (vid.failed) body = `<p class="t-sm text-errink">We couldn’t load the videos.</p>`;
+  else if (!vid.list) body = `<div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">${'<div class="skel aspect-[9/14] rounded-tile"></div>'.repeat(2)}</div>`;
+  else if (!vid.list.length) body = `<p class="t-base text-secondary">Videos are coming soon.</p>`;
+  else body = `
+    <div id="videoGrid" class="mx-auto grid max-w-[1000px] grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">${vid.list.slice(0, vid.shown).map(videoCard).join('')}</div>
+    ${vid.list.length > vid.shown ? `<div class="mt-6 text-center"><button type="button" data-act="more-videos" class="${btnSecondary}">Show more videos</button></div>` : ''}`;
+  return `
+  <section class="space-y-6 text-primary">
+    <header class="space-y-3">
+      <h1 class="font-display text-[length:var(--fs-h1)] font-semibold leading-[1.1] tracking-[-0.02em] text-primary">Videos</h1>
+      <p class="t-base leading-8 text-secondary">Videos from Local America on Instagram. <a href="https://www.instagram.com/local_america/" target="_blank" rel="noopener" class="font-medium text-primary underline underline-offset-2 hover:no-underline">@local_america</a></p>
+    </header>
+    ${body}
+  </section>`;
+}
+
 // ================= ADD TO HOME SCREEN CARD (footer of every page) =================
 function renderInstall() {
   const box = $('#installCard');
@@ -1148,7 +1206,7 @@ function renderInstall() {
 // Show the small flag logo on every page except Home and About (those already show the big logo)
 function syncMiniLogo(page) {
   const el = document.getElementById('mini-logo');
-  if (el) el.hidden = !['list', 'p', 'safety', 'privacy'].includes(page);
+  if (el) el.hidden = !['list', 'p', 'safety', 'privacy', 'videos'].includes(page);
 }
 let lastRouteKey = '';
 function render() {
@@ -1191,13 +1249,15 @@ function render() {
   else if (a === 'about') html = viewAbout();
   else if (a === 'safety') html = viewSafety();
   else if (a === 'privacy') html = viewPrivacy();
+  else if (a === 'videos') { vid.shown = key === lastRouteKey ? vid.shown : VIDEO_BATCH; html = viewVideos(); }
   else html = viewHome();
   view.dataset.page = (a === 'c' || a === 'places') ? 'list' : (a || 'home');
   view.innerHTML = html;
   syncMiniLogo(view.dataset.page);
+  if (a === 'videos' && vid.list && vid.list.length) embedVideos();
 
   // Active tab = soft green pill (no tab is lit on place and place-type pages)
-  const active = !a ? 'home' : (a === 'about' || a === 'safety' || a === 'privacy') ? 'about' : '';
+  const active = !a ? 'home' : a === 'videos' ? 'videos' : (a === 'about' || a === 'safety' || a === 'privacy') ? 'about' : '';
   document.querySelectorAll('[data-nav]').forEach((el) => {
     if (el.dataset.nav === active) el.setAttribute('aria-current', 'page');
     else el.removeAttribute('aria-current');
@@ -1322,6 +1382,7 @@ document.addEventListener('click', async (e) => {
   if (act === 'unlock') return startUnlock(Number(el.dataset.id));
   if (act === 'cat-near-on') { state.catNear = true; state.shown = CFG.PAGE_SIZE; return state.distances ? render() : findMe(); }
   if (act === 'cat-near-off') { state.catNear = false; state.shown = CFG.PAGE_SIZE; return render(); }
+  if (act === 'more-videos') return moreVideos(el);
   if (act === 'more') { state.shown += CFG.PAGE_SIZE; return render(); }
   if (act === 'dist') {
     // First tap: find the phone and show straight-line miles on every card
