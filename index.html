@@ -124,6 +124,13 @@
   .navlink[aria-current="page"] { background: rgb(21 128 61 / .12); color: #166534; }
   /* Pages whose title would land on the flag start just below it */
   #view[data-page="list"], #view[data-page="p"], #view[data-page="safety"], #view[data-page="privacy"] { padding-top: calc(var(--flag-clear) - 1.5rem); }
+  /* Small logo on the flag (every page except Home and About, which show the big one). Tapping it goes Home. */
+  .mini-logo { position: absolute; z-index: 20; top: 1.25rem; left: 53%; transform: translateX(-50%); width: 96px; height: 96px; border-radius: 9999px; }
+  .mini-logo[hidden] { display: none; }
+  .mini-logo.press:active { transform: translateX(-50%) scale(.96); }
+  @media (min-width: 768px) { .mini-logo.press:active { transform: translateX(-50%) scale(.96); } }
+  .mini-logo svg { width: 100%; height: 100%; }
+  @media (min-width: 768px) { .mini-logo { top: 4.75rem; left: calc(50% + 19px); width: 104px; height: 104px; } }
   .view-enter { animation: view-in var(--dur-slow) var(--ease-out); }
   @keyframes view-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
   .skel { background: linear-gradient(90deg, rgb(27 35 30 / .06) 25%, rgb(27 35 30 / .11) 37%, rgb(27 35 30 / .06) 63%); background-size: 400% 100%; animation: shimmer 1.6s ease infinite; }
@@ -156,6 +163,18 @@
       <div></div>
     </div>
   </nav>
+
+  <a id="mini-logo" href="#/" class="mini-logo press" aria-label="Local America home" hidden>
+    <svg viewBox="100 100 800 800" class="contrast-150 brightness-90" aria-hidden="true">
+      <defs>
+        <filter id="mini-logo-bg-off" color-interpolation-filters="sRGB">
+          <feColorMatrix type="matrix" values="0 0 0 0 0.106 0 0 0 0 0.137 0 0 0 0 0.118 6 6 6 0 -4.2"/>
+          <feMorphology operator="dilate" radius="3"/>
+        </filter>
+      </defs>
+      <image href="Notes_261110_202947_da0.jpg" x="0" y="0" width="1000" height="1000" preserveAspectRatio="xMidYMid meet" filter="url(#mini-logo-bg-off)"/>
+    </svg>
+  </a>
 
   <div class="relative z-10 mx-auto w-full max-w-[1200px] px-5 pb-4 pt-6 text-primary md:px-8">
     <main id="view"></main>
@@ -1124,6 +1143,11 @@ function renderInstall() {
 }
 
 // ================= ROUTER =================
+// Show the small flag logo on every page except Home and About (those already show the big logo)
+function syncMiniLogo(page) {
+  const el = document.getElementById('mini-logo');
+  if (el) el.hidden = !['list', 'p', 'safety', 'privacy'].includes(page);
+}
 let lastRouteKey = '';
 function render() {
   const view = $('#view');
@@ -1134,6 +1158,7 @@ function render() {
   if (!state.ready) {
     const pg = (location.hash.slice(1) || '/').split('/')[1];
     view.dataset.page = (pg === 'c' || pg === 'places') ? 'list' : (pg || 'home');
+    syncMiniLogo(view.dataset.page);
     view.innerHTML = `
     <div class="space-y-6" aria-busy="true">
       <p class="sr-only" role="status">Loading field records…</p>
@@ -1167,6 +1192,7 @@ function render() {
   else html = viewHome();
   view.dataset.page = (a === 'c' || a === 'places') ? 'list' : (a || 'home');
   view.innerHTML = html;
+  syncMiniLogo(view.dataset.page);
 
   // Active tab = soft green pill (no tab is lit on place and place-type pages)
   const active = !a ? 'home' : (a === 'about' || a === 'safety' || a === 'privacy') ? 'about' : '';
