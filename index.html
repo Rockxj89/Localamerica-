@@ -123,7 +123,7 @@
   a:focus-visible, button:focus-visible, select:focus-visible { outline: 2px solid #15803D; outline-offset: 2px; }
   .navlink[aria-current="page"] { background: rgb(21 128 61 / .12); color: #166534; }
   /* Pages whose title would land on the flag start just below it */
-  #view[data-page="list"], #view[data-page="p"], #view[data-page="safety"], #view[data-page="privacy"] { padding-top: calc(var(--flag-clear) - 1.5rem); }
+  #view[data-page="list"], #view[data-page="p"], #view[data-page="safety"], #view[data-page="privacy"], #view[data-page="videos"] { padding-top: calc(var(--flag-clear) - 1.5rem); }
   /* Small logo on the flag (every page except Home and About, which show the big one). Tapping it goes Home. */
   .mini-logo { position: absolute; z-index: 20; top: .75rem; left: 48%; transform: translateX(-50%); width: 150px; height: 150px; border-radius: 9999px; }
   .mini-logo[hidden] { display: none; }
@@ -220,6 +220,12 @@
     <span id="pvCap" class="max-w-[60%] rounded-md px-3 py-1.5 text-center text-xs text-white" style="background: rgba(0,0,0,.6);"></span>
     <button type="button" data-act="pv-in" aria-label="Zoom in" class="pvb text-xl">+</button>
   </div>
+</div>
+
+<!-- Full-screen video player: opens when a video tile is tapped -->
+<div id="vv" class="hidden fixed inset-0 z-[60] flex items-center justify-center" style="background: rgba(0,0,0,.95);" role="dialog" aria-modal="true" aria-label="Video">
+  <video id="vvVideo" class="max-h-full max-w-full" controls playsinline></video>
+  <button type="button" data-act="vv-close" aria-label="Close video" class="pvb absolute right-4 top-4 z-10"><span data-icon="x" class="contents"></span></button>
 </div>
 
 <div id="toast" class="hidden fixed bottom-24 inset-x-0 z-[60] flex justify-center pointer-events-none">
@@ -1126,10 +1132,35 @@ function loadVideos() {
     .catch(() => { vid.failed = true; })
     .finally(() => { vid.loading = false; if ((location.hash.slice(1) || '/').split('/')[1] === 'videos') render(); });
 }
+// Small tile: a still from the start of the video (the "#t=0.1" makes phones show that frame instead of black).
+// Tapping it opens the full-screen player.
 const videoCard = (file) => `
-  <div class="min-w-0 overflow-hidden rounded-tile bg-white shadow-card">
-    <video class="aspect-[9/16] w-full bg-black object-contain" src="${VIDEO_BASE}${file}" controls playsinline preload="none"></video>
-  </div>`;
+  <button type="button" data-act="vv-open" data-f="${file}" aria-label="Play video" class="lift press relative block aspect-[4/5] w-full min-w-0 overflow-hidden rounded-tile bg-black shadow-card">
+    <video class="pointer-events-none absolute inset-0 h-full w-full object-cover" src="${VIDEO_BASE}${file}#t=0.1" muted playsinline preload="metadata" tabindex="-1" aria-hidden="true"></video>
+    <span class="absolute inset-0 flex items-center justify-center">
+      <span class="flex h-14 w-14 items-center justify-center rounded-full text-white" style="background: rgba(0,0,0,.55);">
+        <svg viewBox="0 0 24 24" class="h-7 w-7" aria-hidden="true"><path d="M8 5.5v13l11-6.5z" fill="currentColor"/></svg>
+      </span>
+    </span>
+  </button>`;
+function vvOpen(file) {
+  if (!safeFile(file)) return;
+  const v = $('#vvVideo');
+  v.src = VIDEO_BASE + file;
+  $('#vv').classList.remove('hidden'); document.body.style.overflow = 'hidden';
+  const p = v.play(); if (p && p.catch) p.catch(() => {});
+}
+function vvClose() {
+  const v = $('#vvVideo');
+  try { v.pause(); } catch (err) { /* fine */ }
+  v.removeAttribute('src'); v.load();
+  $('#vv').classList.add('hidden'); document.body.style.overflow = '';
+}
+const vvOpenNow = () => !$('#vv').classList.contains('hidden');
+window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && vvOpenNow()) vvClose(); });
+window.addEventListener('hashchange', () => { if (vvOpenNow()) vvClose(); });
+// Tapping the dark area around the video closes it
+document.getElementById('vv').addEventListener('click', (e) => { if (e.target.id === 'vv') vvClose(); });
 function moreVideos(btn) {
   const grid = document.getElementById('videoGrid');
   if (!grid || !vid.list) return;
@@ -1142,10 +1173,10 @@ function viewVideos() {
   loadVideos();
   let body;
   if (vid.failed) body = `<p class="t-sm text-errink">We couldn’t load the videos.</p>`;
-  else if (!vid.list) body = `<div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">${'<div class="skel aspect-[9/14] rounded-tile"></div>'.repeat(2)}</div>`;
+  else if (!vid.list) body = `<div class="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-4">${'<div class="skel aspect-[4/5] rounded-tile"></div>'.repeat(4)}</div>`;
   else if (!vid.list.length) body = `<p class="t-base text-secondary">Videos are coming soon.</p>`;
   else body = `
-    <div id="videoGrid" class="mx-auto grid max-w-[1000px] grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">${vid.list.slice(0, vid.shown).map(videoCard).join('')}</div>
+    <div id="videoGrid" class="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-4">${vid.list.slice(0, vid.shown).map(videoCard).join('')}</div>
     ${vid.list.length > vid.shown ? `<div class="mt-6 text-center"><button type="button" data-act="more-videos" class="${btnSecondary}">Show more videos</button></div>` : ''}`;
   return `
   <section class="space-y-6 text-primary">
@@ -1373,6 +1404,8 @@ document.addEventListener('click', async (e) => {
   if (act === 'cat-near-on') { state.catNear = true; state.shown = CFG.PAGE_SIZE; return state.distances ? render() : findMe(); }
   if (act === 'cat-near-off') { state.catNear = false; state.shown = CFG.PAGE_SIZE; return render(); }
   if (act === 'more-videos') return moreVideos(el);
+  if (act === 'vv-open') return vvOpen(el.dataset.f);
+  if (act === 'vv-close') return vvClose();
   if (act === 'more') { state.shown += CFG.PAGE_SIZE; return render(); }
   if (act === 'dist') {
     // First tap: find the phone and show straight-line miles on every card
