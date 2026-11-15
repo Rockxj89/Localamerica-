@@ -917,7 +917,9 @@ function viewPlace(id) {
   <article class="mx-auto max-w-3xl space-y-8">
     <div class="space-y-4">
       <nav class="flex items-center gap-2 t-sm text-secondary" aria-label="Breadcrumb">
-        <a href="#/places" class="inline-flex items-center gap-2 hover:text-primary">${icon('back', 'ico-sm')} Places</a>
+        ${l.category
+          ? `<a href="#/c/${catSlug(l.category)}" class="inline-flex items-center gap-2 hover:text-primary">${icon('back', 'ico-sm')} ${esc(catLabel(l.category))}</a>`
+          : `<a href="#/places" class="inline-flex items-center gap-2 hover:text-primary">${icon('back', 'ico-sm')} Places</a>`}
         <span aria-hidden="true">/</span>
         <span class="truncate text-secondary">${esc(l.name)}</span>
       </nav>
