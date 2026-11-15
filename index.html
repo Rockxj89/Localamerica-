@@ -6,12 +6,12 @@
 <meta name="theme-color" content="#f7f9fa">
 <meta name="mobile-web-app-capable" content="yes">
 <title>Local America</title>
-<meta name="description" content="Local America is your guide to public-land spots in the Mark Twain National Forest: campsites, caves, swimming holes, scenic views and more. Browse photos and descriptions, and find the 10 places closest to you.">
+<meta name="description" content="Local America helps you find public-land spots in the Mark Twain National Forest: campsites, caves, swimming holes, scenic views and more. Browse photos and descriptions, and find the 10 places closest to you.">
 <!-- Link preview (Facebook, Messenger, texts): shows the logo when the link is shared -->
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Local America">
 <meta property="og:title" content="Local America">
-<meta property="og:description" content="Local America is your guide to public-land spots in the Mark Twain National Forest: campsites, caves, swimming holes, scenic views and more. Browse photos and descriptions, and find the 10 places closest to you.">
+<meta property="og:description" content="Local America helps you find public-land spots in the Mark Twain National Forest: campsites, caves, swimming holes, scenic views and more. Browse photos and descriptions, and find the 10 places closest to you.">
 <meta property="og:url" content="https://localamerica.us/">
 <meta property="og:image" content="https://localamerica.us/Notes_261110_202947_da0.jpg">
 <meta property="og:image:width" content="512">
@@ -166,7 +166,7 @@
     <div class="mt-8 space-y-3 border-t border-black/5 pt-6 t-sm text-secondary">
       <p aria-label="Coordinate note">Coordinates get you close, not always exact. Finding the spot is part of the fun.</p>
       <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <p>Use this guide as a starting point, never as your only navigation source.</p>
+        <p>Use this app as a starting point, never as your only navigation source.</p>
         <div class="flex flex-wrap items-center gap-x-6 gap-y-2">
           <a href="#/about/contact" class="inline-flex items-center gap-2 font-medium text-primary underline decoration-black/20 underline-offset-4 hover:decoration-current">Contact</a>
           <a href="#/privacy" class="inline-flex items-center gap-2 font-medium text-primary underline decoration-black/20 underline-offset-4 hover:decoration-current">Privacy</a>
@@ -806,7 +806,7 @@ function viewHome() {
       </div>` : `
       <div class="py-10 text-center">
         <p class="t-base font-semibold text-primary">No place types are available yet.</p>
-        <p class="mt-2 t-sm text-secondary">The guide has no field records to browse.</p>
+        <p class="mt-2 t-sm text-secondary">The app has no field records to browse.</p>
       </div>`}
     </section>
 
@@ -851,7 +851,7 @@ function viewList(cat) {
     body = `
     <div class="py-10 text-center">
       <p class="t-base font-semibold text-primary">${cat ? 'No places match those filters.' : 'No places are available yet.'}</p>
-      <p class="mt-2 t-sm text-secondary">${cat ? 'Try a broader search or view every field record.' : 'The guide has no field records to show.'}</p>
+      <p class="mt-2 t-sm text-secondary">${cat ? 'Try a broader search or view every field record.' : 'The app has no field records to show.'}</p>
       ${cat ? `<a href="#/places" class="mt-4 inline-flex t-sm font-medium text-okink underline">Browse all places</a>` : ''}
     </div>`;
   }
@@ -951,7 +951,7 @@ function viewPlace(id) {
       <div class="mt-5">
         <button type="button" data-act="unlock" data-id="${l.id}" class="${btnPrimaryLg} w-full sm:w-auto" ${state.busy ? 'disabled' : ''}>${busyHere ? 'Opening secure checkout…' : `Unlock GPS for ${CFG.UNLOCK_PRICE}`}</button>
       </div>
-      <p class="mt-3 t-xs text-secondary">Your purchase is saved in the browser you pay in. If you opened this guide from Facebook, open it in your regular browser first so your unlock is there next time. Payments are processed by Stripe.</p>
+      <p class="mt-3 t-xs text-secondary">Your purchase is saved in the browser you pay in. If you opened this app from Facebook, open it in your regular browser first so your unlock is there next time. Payments are processed by Stripe.</p>
     </section>` : `
     <section class="rounded-card bg-white p-5 shadow-card sm:p-6">
       <p class="t-xs text-secondary">Coordinates</p>
@@ -968,7 +968,7 @@ function viewAbout() {
   const principles = [
     ['Coordinates by access', `Free locations show GPS publicly. Unlock one paid location’s GPS for ${CFG.UNLOCK_PRICE}, a one-time payment with no subscription that never expires. No account needed. Your purchase is saved on this device.`],
     ['Field notes', 'Descriptions preserve the practical observations attached to each location.'],
-    ['Explore responsibly', 'Use the guide as a starting point and prepare for changing trail and road conditions.']
+    ['Explore responsibly', 'Use the app as a starting point and prepare for changing trail and road conditions.']
   ];
   const h2 = 'font-display text-[length:var(--fs-h2)] font-semibold leading-[1.2] tracking-[-0.015em] text-primary';
   const contactBtn = 'lift press inline-flex h-11 items-center gap-2 rounded-full bg-white px-5 text-base font-semibold text-primary shadow-card';
@@ -1026,13 +1026,13 @@ function viewSafety() {
     <header class="space-y-4">
       <p class="t-xs font-semibold uppercase tracking-[0.12em] text-secondary">Please read before using location data</p>
       <h1 class="font-display text-[length:var(--fs-h1)] font-semibold leading-[1.1] tracking-[-0.02em] text-primary">Safety &amp; Terms of Use</h1>
-      <p class="t-base leading-8 text-secondary">This notice explains the limits of this guide and your responsibility when deciding whether and how to visit a listed location.</p>
+      <p class="t-base leading-8 text-secondary">This notice explains the limits of this app and your responsibility when deciding whether and how to visit a listed location.</p>
     </header>
     <section>
       <div class="flex items-start gap-3">
         <span class="mt-0.5 shrink-0 text-warnink">${icon('shield')}</span>
         <div class="space-y-2 t-sm text-warnink">
-          <p class="font-semibold">Use this guide at your own risk.</p>
+          <p class="font-semibold">Use this app at your own risk.</p>
           <p>Conditions, access, and location data can change. Confirm current information with official sources and use your own judgment before entering any area or starting any activity.</p>
         </div>
       </div>
@@ -1056,13 +1056,13 @@ function viewSafety() {
 // Plain-language privacy page (linked from the footer of every page)
 function viewPrivacy() {
   const sections = [
-    ['What the guide records', 'Local America records basic usage events so the owner can see how the guide is used. These include opening the app, viewing a place or place type, tapping Near me, and the purchase steps. Each record can include the kind of event, the place it was about, the browser and device type (for example, Safari on iPhone), the website you came from if your browser shares it (such as Facebook), and random codes for your browser and visit. Records do not include your name or email address.'],
-    ['Your location', 'Near me asks your phone for its location. Your browser asks for permission first, and you can say no. Your location is sent to our database only to work out how far away each place is. The guide does not save your location, and the coordinates are never shown to other visitors.'],
-    ['Meta (Facebook) Pixel', 'The guide uses the Meta Pixel, which reports page views and key steps, such as viewing a place or starting checkout, to Meta. Meta uses this to measure ads and may use it to show ads. Meta may set its own cookies to do this. You can adjust ad settings in your Facebook account, or block the pixel with a browser privacy or ad-blocking tool. Meta’s own privacy policy explains what it does with this information.'],
+    ['What the app records', 'Local America records basic usage events so the owner can see how the app is used. These include opening the app, viewing a place or place type, tapping Near me, and the purchase steps. Each record can include the kind of event, the place it was about, the browser and device type (for example, Safari on iPhone), the website you came from if your browser shares it (such as Facebook), and random codes for your browser and visit. Records do not include your name or email address.'],
+    ['Your location', 'Near me asks your phone for its location. Your browser asks for permission first, and you can say no. Your location is sent to our database only to work out how far away each place is. The app does not save your location, and the coordinates are never shown to other visitors.'],
+    ['Meta (Facebook) Pixel', 'The app uses the Meta Pixel, which reports page views and key steps, such as viewing a place or starting checkout, to Meta. Meta uses this to measure ads and may use it to show ads. Meta may set its own cookies to do this. You can adjust ad settings in your Facebook account, or block the pixel with a browser privacy or ad-blocking tool. Meta’s own privacy policy explains what it does with this information.'],
     ['Payments', 'Paid GPS unlocks are processed by Stripe through Stripe Checkout. Local America never sees or stores your card number. Stripe handles payment details under its own privacy policy. After you pay, a random code is saved in your browser so the unlock works on that device. Only a scrambled version of that code is kept on our side. Clearing your browser data removes the saved unlock.'],
-    ['Stored items in your browser', 'The guide saves a few items in your browser: a random visitor code, a random unlock code, and a visit code that lasts until you close the tab. These help the guide remember your unlock and count visits without using your name.'],
+    ['Stored items in your browser', 'The app saves a few items in your browser: a random visitor code, a random unlock code, and a visit code that lasts until you close the tab. These help the app remember your unlock and count visits without using your name.'],
     ['Your choices', `You can turn off location access in your phone or browser settings, block the Meta Pixel with a privacy tool, or clear your browser data to remove the saved items above. For questions about this page or your information, email ${CFG.CONTACT_EMAIL}.`],
-    ['Changes to this page', 'If the way the guide collects information changes, this page will be updated. Last updated November 12, 2026.']
+    ['Changes to this page', 'If the way the app collects information changes, this page will be updated. Last updated November 12, 2026.']
   ];
   return `
   <article class="mx-auto max-w-3xl space-y-8 text-primary">
@@ -1116,7 +1116,7 @@ function renderInstall() {
       <span class="mt-1 shrink-0 text-secondary">${icon('phone', 'ico-md')}</span>
       <div class="min-w-0 flex-1">
         <p class="t-base font-semibold">Keep Local America on your phone</p>
-        <p class="mt-1 t-sm text-secondary">Add it to your home screen and open the guide like any other app.</p>
+        <p class="mt-1 t-sm text-secondary">Add it to your home screen and open it like any other app.</p>
         ${inner}
       </div>
     </div>
