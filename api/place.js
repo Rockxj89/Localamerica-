@@ -171,7 +171,7 @@ ${jsonLd ? `<script type="application/ld+json">${JSON.stringify(jsonLd).replace(
   ${body}
   <footer class="mt-10 space-y-3 border-t border-black/5 pt-6 t-sm text-secondary">
     <p>Coordinates get you close, not always exact. Finding the spot is part of the fun.</p>
-    <p>Use this guide as a starting point, never as your only navigation source.</p>
+    <p>Use this app as a starting point, never as your only navigation source.</p>
     <div class="flex flex-wrap gap-x-6 gap-y-2">
       <a href="/#/about/contact" class="font-medium text-primary underline decoration-black/20 underline-offset-4 hover:decoration-current">Contact</a>
       <a href="/#/privacy" class="font-medium text-primary underline decoration-black/20 underline-offset-4 hover:decoration-current">Privacy</a>
@@ -234,7 +234,7 @@ function placeBody(p, photos, sample) {
       <div class="mt-5">
         <button type="button" data-act="unlock" class="${btnPrimaryLg} w-full sm:w-auto">Unlock GPS for ${PRICE}</button>
       </div>
-      <p class="mt-3 t-xs text-secondary">Your purchase is saved in the browser you pay in. If you opened this guide from Facebook, open it in your regular browser first so your unlock is there next time. Payments are processed by Stripe.</p>
+      <p class="mt-3 t-xs text-secondary">Your purchase is saved in the browser you pay in. If you opened this app from Facebook, open it in your regular browser first so your unlock is there next time. Payments are processed by Stripe.</p>
     </section>`;
 
   return `

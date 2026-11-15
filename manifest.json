@@ -2,7 +2,7 @@
   "id": "/",
   "name": "Local America",
   "short_name": "Local America",
-  "description": "A field guide to hard-to-find public-land places across the Ozarks.",
+  "description": "Hard-to-find public-land places across the Ozarks.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
