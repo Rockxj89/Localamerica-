@@ -1,5 +1,5 @@
 // Local America service worker: app shell cached, data always fresh
-const CACHE = 'local-america-v7';
+const CACHE = 'local-america-v8';
 const SHELL = ['./', './index.html', './manifest.json', './pixel.js'];
 
 self.addEventListener('install', (event) => {
@@ -31,6 +31,9 @@ self.addEventListener('fetch', (event) => {
   // The private traffic and card maker pages are never cached (and never saved in place of the guide)
   if (url.pathname.endsWith('/traffic.html') || url.pathname.endsWith('/traffic')) return;
   if (url.pathname.endsWith('/cards.html') || url.pathname.endsWith('/cards')) return;
+
+  // The video list: always fresh, so new videos show up right away
+  if (url.pathname === '/videos.json') return;
 
   // Google place pages, the page list and robots.txt: always fresh from the site, never saved in place of the guide
   if (url.pathname.startsWith('/places/') || url.pathname === '/sitemap.xml' || url.pathname === '/robots.txt') return;
