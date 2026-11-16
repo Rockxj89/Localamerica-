@@ -23,8 +23,10 @@ const CATS = {
   popular:     ['Popular locations', 'Well-known Ozarks places on public land, a good place to start.'],
   rocks:       ['Rocks and flex', 'Rock formations and flex spots for off-roading on public land in the Ozarks.'],
   unmarked:    ['Unmarked trails', 'Routes without a formal trail marker on public land in the Ozarks.'],
-  yardage:     ['Yardage fields', 'Open areas measured for yardage on public land in the Ozarks.']
+  'long-shot': ['Long Shot Fields', 'Open fields more than 300 yards across on public land in the Ozarks.']
 };
+// Renamed place types: the old short link forwards to the new one
+const OLD = { yardage: 'long-shot' };
 
 let shell = null;
 function page() {
@@ -39,6 +41,11 @@ function setMeta(html, attr, name, value) {
 
 module.exports = (req, res) => {
   const slug = String((req.query && req.query.c) || '');
+  if (OLD[slug]) {
+    res.statusCode = 301;
+    res.setHeader('Location', '/' + OLD[slug]);
+    return res.end();
+  }
   const cat = CATS[slug];
   if (!cat) {
     res.statusCode = 302;

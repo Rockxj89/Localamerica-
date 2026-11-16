@@ -26,7 +26,7 @@ const CATEGORY_SLUGS = {
   'Legends/lore': 'legends', 'Mud holes/trails': 'mud', 'Non-vehicle trails': 'hiking',
   'Popular locations': 'popular', 'Rappelling bluffs': 'bluffs', 'Rocks/Flex': 'rocks',
   'Scenic views': 'views', 'Swimming holes': 'swimming', 'Unmarked trails': 'unmarked',
-  'Yardage fields': 'yardage'
+  'Long Shot Fields': 'long-shot', 'Yardage fields': 'long-shot'
 };
 // Place types with their own short link (/caves) use it; any other type opens the app's list.
 const catUrl = (c) => (CATEGORY_SLUGS[c] ? '/' + CATEGORY_SLUGS[c] : '/#/c/' + toSlug(c));
@@ -47,7 +47,8 @@ const CATEGORY_DESCRIPTIONS = {
   'Scenic views': 'Lookouts and wide-open views',
   'Swimming holes': 'Creeks, pools, and water spots',
   'Unmarked trails': 'Routes without a formal trail marker',
-  'Yardage fields': 'Open areas measured for yardage'
+  'Long Shot Fields': 'Open fields more than 300 yards across',
+  'Yardage fields': 'Open fields more than 300 yards across'
 };
 
 function photoUrl(key) {
