@@ -196,9 +196,9 @@
       <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <p id="footStart" hidden>Use this app as a starting point, never as your only navigation source.</p>
         <div class="flex flex-wrap items-center gap-x-6 gap-y-2">
-          <a href="#/about/contact" class="inline-flex items-center gap-2 font-medium text-primary underline decoration-black/20 underline-offset-4 hover:decoration-current">Contact</a>
-          <a href="#/privacy" class="inline-flex items-center gap-2 font-medium text-primary underline decoration-black/20 underline-offset-4 hover:decoration-current">Privacy</a>
-          <a href="#/safety" class="inline-flex items-center gap-2 font-medium text-primary underline decoration-black/20 underline-offset-4 hover:decoration-current">Read Safety &amp; Terms <span data-icon="arrow" class="contents"></span></a>
+          <a href="#/about/contact" class="inline-flex min-h-11 items-center gap-2 font-medium text-primary underline decoration-black/20 underline-offset-4 hover:decoration-current">Contact</a>
+          <a href="#/privacy" class="inline-flex min-h-11 items-center gap-2 font-medium text-primary underline decoration-black/20 underline-offset-4 hover:decoration-current">Privacy</a>
+          <a href="#/safety" class="inline-flex min-h-11 items-center gap-2 font-medium text-primary underline decoration-black/20 underline-offset-4 hover:decoration-current">Read Safety &amp; Terms <span data-icon="arrow" class="contents"></span></a>
         </div>
       </div>
     </div>
@@ -950,8 +950,8 @@ function viewPlace(id) {
     <div class="space-y-4">
       <nav class="flex items-center gap-2 t-sm text-secondary" aria-label="Breadcrumb">
         ${l.category
-          ? `<a href="#/c/${catSlug(l.category)}" class="inline-flex items-center gap-2 hover:text-primary">${icon('back', 'ico-sm')} ${esc(catLabel(l.category))}</a>`
-          : `<a href="#/places" class="inline-flex items-center gap-2 hover:text-primary">${icon('back', 'ico-sm')} Places</a>`}
+          ? `<a href="#/c/${catSlug(l.category)}" class="inline-flex min-h-11 items-center gap-2 hover:text-primary">${icon('back', 'ico-sm')} ${esc(catLabel(l.category))}</a>`
+          : `<a href="#/places" class="inline-flex min-h-11 items-center gap-2 hover:text-primary">${icon('back', 'ico-sm')} Places</a>`}
         <span aria-hidden="true">/</span>
         <span class="truncate text-secondary">${esc(l.name)}</span>
       </nav>
@@ -1078,7 +1078,7 @@ function viewSafety() {
   return `
   <article class="mx-auto max-w-3xl space-y-8 text-primary">
     <nav class="flex items-center gap-2 t-sm text-secondary" aria-label="Breadcrumb">
-      <a href="#/about" class="inline-flex items-center gap-2 text-secondary hover:text-primary">${icon('back', 'ico-sm')} About</a>
+      <a href="#/about" class="inline-flex min-h-11 items-center gap-2 text-secondary hover:text-primary">${icon('back', 'ico-sm')} About</a>
       <span aria-hidden="true">/</span>
       <span class="truncate text-secondary">Safety &amp; Terms</span>
     </nav>
@@ -1126,7 +1126,7 @@ function viewPrivacy() {
   return `
   <article class="mx-auto max-w-3xl space-y-8 text-primary">
     <nav class="flex items-center gap-2 t-sm text-secondary" aria-label="Breadcrumb">
-      <a href="#/about" class="inline-flex items-center gap-2 text-secondary hover:text-primary">${icon('back', 'ico-sm')} About</a>
+      <a href="#/about" class="inline-flex min-h-11 items-center gap-2 text-secondary hover:text-primary">${icon('back', 'ico-sm')} About</a>
       <span aria-hidden="true">/</span>
       <span class="truncate text-secondary">Privacy</span>
     </nav>
