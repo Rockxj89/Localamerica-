@@ -288,6 +288,13 @@ module.exports = async (req, res) => {
   }
 
   const p = places.find((x) => x.slug === slug);
+  // Renamed places (Yardage #3 is now Long Shot #3): old links forward to the new page
+  const renamed = !p && /^yardage-\d+$/.test(slug) && places.find((x) => x.slug === slug.replace(/^yardage-/, 'long-shot-'));
+  if (renamed) {
+    res.statusCode = 301;
+    res.setHeader('Location', '/places/' + renamed.slug);
+    return res.end();
+  }
   if (!p) {
     return send(res, 404, frame({ title: 'Local America', description: 'Local America', canonical: '', image: S.SITE + LOGO, body: notFoundBody(), robots: 'noindex' }),
       'public, max-age=0, s-maxage=300');

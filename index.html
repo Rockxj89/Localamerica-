@@ -328,7 +328,8 @@ const CATEGORY_DESCRIPTIONS = {
   'Scenic views': 'Lookouts and wide-open views',
   'Swimming holes': 'Creeks, pools, and water spots',
   'Unmarked trails': 'Routes without a formal trail marker',
-  'Yardage fields': 'Open areas measured for yardage'
+  'Long Shot Fields': 'Open fields more than 300 yards across',
+  'Yardage fields': 'Open fields more than 300 yards across'
 };
 
 // 50 stars for the flag background (same layout as the Glide app)
@@ -411,10 +412,12 @@ const CATEGORY_SLUGS = {
   'Legends/lore': 'legends', 'Mud holes/trails': 'mud', 'Non-vehicle trails': 'hiking',
   'Popular locations': 'popular', 'Rappelling bluffs': 'bluffs', 'Rocks/Flex': 'rocks',
   'Scenic views': 'views', 'Swimming holes': 'swimming', 'Unmarked trails': 'unmarked',
-  'Yardage fields': 'yardage'
+  'Long Shot Fields': 'long-shot', 'Yardage fields': 'long-shot'
 };
+// Old links (#/c/yardage) still open the renamed place type
+const OLD_CAT_SLUGS = { yardage: 'long-shot' };
 const catSlug = (c) => CATEGORY_SLUGS[c] || toSlug(c);
-const catBySlug = (s) => state.cats.find((c) => catSlug(c.name) === s || toSlug(c.name) === s);
+const catBySlug = (s) => { s = OLD_CAT_SLUGS[s] || s; return state.cats.find((c) => catSlug(c.name) === s || toSlug(c.name) === s); };
 
 const fmtMi = (n) => (Number(n) < 10 ? Number(n).toFixed(1) : String(Math.round(Number(n)))) + ' mi';
 
@@ -868,6 +871,22 @@ function viewHome() {
   </div>`;
 }
 
+// Shooting rules shown at the top of the Long Shot Fields page (owner-approved wording)
+const LONG_SHOT_NOTE = `
+    <section class="space-y-3" aria-label="Target shooting rules">
+      <p class="t-base text-primary">Target shooting is generally allowed on Mark Twain National Forest land under Forest Service rules. Before you shoot:</p>
+      <ul class="list-disc space-y-1 pl-6 t-base text-primary">
+        <li>Stay at least 150 yards from any campsite, building or occupied area</li>
+        <li>Never shoot across or along a road, or across water</li>
+        <li>Use a safe backstop</li>
+        <li>Obey any posted signs or closures</li>
+        <li>No tracer ammo, and don’t shoot trees or signs</li>
+        <li>Pack out your targets, brass and trash</li>
+      </ul>
+      <p class="t-base text-primary">Watch for hunters, especially during deer season. Shoot at your own risk.</p>
+    </section>`;
+const isLongShot = (c) => c === 'Long Shot Fields' || c === 'Yardage fields';
+
 // One place type (cat given) or every place (cat = null)
 function viewList(cat) {
   const label = cat ? catLabel(cat.name) : '';
@@ -916,6 +935,8 @@ function viewList(cat) {
         ${scope ? '' : `<p class="mt-3 max-w-2xl t-sm text-secondary">Use this base camp to browse places by name, type, or field note.</p>`}
       </div>
     </header>
+
+    ${cat && isLongShot(cat.name) ? LONG_SHOT_NOTE : ''}
 
     ${cat ? `
     <section class="flex flex-col gap-4 rounded-card bg-white p-5 shadow-card sm:flex-row sm:items-center sm:justify-between" aria-label="${esc(label)} distance filter">
