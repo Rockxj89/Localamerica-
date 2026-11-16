@@ -54,7 +54,8 @@
       warnweak: '#F5EDD7', warnink: '#6A4A0E',
       errweak: '#F6E2DF', errink: '#8A2A20',
       // Colored words for the access and road labels (no highlighted background)
-      freeblue: '#1D5FA8', paidgreen: '#15803D', roadred: '#C0271C'
+      freeblue: '#1D5FA8', paidgreen: '#15803D', roadred: '#C0271C',
+      actionblue: '#1D5FA8', actionbluehover: '#174D8A'
     }
   } } };
 </script>
@@ -191,9 +192,9 @@
   <footer class="relative z-10 mx-auto w-full max-w-[1200px] px-5 pb-36 md:px-8">
     <div id="installCard"></div>
     <div class="mt-8 space-y-3 border-t border-black/5 pt-6 t-sm text-secondary">
-      <p aria-label="Coordinate note">Coordinates get you close, not always exact. Finding the spot is part of the fun.</p>
+      <p id="footNote" hidden aria-label="Coordinate note">Coordinates get you close, not always exact. Finding the spot is part of the fun.</p>
       <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <p>Use this app as a starting point, never as your only navigation source.</p>
+        <p id="footStart" hidden>Use this app as a starting point, never as your only navigation source.</p>
         <div class="flex flex-wrap items-center gap-x-6 gap-y-2">
           <a href="#/about/contact" class="inline-flex items-center gap-2 font-medium text-primary underline decoration-black/20 underline-offset-4 hover:decoration-current">Contact</a>
           <a href="#/privacy" class="inline-flex items-center gap-2 font-medium text-primary underline decoration-black/20 underline-offset-4 hover:decoration-current">Privacy</a>
@@ -462,6 +463,16 @@ const accessToken = (() => {
 })();
 
 // ================= TRAFFIC COUNTER (read on the private traffic.html page) =================
+// Counts visits on this phone (once per browser tab session). Stored only in this phone's browser, never sent to the database.
+const visitCount = (() => {
+  try {
+    if (!sessionStorage.getItem('la_counted')) {
+      sessionStorage.setItem('la_counted', '1');
+      localStorage.setItem('la_visits', String((Number(localStorage.getItem('la_visits')) || 0) + 1));
+    }
+    return Number(localStorage.getItem('la_visits')) || 0;
+  } catch (e) { return 0; }
+})();
 // Long-lived random id per phone, so the Traffic page can tell new from returning visitors.
 const visitorId = (() => {
   try {
@@ -706,16 +717,17 @@ const btnBase = 'press cursor-pointer inline-flex items-center justify-center wh
 const btnPrimary = `${btnBase} h-11 gap-2 px-5 bg-accent text-accentfg shadow-btn hover:bg-accenthover`;
 const btnPrimarySm = `${btnBase} h-11 gap-2 px-4 bg-accent text-accentfg shadow-btn hover:bg-accenthover`;
 const btnPrimaryLg = `${btnBase} h-12 gap-2 px-6 bg-accent text-accentfg shadow-btn hover:bg-accenthover`;
+const btnBlue = `${btnBase} h-11 gap-2 px-5 bg-actionblue text-white shadow-btn hover:bg-actionbluehover`;
 const btnSecondary = `${btnBase} h-11 gap-2 px-5 bg-white text-primary shadow-card hover:shadow-lift`;
 const btnTertiary = `${btnBase} h-11 gap-2 px-5 bg-white text-primary shadow-card hover:shadow-lift`;
 
 const eyebrow = (text) => `<p class="mb-3 t-xs font-semibold uppercase tracking-[0.12em] text-secondary">${esc(text)}</p>`;
 
-// Access label: colored words only, no highlighted pill. Free = blue, Paid = green.
+// Access label: colored words only, no highlighted pill. Free = blue, Paid = black.
 function accessBadge(l, compact = false) {
   const free = isFree(l);
   const sz = compact ? 'text-[13px] font-semibold leading-tight' : 'whitespace-nowrap t-xs font-semibold';
-  return `<span class="inline-flex w-fit max-w-full items-center gap-1 ${sz} ${free ? 'text-freeblue' : 'text-paidgreen'}">${icon(free ? 'unlock' : 'lock', 'ico-xs')}<span class="${compact ? '' : 'truncate'}">${free ? 'Free access' : 'Paid access'}</span></span>`;
+  return `<span class="inline-flex w-fit max-w-full items-center gap-1 ${sz} ${free ? 'text-freeblue' : 'text-black'}">${icon(free ? 'unlock' : 'lock', 'ico-xs')}<span class="${compact ? '' : 'truncate'}">${free ? 'Free access' : 'Paid access'}</span></span>`;
 }
 
 // Road label: colored words only, no highlighted pill.
@@ -744,7 +756,7 @@ function distanceUi(l) {
   return { label: `About ${fmtMi(d)} away`, hint: '(straight line)' };
 }
 
-const btnTile = `${btnBase.replace('whitespace-nowrap', '')} min-h-11 w-full gap-1.5 px-3 py-2 text-center leading-tight bg-accent text-accentfg shadow-btn hover:bg-accenthover`;
+const btnTile = `${btnBase.replace('whitespace-nowrap', '').replace('text-base ', '')} h-10 gap-1.5 px-3.5 text-sm bg-actionblue text-white shadow-btn hover:bg-actionbluehover`;
 
 function cardHtml(l) {
   const ph = state.photos[l.id]?.[0];
@@ -912,7 +924,7 @@ function viewList(cat) {
         <p class="mt-1 t-sm text-secondary" aria-live="polite">${esc(nearMsg)}</p>
         ${ready ? '' : inAppTip('mt-2 t-sm text-secondary')}
       </div>
-      <button type="button" data-act="${nearOn ? 'cat-near-off' : 'cat-near-on'}" class="${nearOn ? btnSecondary : btnPrimary}" ${loading ? 'disabled' : ''}>${icon('pin', 'ico-sm')}${nearOn ? `Show all ${esc(label)}` : 'Near me'}</button>
+      <button type="button" data-act="${nearOn ? 'cat-near-off' : 'cat-near-on'}" class="${nearOn ? btnSecondary : btnBlue}" ${loading ? 'disabled' : ''}>${icon('pin', 'ico-sm')}${nearOn ? `Show all ${esc(label)}` : 'Near me'}</button>
     </section>` : ''}
 
     ${body}
@@ -984,15 +996,21 @@ function viewPlace(id) {
         <span class="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-accent/10 text-accenthover">${icon('lock', 'ico-md')}</span>
         <h2 class="font-display text-xl font-semibold tracking-[-0.01em] text-primary">Unlock this location’s GPS</h2>
       </div>
-      <p class="mt-2 t-sm text-secondary"><span class="font-medium text-primary">${road.label}.</span> ${road.detail}</p>
+      <p class="mt-2 t-sm text-secondary"><span class="font-medium text-primary">${road.label}.</span></p>
       <p class="mt-2 t-sm text-secondary">The photos and field notes above are free. For ${CFG.UNLOCK_PRICE} you get this spot’s exact GPS coordinates and a button that opens it in Google Maps, so you can navigate straight to it.</p>
-      <p class="mt-2 t-sm text-secondary">One-time payment. No subscription, and it never expires.</p>
-      ${sample ? `<p class="mt-2 t-sm text-secondary">Here’s what you get: <a href="#/p/${sample.id}" class="font-medium text-primary underline underline-offset-2 hover:no-underline">${esc(sample.name)}</a> is a free place, and its coordinates are shown openly: <span class="font-mono text-primary">${Number(sample.latitude).toFixed(5)}, ${Number(sample.longitude).toFixed(5)}</span></p>` : ''}
       <p class="mt-2 t-sm text-secondary">All sales are final. No refunds once GPS is unlocked. See <a href="#/safety" class="font-medium text-primary underline underline-offset-2 hover:no-underline">Safety &amp; Terms</a>.</p>
       <div class="mt-5">
         <button type="button" data-act="unlock" data-id="${l.id}" class="${btnPrimaryLg} w-full sm:w-auto" ${state.busy ? 'disabled' : ''}>${busyHere ? 'Opening secure checkout…' : `Unlock GPS for ${CFG.UNLOCK_PRICE}`}</button>
       </div>
-      <p class="mt-3 t-xs text-secondary">Your purchase is saved in the browser you pay in. If you opened this app from Facebook, open it in your regular browser first so your unlock is there next time. Payments are processed by Stripe.</p>
+      <details class="mt-4 t-sm text-secondary">
+        <summary class="cursor-pointer font-medium text-primary underline decoration-black/20 underline-offset-4 hover:decoration-current">More</summary>
+        <div class="mt-3 space-y-2">
+          <p>${road.detail}</p>
+  <p class="mt-2 t-sm text-secondary">One-time payment. No subscription, and it never expires.</p>
+  ${sample ? `<p class="mt-2 t-sm text-secondary">Here’s what you get: <a href="#/p/${sample.id}" class="font-medium text-primary underline underline-offset-2 hover:no-underline">${esc(sample.name)}</a> is a free place, and its coordinates are shown openly: <span class="font-mono text-primary">${Number(sample.latitude).toFixed(5)}, ${Number(sample.longitude).toFixed(5)}</span></p>` : ''}
+  <p class="t-xs text-secondary">Your purchase is saved in the browser you pay in. If you opened this app from Facebook, open it in your regular browser first so your unlock is there next time. Payments are processed by Stripe.</p>
+        </div>
+      </details>
     </section>` : `
     <section class="rounded-card bg-white p-5 shadow-card sm:p-6">
       <p class="t-xs text-secondary">Coordinates</p>
@@ -1304,6 +1322,7 @@ function renderInstall() {
   const box = $('#installCard');
   if (!box) return;
   if (isStandalone || state.installed) { box.innerHTML = ''; return; }
+  if (!onHomePage || visitCount < 3) { box.innerHTML = ''; return; }
   const android = /Android/i.test(ua);
   const ios = /iPhone|iPad|iPod/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   let inner;
@@ -1340,6 +1359,14 @@ function renderInstall() {
 function syncMiniLogo(page) {
   const el = document.getElementById('mini-logo');
   if (el) el.hidden = !['list', 'p', 'safety', 'privacy', 'videos'].includes(page);
+}
+// Footer notes show only on place pages; the home-screen card shows on the home page after a few visits
+let onHomePage = false;
+function syncFooter(a) {
+  onHomePage = !a;
+  const onPlace = a === 'p';
+  ['footNote', 'footStart'].forEach((id) => { const el = document.getElementById(id); if (el) el.hidden = !onPlace; });
+  renderInstall();
 }
 let lastRouteKey = '';
 function render() {
@@ -1387,6 +1414,7 @@ function render() {
   view.dataset.page = (a === 'c' || a === 'places') ? 'list' : (a || 'home');
   view.innerHTML = html;
   syncMiniLogo(view.dataset.page);
+  syncFooter(a);
 
   // Active tab = soft green pill (no tab is lit on place and place-type pages)
   const active = !a ? 'home' : a === 'videos' ? 'videos' : (a === 'about' || a === 'safety' || a === 'privacy') ? 'about' : '';
