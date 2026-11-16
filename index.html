@@ -133,7 +133,7 @@
   /* Pages whose title would land on the flag start just below it */
   #view[data-page="list"], #view[data-page="p"], #view[data-page="safety"], #view[data-page="privacy"], #view[data-page="videos"] { padding-top: calc(var(--flag-clear) - 1.5rem); }
   /* Small logo on the flag (every page except Home and About, which show the big one). Tapping it goes Home. */
-  .mini-logo { position: absolute; z-index: 20; top: .75rem; left: 48%; transform: translateX(-50%); width: 150px; height: 150px; border-radius: 9999px; }
+  .mini-logo { position: absolute; z-index: 20; top: .75rem; left: 48%; transform: translateX(-50%); width: 150px; height: 150px; border-radius: 9999px; background: #f7f9fa; box-shadow: 0 0 0 1px rgb(27 35 30 / .08), 0 4px 12px rgb(27 35 30 / .12); }
   .mini-logo[hidden] { display: none; }
   .mini-logo.press:active { transform: translateX(-50%) scale(.96); }
   @media (min-width: 768px) { .mini-logo.press:active { transform: translateX(-50%) scale(.96); } }
@@ -756,7 +756,7 @@ function distanceUi(l) {
   return { label: `About ${fmtMi(d)} away`, hint: '(straight line)' };
 }
 
-const btnTile = `${btnBase.replace('whitespace-nowrap', '').replace('text-base ', '')} h-10 gap-1.5 px-3.5 text-sm bg-actionblue text-white shadow-btn hover:bg-actionbluehover`;
+const btnTile = `${btnBase.replace('whitespace-nowrap', '').replace('text-base ', '')} h-11 gap-1.5 px-3.5 text-sm bg-actionblue text-white shadow-btn hover:bg-actionbluehover`;
 
 function cardHtml(l) {
   const ph = state.photos[l.id]?.[0];
