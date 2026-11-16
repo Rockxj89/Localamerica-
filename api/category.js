@@ -19,7 +19,7 @@ const CATS = {
   buildings:   ['Buildings and stores', 'Old buildings, shops and structures across the Ozarks.'],
   'dead-ends': ['Dead-end trails', 'Trails that end away from a through route on public land in the Ozarks.'],
   mud:         ['Mud holes and trails', 'Rough tracks and muddy routes for off-roading on public land in the Ozarks.'],
-  hiking:      ['Hiking trails', 'Walking-only routes on public land in the Ozarks.'],
+  hiking:      ['Hiking Trails', 'Walking-only routes on public land in the Ozarks.'],
   popular:     ['Popular locations', 'Well-known Ozarks places on public land, a good place to start.'],
   rocks:       ['Rocks and flex', 'Rock formations and flex spots for off-roading on public land in the Ozarks.'],
   unmarked:    ['Unmarked trails', 'Routes without a formal trail marker on public land in the Ozarks.'],
