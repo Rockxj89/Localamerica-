@@ -113,6 +113,9 @@
   /* Video player arrows show only with a mouse; on phones you swipe */
   .pvb.vvnav { display: none; }
   @media (hover: hover) and (pointer: fine) { .pvb.vvnav { display: flex; } .pvb.vvnav.hidden { display: none; } }
+  /* The two full-screen video players (they take turns so the next one can slide in) */
+  .vvclip { position: absolute; inset: 0; margin: auto; max-width: 100%; max-height: 100%; }
+  .vvclip.anim { transition: transform 300ms var(--ease-out); }
 
   /* ---- Modern look: motion, depth, feedback ---- */
   .lift { transition: transform var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out); }
@@ -227,8 +230,9 @@
 </div>
 
 <!-- Full-screen video player: opens when a video tile is tapped -->
-<div id="vv" class="hidden fixed inset-0 z-[60] flex items-center justify-center" style="background: rgba(0,0,0,.95);" role="dialog" aria-modal="true" aria-label="Video">
-  <video id="vvVideo" class="max-h-full max-w-full" controls playsinline></video>
+<div id="vv" class="hidden fixed inset-0 z-[60] flex items-center justify-center overflow-hidden" style="background: rgba(0,0,0,.95); overscroll-behavior: contain;" role="dialog" aria-modal="true" aria-label="Video">
+  <video id="vvVideo" class="vvclip" controls playsinline></video>
+  <video id="vvVideo2" class="vvclip" controls playsinline style="visibility: hidden;"></video>
   <button type="button" data-act="vv-close" aria-label="Close video" class="pvb absolute right-4 top-4 z-10"><span data-icon="x" class="contents"></span></button>
   <!-- Previous / next arrows: computers only (phones swipe left or right instead) -->
   <button type="button" id="vvPrev" data-act="vv-prev" aria-label="Previous video" class="pvb vvnav absolute left-4 top-1/2 z-10 -translate-y-1/2"><span data-icon="left" class="contents"></span></button>
@@ -1150,16 +1154,30 @@ const videoCard = (file) => `
       </span>
     </span>
   </button>`;
-// Which video in the list is open, so a swipe (or the arrows on a computer) can move to the next or previous one
-const vv = { i: -1, sx: 0, sy: 0, track: false };
+// Which video in the list is open, so a swipe (or the arrows on a computer) can move to the next or previous one.
+// Two video players take turns, so on phones the next video can slide in while the old one slides away (TikTok style).
+const vv = { i: -1, sx: 0, sy: 0, t0: 0, dy: 0, track: false, drag: false, busy: false, timer: 0,
+  cur: document.getElementById('vvVideo'), spare: document.getElementById('vvVideo2') };
+const vvPlay = (v) => { const p = v.play(); if (p && p.catch) p.catch(() => {}); };
+function vvStop(v) {
+  try { v.pause(); } catch (err) { /* fine */ }
+  v.removeAttribute('src'); v.load();
+}
 function vvLoad(file) {
-  const v = $('#vvVideo');
+  const v = vv.cur;
   try { v.pause(); } catch (err) { /* fine */ }
   v.src = VIDEO_BASE + file;
-  const p = v.play(); if (p && p.catch) p.catch(() => {});
+  vvPlay(v);
+}
+// Puts both players back to the starting position (current one showing, spare one hidden)
+function vvReset() {
+  clearTimeout(vv.timer); vv.busy = false; vv.track = false; vv.drag = false;
+  [vv.cur, vv.spare].forEach((v) => { v.classList.remove('anim'); v.style.transform = ''; });
+  vv.cur.style.visibility = ''; vv.spare.style.visibility = 'hidden';
 }
 function vvOpen(file) {
   if (!safeFile(file)) return;
+  vvReset(); vvStop(vv.spare);
   vv.i = vid.list ? vid.list.indexOf(file) : -1;
   const many = vv.i >= 0 && vid.list.length > 1;
   $('#vvPrev').classList.toggle('hidden', !many);
@@ -1167,16 +1185,44 @@ function vvOpen(file) {
   $('#vv').classList.remove('hidden'); document.body.style.overflow = 'hidden';
   vvLoad(file);
 }
-// Wraps around: after the last video comes the first, like the photo viewer. No autoplay: it only moves on a swipe or arrow.
+const vvMany = () => vvOpenNow() && !!vid.list && vid.list.length > 1 && vv.i >= 0;
+// Computers (arrows and arrow keys): switch straight to the next or previous video. Wraps around. No autoplay.
 function vvGo(step) {
-  if (!vvOpenNow() || !vid.list || vid.list.length < 2 || vv.i < 0) return;
+  if (!vvMany() || vv.busy) return;
   vv.i = (vv.i + step + vid.list.length) % vid.list.length;
   vvLoad(vid.list[vv.i]);
 }
+// Phones: step 1 = next (old video slides up and away), -1 = previous (old video slides down)
+function vvSlide(step) {
+  if (!vvMany() || vv.busy) return vvSnapBack();
+  vv.busy = true;
+  vv.i = (vv.i + step + vid.list.length) % vid.list.length;
+  const out = vv.cur, inc = vv.spare, h = window.innerHeight;
+  try { out.pause(); } catch (err) { /* fine */ }
+  inc.classList.remove('anim');
+  inc.style.transform = `translateY(${step > 0 ? h : -h}px)`;
+  inc.style.visibility = '';
+  inc.src = VIDEO_BASE + vid.list[vv.i];
+  vvPlay(inc);
+  void inc.offsetWidth;
+  out.classList.add('anim'); inc.classList.add('anim');
+  out.style.transform = `translateY(${step > 0 ? -h : h}px)`;
+  inc.style.transform = 'translateY(0)';
+  vv.timer = setTimeout(() => {
+    vvStop(out);
+    vv.cur = inc; vv.spare = out;
+    vvReset();
+  }, 320);
+}
+// Not swiped far enough: the video slides back into place
+function vvSnapBack() {
+  const v = vv.cur;
+  v.classList.add('anim'); v.style.transform = 'translateY(0)';
+  setTimeout(() => { if (!vv.drag) v.classList.remove('anim'); }, 320);
+}
 function vvClose() {
-  const v = $('#vvVideo');
-  try { v.pause(); } catch (err) { /* fine */ }
-  v.removeAttribute('src'); v.load();
+  vvReset();
+  vvStop(vv.cur); vvStop(vv.spare);
   vv.i = -1;
   $('#vv').classList.add('hidden'); document.body.style.overflow = '';
 }
@@ -1190,25 +1236,41 @@ window.addEventListener('keydown', (e) => {
 window.addEventListener('hashchange', () => { if (vvOpenNow()) vvClose(); });
 // Tapping the dark area around the video closes it
 document.getElementById('vv').addEventListener('click', (e) => { if (e.target.id === 'vv') vvClose(); });
-// Swipe left = next video, swipe right = previous. Swipes that start on the play bar at the bottom of the video are ignored.
+// Phones: swipe up = next video, swipe down = previous. The video follows your finger.
+// Left/right swipes do nothing. Swipes that start on the play bar at the bottom of the video are ignored.
 (function wireVideoSwipe() {
   const box = document.getElementById('vv');
   box.addEventListener('touchstart', (e) => {
-    vv.track = false;
-    if (e.touches.length !== 1 || e.target.closest('button')) return;
+    vv.track = false; vv.drag = false;
+    if (vv.busy || e.touches.length !== 1 || e.target.closest('button')) return;
     const t = e.touches[0];
-    const r = $('#vvVideo').getBoundingClientRect();
+    const r = vv.cur.getBoundingClientRect();
     if (t.clientY > r.bottom - 70 && t.clientY <= r.bottom + 10) return;
-    vv.sx = t.clientX; vv.sy = t.clientY; vv.track = true;
+    vv.sx = t.clientX; vv.sy = t.clientY; vv.t0 = Date.now(); vv.dy = 0; vv.track = true;
   }, { passive: true });
-  box.addEventListener('touchend', (e) => {
+  box.addEventListener('touchmove', (e) => {
+    if (!vv.track || e.touches.length !== 1) return;
+    const t = e.touches[0];
+    const dx = t.clientX - vv.sx, dy = t.clientY - vv.sy;
+    if (!vv.drag) {
+      if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) { vv.drag = true; vv.cur.classList.remove('anim'); }
+      else if (Math.abs(dx) > 10) { vv.track = false; return; }
+      else return;
+    }
+    e.preventDefault();
+    vv.dy = dy;
+    vv.cur.style.transform = `translateY(${dy}px)`;
+  }, { passive: false });
+  box.addEventListener('touchend', () => {
     if (!vv.track) return;
     vv.track = false;
-    const t = e.changedTouches[0];
-    const dx = t.clientX - vv.sx, dy = t.clientY - vv.sy;
-    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) vvGo(dx < 0 ? 1 : -1);
+    if (!vv.drag) return;
+    vv.drag = false;
+    const dy = vv.dy, fast = Math.abs(dy) > 30 && Math.abs(dy) / Math.max(1, Date.now() - vv.t0) > 0.5;
+    if (vvMany() && (Math.abs(dy) > 80 || fast)) vvSlide(dy < 0 ? 1 : -1);
+    else vvSnapBack();
   }, { passive: true });
-  box.addEventListener('touchcancel', () => { vv.track = false; }, { passive: true });
+  box.addEventListener('touchcancel', () => { if (vv.drag) { vv.drag = false; vvSnapBack(); } vv.track = false; }, { passive: true });
 })();
 function moreVideos(btn) {
   const grid = document.getElementById('videoGrid');
