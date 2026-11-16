@@ -11,6 +11,13 @@ const PRICE_CENTS = 499;
 const CURRENCY = "usd";
 const APP_TAG = "local-america-pwa";
 
+// Checkout limits: stop one visitor (or a script) from opening endless Stripe checkouts.
+// Checked before anything is sent to Stripe, so blocked tries never show up in the Stripe dashboard.
+const LIMIT_PER_BROWSER_HOUR = 6; // one browser: at most 6 unpaid checkout starts per hour (finished purchases don't count)
+const LIMIT_PER_IP_10MIN = 10; // one internet connection: at most 10 starts per 10 minutes (per warm server)
+const LIMIT_ALL_HOUR = 150; // whole site: at most 150 unpaid checkout starts per hour
+const TOO_MANY = "Too many checkout tries. Please wait a little while and try again.";
+
 const db = createClient(
   Deno.env.get("SUPABASE_URL")!,
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
@@ -28,6 +35,20 @@ const json = (body: unknown, status = 200) =>
 async function sha256(text: string) {
   const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
   return Array.from(new Uint8Array(d), (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+// Short-term memory of recent checkout starts per internet connection (kept only while the server is warm, never saved).
+const ipHits = new Map<string, number[]>();
+function ipTooBusy(req: Request) {
+  const ip = req.headers.get("cf-connecting-ip") || (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || "";
+  if (!ip) return false;
+  const now = Date.now();
+  const recent = (ipHits.get(ip) ?? []).filter((t) => now - t < 10 * 60 * 1000);
+  if (recent.length >= LIMIT_PER_IP_10MIN) { ipHits.set(ip, recent); return true; }
+  recent.push(now);
+  ipHits.set(ip, recent);
+  if (ipHits.size > 5000) { for (const [k, v] of ipHits) { if (!v.length || now - v[v.length - 1] > 10 * 60 * 1000) ipHits.delete(k); } }
+  return false;
 }
 
 async function stripe(method: "GET" | "POST", path: string, params?: Record<string, string>) {
@@ -142,6 +163,7 @@ Deno.serve(async (req) => {
     if (action === "start") {
       const locationId = Number(body.locationId);
       if (!Number.isInteger(locationId) || locationId <= 0) return json({ ok: false, error: "Place not found." }, 400);
+
       const { data: loc } = await db.from("poi_locations")
         .select("id, name, access, status").eq("id", locationId).maybeSingle();
       if (!loc || String(loc.status ?? "").toLowerCase() === "archived") return json({ ok: false, error: "Place not found." }, 404);
@@ -151,6 +173,22 @@ Deno.serve(async (req) => {
         .select("id").eq("browser_token_hash", tokenHash).eq("location_id", locationId)
         .eq("access_type", "location").eq("status", "active").limit(1);
       if (existing && existing.length) return json({ ok: true, alreadyActive: true });
+
+      // Limits, checked before anything goes to Stripe.
+      if (ipTooBusy(req)) return json({ ok: false, error: TOO_MANY }, 429);
+      const hourAgo = new Date(Date.now() - 3600 * 1000).toISOString();
+      const [mine, all] = await Promise.all([
+        db.from("poi_customer_access").select("id", { count: "exact", head: true })
+          .eq("browser_token_hash", tokenHash).eq("status", "pending").gte("created_at", hourAgo),
+        db.from("poi_customer_access").select("id", { count: "exact", head: true })
+          .eq("status", "pending").gte("created_at", hourAgo),
+      ]);
+      if (mine.error) throw mine.error;
+      if (all.error) throw all.error;
+      if ((mine.count ?? 0) >= LIMIT_PER_BROWSER_HOUR || (all.count ?? 0) >= LIMIT_ALL_HOUR) {
+        console.warn("Checkout limit reached", { browser: mine.count, sitewide: all.count });
+        return json({ ok: false, error: TOO_MANY }, 429);
+      }
 
       const base = safeReturnBase(body.returnUrl, req);
       if (!base) return json({ ok: false, error: "Could not work out where to send you back." }, 400);
