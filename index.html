@@ -110,6 +110,9 @@
   /* Round dark buttons in the full-screen photo viewer */
   .pvb { display: flex; width: 2.75rem; height: 2.75rem; align-items: center; justify-content: center; border-radius: 9999px; background: rgba(0,0,0,.6); color: #fff; }
   .pvb.hidden { display: none; }
+  /* Video player arrows show only with a mouse; on phones you swipe */
+  .pvb.vvnav { display: none; }
+  @media (hover: hover) and (pointer: fine) { .pvb.vvnav { display: flex; } .pvb.vvnav.hidden { display: none; } }
 
   /* ---- Modern look: motion, depth, feedback ---- */
   .lift { transition: transform var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out); }
@@ -227,6 +230,9 @@
 <div id="vv" class="hidden fixed inset-0 z-[60] flex items-center justify-center" style="background: rgba(0,0,0,.95);" role="dialog" aria-modal="true" aria-label="Video">
   <video id="vvVideo" class="max-h-full max-w-full" controls playsinline></video>
   <button type="button" data-act="vv-close" aria-label="Close video" class="pvb absolute right-4 top-4 z-10"><span data-icon="x" class="contents"></span></button>
+  <!-- Previous / next arrows: computers only (phones swipe left or right instead) -->
+  <button type="button" id="vvPrev" data-act="vv-prev" aria-label="Previous video" class="pvb vvnav absolute left-4 top-1/2 z-10 -translate-y-1/2"><span data-icon="left" class="contents"></span></button>
+  <button type="button" id="vvNext" data-act="vv-next" aria-label="Next video" class="pvb vvnav absolute right-4 top-1/2 z-10 -translate-y-1/2"><span data-icon="right" class="contents"></span></button>
 </div>
 
 <div id="toast" class="hidden fixed bottom-24 inset-x-0 z-[60] flex justify-center pointer-events-none">
@@ -1144,24 +1150,66 @@ const videoCard = (file) => `
       </span>
     </span>
   </button>`;
+// Which video in the list is open, so a swipe (or the arrows on a computer) can move to the next or previous one
+const vv = { i: -1, sx: 0, sy: 0, track: false };
+function vvLoad(file) {
+  const v = $('#vvVideo');
+  try { v.pause(); } catch (err) { /* fine */ }
+  v.src = VIDEO_BASE + file;
+  const p = v.play(); if (p && p.catch) p.catch(() => {});
+}
 function vvOpen(file) {
   if (!safeFile(file)) return;
-  const v = $('#vvVideo');
-  v.src = VIDEO_BASE + file;
+  vv.i = vid.list ? vid.list.indexOf(file) : -1;
+  const many = vv.i >= 0 && vid.list.length > 1;
+  $('#vvPrev').classList.toggle('hidden', !many);
+  $('#vvNext').classList.toggle('hidden', !many);
   $('#vv').classList.remove('hidden'); document.body.style.overflow = 'hidden';
-  const p = v.play(); if (p && p.catch) p.catch(() => {});
+  vvLoad(file);
+}
+// Wraps around: after the last video comes the first, like the photo viewer. No autoplay: it only moves on a swipe or arrow.
+function vvGo(step) {
+  if (!vvOpenNow() || !vid.list || vid.list.length < 2 || vv.i < 0) return;
+  vv.i = (vv.i + step + vid.list.length) % vid.list.length;
+  vvLoad(vid.list[vv.i]);
 }
 function vvClose() {
   const v = $('#vvVideo');
   try { v.pause(); } catch (err) { /* fine */ }
   v.removeAttribute('src'); v.load();
+  vv.i = -1;
   $('#vv').classList.add('hidden'); document.body.style.overflow = '';
 }
 const vvOpenNow = () => !$('#vv').classList.contains('hidden');
-window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && vvOpenNow()) vvClose(); });
+window.addEventListener('keydown', (e) => {
+  if (!vvOpenNow()) return;
+  if (e.key === 'Escape') vvClose();
+  else if (e.key === 'ArrowLeft') { e.preventDefault(); vvGo(-1); }
+  else if (e.key === 'ArrowRight') { e.preventDefault(); vvGo(1); }
+});
 window.addEventListener('hashchange', () => { if (vvOpenNow()) vvClose(); });
 // Tapping the dark area around the video closes it
 document.getElementById('vv').addEventListener('click', (e) => { if (e.target.id === 'vv') vvClose(); });
+// Swipe left = next video, swipe right = previous. Swipes that start on the play bar at the bottom of the video are ignored.
+(function wireVideoSwipe() {
+  const box = document.getElementById('vv');
+  box.addEventListener('touchstart', (e) => {
+    vv.track = false;
+    if (e.touches.length !== 1 || e.target.closest('button')) return;
+    const t = e.touches[0];
+    const r = $('#vvVideo').getBoundingClientRect();
+    if (t.clientY > r.bottom - 70 && t.clientY <= r.bottom + 10) return;
+    vv.sx = t.clientX; vv.sy = t.clientY; vv.track = true;
+  }, { passive: true });
+  box.addEventListener('touchend', (e) => {
+    if (!vv.track) return;
+    vv.track = false;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - vv.sx, dy = t.clientY - vv.sy;
+    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) vvGo(dx < 0 ? 1 : -1);
+  }, { passive: true });
+  box.addEventListener('touchcancel', () => { vv.track = false; }, { passive: true });
+})();
 function moreVideos(btn) {
   const grid = document.getElementById('videoGrid');
   if (!grid || !vid.list) return;
@@ -1407,6 +1455,8 @@ document.addEventListener('click', async (e) => {
   if (act === 'more-videos') return moreVideos(el);
   if (act === 'vv-open') return vvOpen(el.dataset.f);
   if (act === 'vv-close') return vvClose();
+  if (act === 'vv-prev') return vvGo(-1);
+  if (act === 'vv-next') return vvGo(1);
   if (act === 'more') { state.shown += CFG.PAGE_SIZE; return render(); }
   if (act === 'dist') {
     // First tap: find the phone and show straight-line miles on every card
