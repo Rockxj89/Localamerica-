@@ -29,7 +29,7 @@ const ROAD = {
 };
 const ROAD_BY_CATEGORY = {
   'Buildings and stores': 'easy', 'Open Stores': 'easy', 'Popular locations': 'easy',
-  'Legends/lore': 'easy', 'Non-vehicle trails': 'walk'
+  'Legends/lore': 'easy', 'Hiking Trails': 'walk', 'Non-vehicle trails': 'walk'
 };
 const roadInfo = (p) => ROAD[ROAD_BY_CATEGORY[p.category] || 'rough'];
 
@@ -288,8 +288,10 @@ module.exports = async (req, res) => {
   }
 
   const p = places.find((x) => x.slug === slug);
-  // Renamed places (Yardage #3 is now Long Shot #3): old links forward to the new page
-  const renamed = !p && /^yardage-\d+$/.test(slug) && places.find((x) => x.slug === slug.replace(/^yardage-/, 'long-shot-'));
+  // Renamed places (Yardage #3 is now Long Shot #3, Non Vehicle #1 is now Hike #1): old links forward to the new page
+  const OLD_PREFIX = { 'yardage-': 'long-shot-', 'non-vehicle-': 'hike-' };
+  const oldMatch = !p && slug.match(/^(yardage-|non-vehicle-)(\d+)$/);
+  const renamed = oldMatch && places.find((x) => x.slug === OLD_PREFIX[oldMatch[1]] + oldMatch[2]);
   if (renamed) {
     res.statusCode = 301;
     res.setHeader('Location', '/places/' + renamed.slug);

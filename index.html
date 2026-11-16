@@ -321,6 +321,7 @@ const CATEGORY_DESCRIPTIONS = {
   'Frog ponds': 'Small ponds and wetland spots',
   'Legends/lore': 'Places connected to local stories',
   'Mud holes/trails': 'Rough tracks and muddy routes',
+  'Hiking Trails': 'Routes intended for walking',
   'Non-vehicle trails': 'Routes intended for walking',
   'Popular locations': 'Well-known places worth starting with',
   'Rappelling bluffs': 'Cliffs and rock faces for vertical routes',
@@ -395,7 +396,7 @@ const ROAD = {
 };
 const ROAD_BY_CATEGORY = {
   'Buildings and stores': 'easy', 'Open Stores': 'easy', 'Popular locations': 'easy',
-  'Legends/lore': 'easy', 'Non-vehicle trails': 'walk'
+  'Legends/lore': 'easy', 'Hiking Trails': 'walk', 'Non-vehicle trails': 'walk'
 };
 const roadInfo = (l) => ROAD[ROAD_BY_CATEGORY[l.category] || 'rough'];
 
@@ -409,7 +410,7 @@ const catLabel = (c) => CATEGORY_LABELS[c] || c;
 const CATEGORY_SLUGS = {
   'Buildings and stores': 'buildings', 'Caves': 'caves', 'Dead end trails': 'dead-ends',
   'Established campsites': 'camp', 'Forgotten grounds': 'forgotten', 'Frog ponds': 'frogs',
-  'Legends/lore': 'legends', 'Mud holes/trails': 'mud', 'Non-vehicle trails': 'hiking',
+  'Legends/lore': 'legends', 'Mud holes/trails': 'mud', 'Hiking Trails': 'hiking', 'Non-vehicle trails': 'hiking',
   'Popular locations': 'popular', 'Rappelling bluffs': 'bluffs', 'Rocks/Flex': 'rocks',
   'Scenic views': 'views', 'Swimming holes': 'swimming', 'Unmarked trails': 'unmarked',
   'Long Shot Fields': 'long-shot', 'Yardage fields': 'long-shot'

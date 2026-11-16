@@ -23,7 +23,7 @@ const catLabel = (c) => CATEGORY_LABELS[c] || c;
 const CATEGORY_SLUGS = {
   'Buildings and stores': 'buildings', 'Caves': 'caves', 'Dead end trails': 'dead-ends',
   'Established campsites': 'camp', 'Forgotten grounds': 'forgotten', 'Frog ponds': 'frogs',
-  'Legends/lore': 'legends', 'Mud holes/trails': 'mud', 'Non-vehicle trails': 'hiking',
+  'Legends/lore': 'legends', 'Mud holes/trails': 'mud', 'Hiking Trails': 'hiking', 'Non-vehicle trails': 'hiking',
   'Popular locations': 'popular', 'Rappelling bluffs': 'bluffs', 'Rocks/Flex': 'rocks',
   'Scenic views': 'views', 'Swimming holes': 'swimming', 'Unmarked trails': 'unmarked',
   'Long Shot Fields': 'long-shot', 'Yardage fields': 'long-shot'
@@ -40,6 +40,7 @@ const CATEGORY_DESCRIPTIONS = {
   'Frog ponds': 'Small ponds and wetland spots',
   'Legends/lore': 'Places connected to local stories',
   'Mud holes/trails': 'Rough tracks and muddy routes',
+  'Hiking Trails': 'Routes intended for walking',
   'Non-vehicle trails': 'Routes intended for walking',
   'Popular locations': 'Well-known places worth starting with',
   'Rappelling bluffs': 'Cliffs and rock faces for vertical routes',
