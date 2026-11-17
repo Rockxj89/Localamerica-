@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#15803D">
+<title>Local America · Towns &amp; Rivers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+  // Same palette as the Traffic and Card Maker pages
+  tailwind.config = { theme: { extend: {
+    fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'] },
+    colors: {
+      accent: '#15803D', accentfg: '#FFFFFF',
+      primary: '#1B231E', secondary: '#3F4A43', tertiary: '#5C675F',
+      page: '#f7f9fa', line: '#D3DBD0', lineweak: '#E3E9E0', linestrong: '#AFBBAD',
+      errweak: '#F6E2DF', errink: '#8A2A20'
+    }
+  } } };
+</script>
+<style>
+  html, body { background: #f7f9fa; }
+  body { -webkit-tap-highlight-color: transparent; color: #1B231E; font-size: 1.0625rem; }
+  .free { color: #1D4ED8; font-weight: 600; }
+  .paid { color: #15803D; font-weight: 600; }
+  details > summary { list-style: none; cursor: pointer; }
+  details > summary::-webkit-details-marker { display: none; }
+  details[open] .chev { transform: rotate(90deg); }
+  select { border: 1px solid #D3DBD0; background: #fff; border-radius: 0.5rem; padding: 0.5rem 0.65rem; font-size: 1rem; }
+</style>
+</head>
+<body class="font-sans">
+
+<header class="sticky top-0 z-40 bg-accent text-accentfg">
+  <div class="mx-auto flex max-w-3xl items-center justify-between gap-3 px-4 py-3">
+    <div class="min-w-0">
+      <p class="text-xs font-medium opacity-80">Local America · private</p>
+      <h1 class="text-lg font-bold leading-tight">Towns &amp; Rivers</h1>
+    </div>
+    <button id="signOutBtn" class="hidden rounded-full bg-white/15 px-3 py-1.5 text-sm font-semibold">Sign out</button>
+  </div>
+</header>
+
+<main id="view" class="mx-auto max-w-3xl px-4 pb-24 pt-5"></main>
+
+<script>
+// ================= CONFIG =================
+const CFG = {
+  SUPABASE_URL: 'https://ycdlxdijrlfsxvxksyrq.supabase.co',
+  SUPABASE_KEY: 'sb_publishable_2ExdXbNtW9HpuOGAq1Oa7g_gPdONH_s'
+};
+const SITE = 'https://localamerica.us';
+
+// Town centers. Order: strongest marketing towns first.
+const TOWNS = [
+  ['Willow Springs', 36.9923, -91.9696],
+  ['Cabool', 37.1237, -92.1013],
+  ['Mountain Grove', 37.1306, -92.2635],
+  ['Winona', 37.0092, -91.3229],
+  ['Eminence', 37.1506, -91.3576],
+  ['West Plains', 36.7281, -91.8524],
+  ['Gainesville', 36.6034, -92.4282],
+  ['Ava', 36.9520, -92.6605],
+  ['Mountain View', 36.9953, -91.7035],
+  ['Mansfield', 37.1067, -92.5807],
+  ['Hartville', 37.2506, -92.5102],
+  ['Lebanon', 37.6806, -92.6638],
+  ['Forsyth', 36.6851, -93.1199],
+  ['Licking', 37.4995, -91.8571],
+  ['Houston', 37.3262, -91.9560]
+];
+
+// River access points (coordinates from howsyourriver.com). Upstream to downstream.
+// More can be added here later, for example Jacks Fork access points.
+const RIVERS = [
+  ['Baptist (Current River)', 37.435307, -91.657491],
+  ['Cedar Grove (Current River)', 37.419201, -91.603345],
+  ['Welch Landing (Current River)', 37.387505, -91.573924],
+  ['Akers Ferry (Current River)', 37.375982, -91.551546],
+  ['Pulltite (Current River)', 37.334063, -91.476243],
+  ['Round Spring (Current River)', 37.287173, -91.409922],
+  ['Jerktail Landing (Current River)', 37.229624, -91.309372],
+  ['Two Rivers (Current River)', 37.188911, -91.269182],
+  ['Powder Mill (Current River)', 37.182648, -91.174776],
+  ['Roberts Field (Current River)', 37.131177, -91.175117],
+  ['Logyard (Current River)', 37.108537, -91.121072],
+  ['Eminence, Chilton Access (Jacks Fork)', 37.152662, -91.353512]
+];
+
+// Same place-type names as the Home tiles
+const TYPE_NAMES = {
+  'Established campsites': 'Campsite', 'Swimming holes': 'Swimming hole', 'Caves': 'Cave',
+  'Scenic views': 'Scenic view', 'Rappelling bluffs': 'Rappelling bluff', 'Forgotten grounds': 'Forgotten grounds',
+  'Frog ponds': 'Frog pond', 'Legends/lore': 'Legends & lore', 'Buildings and stores': 'Building / store',
+  'Dead end trails': 'Dead-end trail', 'Mud holes/trails': 'Mud hole', 'Hiking Trails': 'Hiking trail',
+  'Popular locations': 'Popular location', 'Rocks/Flex': 'Rocks & flex', 'Unmarked trails': 'Unmarked trail',
+  'Long Shot Fields': 'Long Shot field'
+};
+
+// Same sign-in as the Traffic page, so signing in on one signs you in on the other.
+const sb = supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_KEY, {
+  auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: 'pkce', storageKey: 'la-traffic-auth' }
+});
+
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+const toSlug = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+
+function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; } }
+
+const state = {
+  user: null, loading: false, error: null, places: [],
+  tab: store('la-towns-tab') === 'rivers' ? 'rivers' : 'towns',
+  within: Number(store('la-towns-within')) || 25
+};
+
+// Straight-line miles
+function miles(lat1, lng1, lat2, lng2) {
+  const r = (d) => d * Math.PI / 180;
+  const a = Math.sin(r(lat2 - lat1) / 2) ** 2 + Math.cos(r(lat1)) * Math.cos(r(lat2)) * Math.sin(r(lng2 - lng1) / 2) ** 2;
+  return 3958.8 * 2 * Math.asin(Math.sqrt(a));
+}
+
+// ================= SIGN IN =================
+function viewSignIn(msg) {
+  $('#signOutBtn').classList.add('hidden');
+  $('#view').innerHTML = `
+  <div class="mx-auto mt-6 max-w-md text-center">
+    <h2 class="text-xl font-bold">Sign in to see this page</h2>
+    <p class="mt-2 text-secondary">This page is private. It uses the same sign-in as the Traffic page. Sign in there, then come back here.</p>
+    ${msg ? `<p class="mt-4 rounded-lg bg-errweak p-3 text-sm text-errink">${esc(msg)}</p>` : ''}
+    <a href="/traffic.html" class="mt-5 inline-block w-full rounded-lg bg-accent px-4 py-3 font-semibold text-accentfg">Go to the Traffic page to sign in</a>
+  </div>`;
+}
+
+async function notAllowed() {
+  const email = state.user && state.user.email;
+  await sb.auth.signOut();
+  state.user = null;
+  viewSignIn(`${email || 'That account'} is not allowed to see this page. Sign in with the Local America Gmail.`);
+}
+function isDenied(error) { return error && (error.code === '42501' || /not_allowed/.test(error.message || '')); }
+
+// ================= DATA =================
+async function load() {
+  state.loading = true; state.error = null; render();
+  const res = await sb.rpc('owner_place_coords');
+  state.loading = false;
+  if (isDenied(res.error)) return notAllowed();
+  if (res.error) state.error = res.error.message || 'Could not load places.';
+  else state.places = (res.data || []).filter((p) => Number.isFinite(Number(p.latitude)) && Number.isFinite(Number(p.longitude)));
+  render();
+}
+
+function nearby(lat, lng) {
+  return state.places
+    .map((p) => ({ ...p, d: miles(lat, lng, Number(p.latitude), Number(p.longitude)) }))
+    .filter((p) => p.d <= state.within)
+    .sort((a, b) => a.d - b.d);
+}
+
+// ================= VIEW =================
+function placeRow(p) {
+  const free = String(p.access || '').toLowerCase() === 'free';
+  const gps = `${Number(p.latitude).toFixed(5)}, ${Number(p.longitude).toFixed(5)}`;
+  return `
+  <li class="border-b border-lineweak py-3 last:border-0">
+    <div class="flex items-baseline justify-between gap-3">
+      <a href="${SITE}/places/${esc(toSlug(p.name))}" target="_blank" rel="noopener" class="font-semibold text-primary underline underline-offset-2">${esc(p.name)}</a>
+      <span class="shrink-0 font-semibold">${Math.round(p.d)} mi</span>
+    </div>
+    <p class="mt-0.5 text-secondary">${esc(TYPE_NAMES[p.category] || p.category || '')} · <span class="${free ? 'free' : 'paid'}">${free ? 'Free' : 'Paid'}</span></p>
+    <p class="mt-0.5 select-all font-mono text-[0.95rem] text-secondary">${esc(gps)}</p>
+  </li>`;
+}
+
+function section([name, lat, lng]) {
+  const list = nearby(lat, lng);
+  return `
+  <details class="border-b border-line py-1">
+    <summary class="flex items-center justify-between gap-3 py-3">
+      <span class="flex items-center gap-2 text-lg font-bold"><span class="chev inline-block text-tertiary transition-transform">›</span>${esc(name)}</span>
+      <span class="shrink-0 text-secondary">${list.length} ${list.length === 1 ? 'place' : 'places'}${list.length ? ` · closest ${Math.round(list[0].d)} mi` : ''}</span>
+    </summary>
+    ${list.length ? `<ul class="pb-3 pl-5">${list.map(placeRow).join('')}</ul>` : `<p class="pb-4 pl-5 text-secondary">No places within ${state.within} miles.</p>`}
+  </details>`;
+}
+
+function render() {
+  if (!state.user) return;
+  $('#signOutBtn').classList.remove('hidden');
+  const tabBtn = (id, label) => `<button data-tab="${id}" class="flex-1 rounded-full px-4 py-2 font-semibold ${state.tab === id ? 'bg-accent text-accentfg' : 'text-secondary'}">${label}</button>`;
+  let body;
+  if (state.loading) body = `<p class="mt-6 text-secondary">Loading places…</p>`;
+  else if (state.error) body = `<p class="mt-6 rounded-lg bg-errweak p-3 text-errink">${esc(state.error)}</p><button id="retry" class="mt-3 rounded-full bg-accent px-4 py-2 font-semibold text-accentfg">Try again</button>`;
+  else {
+    const spots = state.tab === 'towns' ? TOWNS : RIVERS;
+    body = `
+    <p class="mt-4 text-secondary">${state.tab === 'towns'
+      ? 'Places near each town, closest first. Miles are straight-line from the town center, so driving is longer.'
+      : 'Places near each river access point, closest first. Miles are straight-line, so driving is longer.'}
+      Paid places show GPS here because this page is private. Never post paid GPS.</p>
+    <div class="mt-3 flex items-center gap-2">
+      <label for="within" class="text-secondary">Show places within</label>
+      <select id="within">${[10, 15, 20, 25, 30, 35].map((n) => `<option value="${n}" ${n === state.within ? 'selected' : ''}>${n} miles</option>`).join('')}</select>
+    </div>
+    <div class="mt-2">${spots.map(section).join('')}</div>`;
+  }
+  $('#view').innerHTML = `
+    <div class="flex gap-1 rounded-full border border-line bg-white p-1">${tabBtn('towns', 'Towns')}${tabBtn('rivers', 'Rivers')}</div>
+    ${body}`;
+}
+
+document.addEventListener('click', (e) => {
+  const tab = e.target.closest('[data-tab]');
+  if (tab) { state.tab = tab.dataset.tab; store('la-towns-tab', state.tab); return render(); }
+  if (e.target.closest('#retry')) return load();
+});
+document.addEventListener('change', (e) => {
+  if (e.target.id === 'within') { state.within = Number(e.target.value) || 25; store('la-towns-within', String(state.within)); render(); }
+});
+$('#signOutBtn').onclick = async () => { await sb.auth.signOut(); state.user = null; state.places = []; viewSignIn(); };
+
+// ================= START =================
+(async function start() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) return viewSignIn('');
+  state.user = session.user;
+  load();
+})();
+</script>
+</body>
+</html>
