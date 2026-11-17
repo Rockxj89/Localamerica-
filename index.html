@@ -824,6 +824,45 @@ function logoSvg(matrix) {
   </header>`;
 }
 
+// Towns with their own page at /near/<slug> (same list as TOWNS in api/_site.js), A to Z
+const TOWN_NAMES = ['Ava', 'Cabool', 'Eminence', 'Forsyth', 'Gainesville', 'Hartville', 'Houston', 'Lebanon',
+  'Licking', 'Mansfield', 'Mountain Grove', 'Mountain View', 'West Plains', 'Willow Springs', 'Winona'];
+const townSlug = (n) => n.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+
+// Big Towns tile at the top of Home (no photo yet)
+function townsTile() {
+  return `
+      <a href="#/towns" aria-label="Browse towns" class="lift press relative col-span-2 block aspect-[16/10] overflow-hidden rounded-tile bg-inset shadow-card md:col-span-1 md:aspect-[3/2]">
+        <div class="absolute inset-0 flex items-center justify-center text-tertiary">${icon('pin')}</div>
+        <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-transparent"></div>
+        <div class="absolute inset-x-0 bottom-0 p-3.5 text-white md:p-4">
+          <h3 class="mt-1 font-display text-xl font-semibold leading-tight tracking-[-0.01em]">Towns</h3>
+          <p class="mt-1 line-clamp-2 text-[15px] leading-snug text-white/85">Places near your town</p>
+        </div>
+      </a>`;
+}
+
+// List of towns, laid out like a place-type list; each opens its town page
+function viewTowns() {
+  const tiles = TOWN_NAMES.map((n) => `
+      <a href="/near/${townSlug(n)}" aria-label="Places near ${esc(n)}" class="lift press relative block aspect-[4/3] min-w-0 overflow-hidden rounded-tile bg-inset shadow-card md:aspect-[3/2]">
+        <div class="absolute inset-0 flex items-center justify-center text-tertiary">${icon('pin')}</div>
+        <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-transparent"></div>
+        <div class="absolute inset-x-0 bottom-0 p-3.5 text-white md:p-4">
+          <h3 class="font-display text-xl font-semibold leading-tight tracking-[-0.01em]">${esc(n)}</h3>
+        </div>
+      </a>`).join('');
+  return `
+  <div class="space-y-8">
+    <header>
+      ${eyebrow('Local America')}
+      <h1 class="font-display text-[length:var(--fs-h1)] font-semibold leading-[1.1] tracking-[-0.02em] text-primary">Places near your town</h1>
+    </header>
+    <div class="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-4">${tiles}
+    </div>
+  </div>`;
+}
+
 // ================= SCREENS =================
 function viewHome() {
   const total = state.locs.length;
@@ -861,6 +900,7 @@ function viewHome() {
       ${eyebrow(`${total} ${total === 1 ? 'field record' : 'field records'}`)}
       ${state.cats.length ? `
       <div class="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-4">
+        ${townsTile()}
         ${cats.map(tile).join('')}
       </div>` : `
       <div class="py-10 text-center">
@@ -1403,7 +1443,7 @@ function render() {
   }
   if (!state.ready) {
     const pg = (location.hash.slice(1) || '/').split('/')[1];
-    view.dataset.page = (pg === 'c' || pg === 'places') ? 'list' : (pg || 'home');
+    view.dataset.page = (pg === 'c' || pg === 'places' || pg === 'towns') ? 'list' : (pg || 'home');
     syncMiniLogo(view.dataset.page);
     view.innerHTML = `
     <div class="space-y-6" aria-busy="true">
@@ -1435,9 +1475,10 @@ function render() {
   else if (a === 'about') html = viewAbout();
   else if (a === 'safety') html = viewSafety();
   else if (a === 'privacy') html = viewPrivacy();
+  else if (a === 'towns') html = viewTowns();
   else if (a === 'videos') { vid.shown = key === lastRouteKey ? vid.shown : VIDEO_BATCH; html = viewVideos(); }
   else html = viewHome();
-  view.dataset.page = (a === 'c' || a === 'places') ? 'list' : (a || 'home');
+  view.dataset.page = (a === 'c' || a === 'places' || a === 'towns') ? 'list' : (a || 'home');
   view.innerHTML = html;
   syncMiniLogo(view.dataset.page);
   syncFooter(a);
