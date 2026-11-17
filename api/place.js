@@ -197,7 +197,7 @@ document.getElementById('app').style.setProperty('--stars','url("data:image/svg+
 }
 
 // ---------- one place ----------
-function placeBody(p, photos, sample) {
+function placeBody(p, photos, sample, near) {
   const road = roadInfo(p);
   const label = S.catLabel(p.category);
   const gps = hasGps(p);
@@ -209,7 +209,7 @@ function placeBody(p, photos, sample) {
   const photoGrid = photos.length ? `
     <section>
       <div class="grid grid-cols-2 gap-3">
-        ${photos.map((k, i) => `<a href="${esc(S.photoUrl(k))}" target="_blank" rel="noopener" aria-label="Open photo ${i + 1} full size" class="lift press block overflow-hidden rounded-tile bg-inset shadow-card ${i === 0 ? 'col-span-2' : ''}"><div class="${i === 0 ? 'aspect-[16/10]' : 'aspect-[4/3]'} w-full"><img ${i === 0 ? 'fetchpriority="high"' : 'loading="lazy"'} src="${esc(S.sizedUrl(k, i === 0 ? 1080 : 640))}" data-full="${esc(S.photoUrl(k))}" alt="${esc(p.name)} field photo${photos.length > 1 ? ' ' + (i + 1) : ''}" class="img-zoom h-full w-full object-cover"></div></a>`).join('')}
+        ${photos.map((k, i) => `<a href="${esc(S.photoUrl(k))}" target="_blank" rel="noopener" aria-label="Open photo ${i + 1} full size" class="lift press block overflow-hidden rounded-tile bg-inset shadow-card ${i === 0 ? 'col-span-2' : ''}"><div class="${i === 0 ? 'aspect-[16/10]' : 'aspect-[4/3]'} w-full"><img ${i === 0 ? 'fetchpriority="high"' : 'loading="lazy"'} src="${esc(S.sizedUrl(k, i === 0 ? 1080 : 640))}" data-full="${esc(S.photoUrl(k))}" alt="${esc(near ? S.photoLabel(p, near.town) : p.name + ' field photo')}${photos.length > 1 ? ' (' + (i + 1) + ')' : ''}" class="img-zoom h-full w-full object-cover"></div></a>`).join('')}
       </div>
     </section>` : '';
 
@@ -310,6 +310,9 @@ module.exports = async (req, res) => {
 
   let photos = [];
   try { photos = await S.loadPhotos(p.id); } catch (e) { console.error(e); }
+  // Closest town, for photo labels and Google's hidden labels (rounded miles, no coordinates)
+  let near = null;
+  try { near = (await S.loadNearestTowns())[p.id] || null; } catch (e) { console.error(e); }
 
   const label = S.catLabel(p.category);
   const title = `${p.name} – ${label} in Mark Twain National Forest | Local America`;
@@ -320,19 +323,30 @@ module.exports = async (req, res) => {
   const catAbs = S.catUrl(p.category).startsWith('/#') ? S.SITE + '/' + S.catUrl(p.category).slice(1) : S.SITE + S.catUrl(p.category);
 
   // Lets Google show "Home › Caves › Cave #4" in search results. No coordinates in here.
+  // Also a hidden label for Google and AI answers: what kind of public-land place this is and which town
+  // it's near. Never coordinates (not even for free places), so paid GPS can't leak through here.
+  const placeLd = {
+    '@type': 'Place', name: p.name, url: canonical, description,
+    isAccessibleForFree: p.free,
+    containedInPlace: { '@type': 'Place', name: 'Mark Twain National Forest' },
+    ...(photos.length ? { image: photos.slice(0, 3).map((k) => S.SITE + S.sizedUrl(k, 1080)) } : {}),
+    ...(near ? { additionalProperty: { '@type': 'PropertyValue', name: 'Near', value: `About ${near.miles} miles from ${near.town}, Missouri` } } : {})
+  };
   const jsonLd = {
     '@context': 'https://schema.org',
-    '@type': 'BreadcrumbList',
-    itemListElement: [
-      { '@type': 'ListItem', position: 1, name: 'Home', item: S.SITE + '/' },
-      { '@type': 'ListItem', position: 2, name: label, item: catAbs },
-      { '@type': 'ListItem', position: 3, name: p.name, item: canonical }
-    ]
+    '@graph': [{
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: 'Home', item: S.SITE + '/' },
+        { '@type': 'ListItem', position: 2, name: label, item: catAbs },
+        { '@type': 'ListItem', position: 3, name: p.name, item: canonical }
+      ]
+    }, placeLd]
   };
 
   const html = frame({
     title, description, canonical, image, jsonLd,
-    body: placeBody(p, photos, sample),
+    body: placeBody(p, photos, sample, near),
     bodyAttrs: ` data-place-id="${Number(p.id)}"`
   });
   send(res, 200, html, 'public, max-age=0, s-maxage=300, stale-while-revalidate=60');
@@ -340,3 +354,5 @@ module.exports = async (req, res) => {
 
 // For the checks run before merging
 module.exports._test = { frame, placeBody, hasGps };
+// Shared with the town pages (/near/ava)
+module.exports._shared = { frame, esc, icon, roadInfo, LOGO };
