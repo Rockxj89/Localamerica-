@@ -1,4 +1,7 @@
 {
+  "redirects": [
+    { "source": "/r", "destination": "/?s=r", "permanent": false }
+  ],
   "rewrites": [
     {
       "source": "/:slug(camp|swimming|caves|views|bluffs|forgotten|frogs|legends|buildings|dead-ends|mud|hiking|popular|rocks|unmarked|yardage|long-shot)",

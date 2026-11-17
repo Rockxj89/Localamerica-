@@ -494,6 +494,10 @@ const landingReferrer = (() => {
     let host = '';
     try { host = document.referrer ? new URL(document.referrer).hostname : ''; } catch (e) { host = ''; }
     if (host === location.hostname) host = '';
+    // The short link localamerica.us/r forwards to /?s=r. It marks the visit as Reddit even when the Reddit app hides the referrer.
+    let tag = ''; try { tag = new URLSearchParams(location.search).get('s') || ''; } catch (e) { tag = ''; }
+    if (tag === 'r') host = 'reddit.com';
+    if (/(^|\.)(reddit\.com|redd\.it)$/i.test(host)) host = 'reddit.com';
     // Facebook/Instagram's own in-app browser often hides the referrer; the user agent still tells us.
     if (!host && /FBAN|FBAV|FB_IAB|FBIOS|Messenger/i.test(navigator.userAgent)) host = 'facebook.com';
     if (!host && /Instagram/i.test(navigator.userAgent)) host = 'instagram.com';

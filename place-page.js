@@ -52,6 +52,7 @@
       var host = '';
       try { host = document.referrer ? new URL(document.referrer).hostname : ''; } catch (e) { host = ''; }
       if (host === location.hostname) host = '';
+      if (/(^|\.)(reddit\.com|redd\.it)$/i.test(host)) host = 'reddit.com';
       if (!host && /FBAN|FBAV|FB_IAB|FBIOS|Messenger/i.test(ua)) host = 'facebook.com';
       if (!host && /Instagram/i.test(ua)) host = 'instagram.com';
       sessionStorage.setItem('la_ref', host);
