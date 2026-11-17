@@ -1,6 +1,10 @@
 {
   "redirects": [
-    { "source": "/r", "destination": "/?s=r", "permanent": false }
+    {
+      "source": "/r",
+      "destination": "/?s=r",
+      "permanent": false
+    }
   ],
   "rewrites": [
     {
@@ -12,16 +16,28 @@
       "destination": "/api/place?s=:slug"
     },
     {
+      "source": "/near/:town",
+      "destination": "/api/near?t=:town"
+    },
+    {
       "source": "/sitemap.xml",
       "destination": "/api/sitemap"
     }
   ],
   "functions": {
-    "api/category.js": { "includeFiles": "index.html" }
+    "api/category.js": {
+      "includeFiles": "index.html"
+    }
   },
   "images": {
-    "sizes": [640, 1080, 1600],
-    "formats": ["image/webp"],
+    "sizes": [
+      640,
+      1080,
+      1600
+    ],
+    "formats": [
+      "image/webp"
+    ],
     "minimumCacheTTL": 2678400,
     "remotePatterns": [
       {
