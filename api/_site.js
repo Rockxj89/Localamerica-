@@ -136,20 +136,23 @@ const roundMiles = (m) => Math.max(5, Math.round(Number(m) / 5) * 5);
 // Straight-line miles from every town to every place, from the app's existing public
 // poi_distances function (the same one Near me uses). Only whole-mile numbers come back, no coordinates.
 let distCache = null;
+let distFailedAt = 0;
 async function loadTownDistances() {
   if (distCache && Date.now() - distCache.at < 10 * 60 * 1000) return distCache.byTown;
+  // After a failure, don't hammer the database: wait 30 seconds before trying again
+  if (distFailedAt && Date.now() - distFailedAt < 30 * 1000) throw new Error('Distances recently failed');
   const byTown = {};
-  await Promise.all(TOWNS.map(async (t) => {
+  try { await Promise.all(TOWNS.map(async (t) => {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/poi_distances`, {
-      method: 'POST',
+      method: 'POST', signal: AbortSignal.timeout(3000),
       headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify({ user_lat: t.lat, user_lng: t.lng })
     });
     if (!res.ok) throw new Error(`Database answered ${res.status}`);
     const m = {};
-    (await res.json() || []).forEach((r) => { if (r && r.miles != null) m[r.id] = Number(r.miles); });
+    (await res.json() || []).forEach((r) => { if (r && r.miles != null && Number.isFinite(Number(r.miles))) m[r.id] = Number(r.miles); });
     byTown[t.slug] = m;
-  }));
+  })); } catch (e) { distFailedAt = Date.now(); throw e; }
   distCache = { at: Date.now(), byTown };
   return byTown;
 }

@@ -87,8 +87,10 @@ module.exports = async (req, res) => {
 
   let places, dist, photos;
   try {
-    [places, dist, photos] = await Promise.all([S.loadPlaces(), S.loadTownDistances(), S.loadAllPhotos()]);
+    [places, dist] = await Promise.all([S.loadPlaces(), S.loadTownDistances()]);
   } catch (e) { console.error(e); return plain(503); }
+  // Photos are a nice-to-have: if they fail, the page still shows (with plain tiles)
+  try { photos = await S.loadAllPhotos(); } catch (e) { console.error(e); photos = {}; }
 
   const groups = buildGroups(places, dist[town.slug] || {});
   const canonical = `${S.SITE}/near/${town.slug}`;
@@ -116,7 +118,8 @@ module.exports = async (req, res) => {
 
   const html = P.frame({
     title, description: town.intro, canonical,
-    image: firstPhoto ? S.photoUrl(firstPhoto) : S.SITE + P.LOGO,
+    image: firstPhoto ? S.SITE + S.sizedUrl(firstPhoto, 1080) : S.SITE + P.LOGO,
+    ...(groups.length ? {} : { robots: 'noindex, follow' }),
     jsonLd, body: townBody(town, groups, photos)
   });
   send(res, 200, html, 'public, max-age=0, s-maxage=600, stale-while-revalidate=86400');
