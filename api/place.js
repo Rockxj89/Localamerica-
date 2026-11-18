@@ -145,7 +145,12 @@ ${canonical ? `<meta property="og:url" content="${esc(canonical)}">` : ''}
   .press:active { transform: scale(.98); }
   a:focus-visible, button:focus-visible { outline: 2px solid #15803D; outline-offset: 2px; }
   /* The title starts just below the faded flag, like the app's place page */
-  #view { padding-top: max(1.5rem, calc(var(--flag-clear) - 5.75rem)); }
+  #view { padding-top: var(--flag-clear); }
+  /* Small logo on the flag, the same one the app shows. Tapping it goes Home. */
+  .mini-logo { position: absolute; z-index: 20; top: .75rem; left: 48%; transform: translateX(-50%); width: 150px; height: 150px; border-radius: 9999px; }
+  .mini-logo.press:active { transform: translateX(-50%) scale(.96); }
+  .mini-logo svg { width: 100%; height: 100%; }
+  @media (min-width: 768px) { .mini-logo { left: calc(50% - 12px); width: 160px; height: 160px; } }
   h1, h2, h3 { text-wrap: balance; } p { text-wrap: pretty; }
   @media (min-width: 768px) {
     :root { --flag-clear: 230px; }
@@ -160,12 +165,17 @@ ${jsonLd ? `<script type="application/ld+json">${JSON.stringify(jsonLd).replace(
 </head>
 <body class="font-sans"${bodyAttrs}>
 <div id="app" class="flag-bg big-text">
-  <header class="relative z-10 mx-auto max-w-3xl px-5 pt-5">
-    <a href="/" class="inline-flex items-center gap-3" aria-label="Local America home">
-      <img src="${LOGO}" alt="Local America logo" width="48" height="48" class="h-12 w-12 rounded-full shadow-card">
-      <span class="font-display text-2xl font-semibold text-primary">Local America</span>
-    </a>
-  </header>
+  <a href="/" class="mini-logo press" aria-label="Local America home">
+    <svg viewBox="100 100 800 800" class="contrast-150 brightness-90" aria-hidden="true">
+      <defs>
+        <filter id="mini-logo-bg-off" color-interpolation-filters="sRGB">
+          <feColorMatrix type="matrix" values="0 0 0 0 0.106 0 0 0 0 0.137 0 0 0 0 0.118 6 6 6 0 -4.2"/>
+          <feMorphology operator="dilate" radius="3"/>
+        </filter>
+      </defs>
+      <image href="${LOGO}" x="0" y="0" width="1000" height="1000" preserveAspectRatio="xMidYMid meet" filter="url(#mini-logo-bg-off)"/>
+    </svg>
+  </a>
 
   <main id="view" class="relative z-10 mx-auto max-w-3xl px-5 pb-16">
   ${body}
