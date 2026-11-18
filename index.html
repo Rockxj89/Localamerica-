@@ -859,11 +859,12 @@ const TOWN_PHOTOS = {
 // Wikimedia's own 960px copy is the source, so Vercel never has to fetch the multi-MB original
 const townPhotoSrc = (p) => sizedUrl(`${WM}${p.f}/960px-${p.f.split('/').pop()}`, 640);
 
-// Big Towns tile at the top of Home (no photo yet)
+// Big Towns tile at the top of Home (owner's own photo, served from the app; pin shows if it fails)
 function townsTile() {
   return `
       <a href="#/towns" aria-label="Browse towns" class="lift press relative col-span-2 block aspect-[16/10] overflow-hidden rounded-tile bg-inset shadow-card md:col-span-1 md:aspect-[3/2]">
         <div class="absolute inset-0 flex items-center justify-center text-tertiary">${icon('pin')}</div>
+        <img src="/towns-home.jpg" alt="Small Ozarks town" data-hide-on-error class="absolute inset-0 h-full w-full object-cover">
         <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-transparent"></div>
         <div class="absolute inset-x-0 bottom-0 p-3.5 text-white md:p-4">
           <h3 class="mt-1 font-display text-xl font-semibold leading-tight tracking-[-0.01em]">Towns</h3>
