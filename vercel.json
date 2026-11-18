@@ -44,6 +44,11 @@
         "protocol": "https",
         "hostname": "ycdlxdijrlfsxvxksyrq.supabase.co",
         "pathname": "/storage/v1/object/public/poi-photos/**"
+      },
+      {
+        "protocol": "https",
+        "hostname": "thumb.wikimedia.org",
+        "pathname": "/wikipedia/commons/thumb/**"
       }
     ]
   }
