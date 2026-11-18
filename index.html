@@ -383,6 +383,7 @@ function sizedUrl(key, w) {
 // If a smaller copy can't load, show the full-size photo instead
 document.addEventListener('error', (e) => {
   const img = e.target;
+  if (img && img.tagName === 'IMG' && img.dataset.hideOnError !== undefined) { img.remove(); return; }
   if (img && img.tagName === 'IMG' && img.dataset.full && img.getAttribute('src') !== img.dataset.full) img.src = img.dataset.full;
 }, true);
 
@@ -829,6 +830,35 @@ const TOWN_NAMES = ['Ava', 'Cabool', 'Eminence', 'Forsyth', 'Gainesville', 'Hart
   'Licking', 'Mansfield', 'Mountain Grove', 'Mountain View', 'West Plains', 'Willow Springs', 'Winona'];
 const townSlug = (n) => n.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 
+// Town tile photos from Wikimedia Commons (free licenses; credits shown under the list).
+// Served through Vercel's resizer, so visitors never load anything from Wikimedia directly.
+// Licking has no free photo yet, so it keeps the plain tile.
+const WM = 'https://thumb.wikimedia.org/wikipedia/commons/thumb/';
+const LIC = {
+  'CC BY 4.0': 'https://creativecommons.org/licenses/by/4.0/',
+  'CC BY-SA 4.0': 'https://creativecommons.org/licenses/by-sa/4.0/',
+  'CC BY-SA 3.0': 'https://creativecommons.org/licenses/by-sa/3.0/',
+  'CC0': 'https://creativecommons.org/publicdomain/zero/1.0/'
+};
+const TOWN_PHOTOS = {
+  'Ava':            { f: '2/2d/Douglas_County_Court_House_-_Ava%2C_MO.jpg', page: 'Douglas_County_Court_House_-_Ava,_MO.jpg', by: 'Vsmith', lic: 'CC BY-SA 4.0' },
+  'Cabool':         { f: 'c/c0/Cabool-Main-St-mo.jpg', page: 'Cabool-Main-St-mo.jpg', by: 'Brian Stansberry', lic: 'CC BY 4.0' },
+  'Eminence':       { f: '5/57/Eminence_tour_%287%29.JPG', page: 'Eminence_tour_(7).JPG', by: 'Drowzy', lic: 'public domain' },
+  'Forsyth':        { f: 'f/ff/Taney_County_MO_Courthouse_20151021-047.jpg', page: 'Taney_County_MO_Courthouse_20151021-047.jpg', by: 'Kbh3rd', lic: 'CC BY 4.0' },
+  'Gainesville':    { f: '3/3a/Ozark_County_MO_Courthouse_20151021-028.jpg', page: 'Ozark_County_MO_Courthouse_20151021-028.jpg', by: 'Kbh3rd', lic: 'CC BY 4.0' },
+  'Hartville':      { f: '7/77/Hartville-City-Hall-mo.jpeg', page: 'Hartville-City-Hall-mo.jpeg', by: 'Brian Stansberry', lic: 'CC BY 4.0' },
+  'Houston':        { f: 'f/fb/Texas_County_Missouri_Administrative_Center_20150314_1.jpg', page: 'Texas_County_Missouri_Administrative_Center_20150314_1.jpg', by: 'Kbh3rd', lic: 'CC BY 4.0' },
+  'Lebanon':        { f: 'f/fc/Route_66_sign_in_Boswell_Park%2C_Lebanon_Missouri.jpg', page: 'Route_66_sign_in_Boswell_Park,_Lebanon_Missouri.jpg', by: 'UnitedShoes', lic: 'CC0' },
+  'Mansfield':      { f: 'f/f1/LauraIngallsWilder-RockyRidgeFarm-MansfieldMO.JPG', page: 'LauraIngallsWilder-RockyRidgeFarm-MansfieldMO.JPG', by: 'TimothyMN', lic: 'CC BY-SA 3.0' },
+  'Mountain Grove': { f: '4/48/Mountain-Grove-caboose-mo.jpg', page: 'Mountain-Grove-caboose-mo.jpg', by: 'Brian Stansberry', lic: 'CC BY 4.0' },
+  'Mountain View':  { f: 'f/fa/Mountain-View-1st-St-mo.jpg', page: 'Mountain-View-1st-St-mo.jpg', by: 'Brian Stansberry', lic: 'CC BY 4.0' },
+  'West Plains':    { f: 'e/e9/West_Plains_Washington_Avenue.jpg', page: 'West_Plains_Washington_Avenue.jpg', by: 'Truett Ray', lic: 'CC BY-SA 4.0' },
+  'Willow Springs': { f: '6/62/Willow-Springs-Main-St-mo.jpg', page: 'Willow-Springs-Main-St-mo.jpg', by: 'Brian Stansberry', lic: 'CC BY 4.0' },
+  'Winona':         { f: 'b/bf/Winona-City-Hall-mo.jpeg', page: 'Winona-City-Hall-mo.jpeg', by: 'Brian Stansberry', lic: 'CC BY 4.0' }
+};
+// Wikimedia's own 960px copy is the source, so Vercel never has to fetch the multi-MB original
+const townPhotoSrc = (p) => sizedUrl(`${WM}${p.f}/960px-${p.f.split('/').pop()}`, 640);
+
 // Big Towns tile at the top of Home (no photo yet)
 function townsTile() {
   return `
@@ -844,14 +874,21 @@ function townsTile() {
 
 // List of towns, laid out like a place-type list; each opens its town page
 function viewTowns() {
-  const tiles = TOWN_NAMES.map((n) => `
+  const tiles = TOWN_NAMES.map((n) => { const p = TOWN_PHOTOS[n]; return `
       <a href="/near/${townSlug(n)}" aria-label="Places near ${esc(n)}" class="lift press relative block aspect-[4/3] min-w-0 overflow-hidden rounded-tile bg-inset shadow-card md:aspect-[3/2]">
         <div class="absolute inset-0 flex items-center justify-center text-tertiary">${icon('pin')}</div>
+        ${p ? `<img loading="lazy" src="${esc(townPhotoSrc(p))}" alt="${esc(n)}, Missouri" data-hide-on-error class="absolute inset-0 h-full w-full object-cover">` : ''}
         <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-transparent"></div>
         <div class="absolute inset-x-0 bottom-0 p-3.5 text-white md:p-4">
           <h3 class="font-display text-xl font-semibold leading-tight tracking-[-0.01em]">${esc(n)}</h3>
         </div>
-      </a>`).join('');
+      </a>`; }).join('');
+  const link = 'underline decoration-black/20 underline-offset-2 hover:decoration-current';
+  const credits = TOWN_NAMES.filter((n) => TOWN_PHOTOS[n]).map((n) => {
+    const p = TOWN_PHOTOS[n];
+    const lic = LIC[p.lic] ? `<a href="${LIC[p.lic]}" target="_blank" rel="noopener" class="${link}">${esc(p.lic)}</a>` : esc(p.lic);
+    return `${esc(n)}: <a href="https://commons.wikimedia.org/wiki/File:${encodeURIComponent(p.page)}" target="_blank" rel="noopener" class="${link}">${esc(p.by)}</a>, ${lic}`;
+  }).join('; ');
   return `
   <div class="space-y-8">
     <header>
@@ -860,6 +897,7 @@ function viewTowns() {
     </header>
     <div class="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-4">${tiles}
     </div>
+    <p class="t-xs text-secondary">Town photos from Wikimedia Commons. ${credits}.</p>
   </div>`;
 }
 
