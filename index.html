@@ -866,11 +866,10 @@ function viewTowns() {
 // ================= SCREENS =================
 function viewHome() {
   const total = state.locs.length;
-  // Popular locations leads as the big tile; the rest stay in A to Z order
+  // Popular locations leads; every place-type tile is the same size (only the Towns tile is big)
   const cats = state.cats.slice().sort((a, b) => (b.name === 'Popular locations') - (a.name === 'Popular locations'));
-  const lastWide = (cats.length - 1) % 2 === 1;
-  const tile = (c, i) => {
-    const wide = i === 0 || (lastWide && i === cats.length - 1);
+  const tile = (c) => {
+    const wide = false;
     const desc = CATEGORY_DESCRIPTIONS[c.name] || 'Field-collected locations in this group';
     const src = c.photo ? sizedUrl(c.photo, wide ? 1080 : 640) : '';
     const full = c.photo ? photoUrl(c.photo) : '';
