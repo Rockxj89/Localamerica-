@@ -1,5 +1,5 @@
 // Town pages for Google: localamerica.us/near/ava
-// The 3 closest places of each type within 35 miles of the town, closest types first.
+// The 3 closest places of each type within 35 estimated driving miles of the town (see ROAD_FACTOR in _site.js), closest types first.
 // Built fresh from the database (cached), so new places show up by themselves.
 // SAFETY: no coordinates on these pages at all; distances are rounded to the nearest 5 miles
 // (see roundMiles in _site.js). Photos and names only, same as the free part of a place page.

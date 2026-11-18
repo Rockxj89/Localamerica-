@@ -133,8 +133,12 @@ const PER_TYPE = 3;      // closest places of each type on a town page
 // so the town pages can't be used to work out where a paid place is.
 const roundMiles = (m) => Math.max(5, Math.round(Number(m) / 5) * 5);
 
-// Straight-line miles from every town to every place, from the app's existing public
-// poi_distances function (the same one Near me uses). Only whole-mile numbers come back, no coordinates.
+// Roads in the Ozarks wind, so driving is longer than straight-line miles. Town pages show an estimate of
+// driving miles: straight-line miles x 1.4 (owner decision, Nov 17). The 35-mile limit above uses these miles too.
+const ROAD_FACTOR = 1.4;
+
+// Miles from every town to every place: straight-line miles from the app's existing public
+// poi_distances function (the same one Near me uses) x ROAD_FACTOR. Only whole-mile numbers come back, no coordinates.
 let distCache = null;
 let distFailedAt = 0;
 async function loadTownDistances() {
@@ -150,7 +154,7 @@ async function loadTownDistances() {
     });
     if (!res.ok) throw new Error(`Database answered ${res.status}`);
     const m = {};
-    (await res.json() || []).forEach((r) => { if (r && r.miles != null && Number.isFinite(Number(r.miles))) m[r.id] = Number(r.miles); });
+    (await res.json() || []).forEach((r) => { if (r && r.miles != null && Number.isFinite(Number(r.miles))) m[r.id] = Number(r.miles) * ROAD_FACTOR; });
     byTown[t.slug] = m;
   })); } catch (e) { distFailedAt = Date.now(); throw e; }
   distCache = { at: Date.now(), byTown };
