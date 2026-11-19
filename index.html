@@ -312,6 +312,12 @@ function categoryIcon(c) {
   return 'compass';
 }
 
+// Owner-chosen Home tile photos (served from localamerica.us). Other tiles use their first place's photo.
+// If one is replaced, give the new file a new name so returning visitors don't keep the old one.
+const CATEGORY_HOME_PHOTOS = {
+  'Unmarked trails': { src: '/unmarked-home.jpg', alt: 'Dotted trail through the forest' },
+};
+
 const CATEGORY_DESCRIPTIONS = {
   'Buildings and stores': 'Old buildings, shops, and structures',
   'Caves': 'Caverns, overhangs, and tucked-away openings',
@@ -910,9 +916,10 @@ function viewHome() {
   const tile = (c) => {
     const wide = false;
     const desc = CATEGORY_DESCRIPTIONS[c.name] || 'Field-collected locations in this group';
-    const src = c.photo ? sizedUrl(c.photo, wide ? 1080 : 640) : '';
-    const full = c.photo ? photoUrl(c.photo) : '';
-    const alt = c.photoOf ? `${c.photoOf} in ${catLabel(c.name)} field photo` : '';
+    const own = CATEGORY_HOME_PHOTOS[c.name];
+    const src = own ? own.src : c.photo ? sizedUrl(c.photo, wide ? 1080 : 640) : '';
+    const full = own ? own.src : c.photo ? photoUrl(c.photo) : '';
+    const alt = own ? own.alt : c.photoOf ? `${c.photoOf} in ${catLabel(c.name)} field photo` : '';
     return `
       <a href="#/c/${catSlug(c.name)}" aria-label="Browse ${esc(catLabel(c.name))}" class="lift press relative block overflow-hidden rounded-tile bg-inset shadow-card ${wide ? 'col-span-2 aspect-[16/10] md:col-span-1 md:aspect-[3/2]' : 'aspect-[4/5] md:aspect-[3/2]'}">
         ${src
