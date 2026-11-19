@@ -10,7 +10,7 @@ const SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ORIGINS = ["https://localamerica.us", "https://www.localamerica.us", "https://localamerica.vercel.app"];
 function cors(req: Request) {
   const o = req.headers.get("origin") || "";
-  const ok = ORIGINS.includes(o) || /^https:\/\/localamerica-[a-z0-9-]+\.vercel\.app$/.test(o);
+  const ok = ORIGINS.includes(o) || /^https:\/\/localamerica-[a-z0-9]+-local-america\.vercel\.app$/.test(o);
   return {
     "Access-Control-Allow-Origin": ok ? o : ORIGINS[0],
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -76,6 +76,10 @@ function cleanNotes(notes: string | null): string {
   return out.join("\n").replace(/\n{3,}/g, "\n\n").trim();
 }
 
+// Paid places must never show GPS publicly. The description and name are public (app, place pages,
+// Facebook captions), so they can't hold coordinates or web/map links.
+const LEAKY = /-?\d{2,3}\.\d{3,}\s*[,;\s]\s*-?\d{2,3}\.\d{3,}|https?:\/\/|www\.|maps\.|onx/i;
+
 function miles(a: number, b: number, c: number, d: number) {
   const r = (x: number) => x * Math.PI / 180;
   const h = Math.sin(r(c - a) / 2) ** 2 + Math.cos(r(a)) * Math.cos(r(c)) * Math.sin(r(d - b) / 2) ** 2;
@@ -93,7 +97,10 @@ async function nextName(admin: any, category: string, subject: string) {
     const m = String(r.name || "").match(/^(.*?)\s*#\s*(\d+)\s*$/);
     if (m) { if (!PREFIX[category]) prefix = m[1]; max = Math.max(max, Number(m[2])); }
   }
-  if (!prefix) return (subject || "New place").slice(0, 60).trim();
+  if (!prefix) {
+    const s = (subject || "").replace(/\s+/g, " ").trim().slice(0, 60);
+    return s && !LEAKY.test(s) ? s : "New Store";
+  }
   return `${prefix} #${max + 1}`;
 }
 
@@ -166,6 +173,7 @@ Deno.serve(async (req) => {
     if (!CATEGORIES.includes(category)) return json({ ok: false, error: "Pick a place type first." }, 400);
     if (!description) return json({ ok: false, error: "Add a description first." }, 400);
     if (description.length > 2000) return json({ ok: false, error: "The description is too long." }, 400);
+    if (LEAKY.test(description)) return json({ ok: false, error: "Take the GPS numbers or web link out of the description first. Everyone can see the description, and this is a Paid place." }, 400);
 
     // Claim the pin so a double tap can't add it twice
     const { data: claimed, error: claimErr } = await admin.from("poi_pin_inbox")
@@ -193,6 +201,8 @@ Deno.serve(async (req) => {
       if (locErr && locErr.code !== "23505") break; // only retry when the number was just taken
     }
     if (locErr || !loc) { await release(); return json({ ok: false, error: locErr?.message || "Could not add the place." }, 500); }
+    // Link the pin to its place right away, so a slow photo copy can't leave it half-done
+    await admin.from("poi_pin_inbox").update({ status: "approved", location_id: loc.id, category, final_description: description, decided_at: new Date().toISOString() }).eq("id", id);
 
     // Copy photos (already stripped of location data when they arrived) into the app's photo bucket
     let copied = 0;
