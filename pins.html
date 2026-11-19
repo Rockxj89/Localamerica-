@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#15803D">
+<title>Local America · Pins</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+  // Same palette as the Traffic, Card Maker and Towns pages
+  tailwind.config = { theme: { extend: {
+    fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'] },
+    colors: {
+      accent: '#15803D', accentfg: '#FFFFFF',
+      primary: '#1B231E', secondary: '#3F4A43', tertiary: '#5C675F',
+      page: '#f7f9fa', line: '#D3DBD0', lineweak: '#E3E9E0', linestrong: '#AFBBAD',
+      errweak: '#F6E2DF', errink: '#8A2A20', roadred: '#B91C1C'
+    }
+  } } };
+</script>
+<style>
+  html, body { background: #f7f9fa; }
+  body { -webkit-tap-highlight-color: transparent; color: #1B231E; font-size: 1.0625rem; }
+  .paid { color: #15803D; font-weight: 600; }
+  .warn { color: #B91C1C; font-weight: 600; }
+  select, textarea { border: 1px solid #D3DBD0; background: #fff; border-radius: 0.5rem; padding: 0.6rem 0.7rem; font-size: 1.0625rem; width: 100%; }
+  textarea { min-height: 7rem; line-height: 1.5; }
+</style>
+</head>
+<body class="font-sans">
+
+<header class="sticky top-0 z-40 bg-accent text-accentfg">
+  <div class="mx-auto flex max-w-3xl items-center justify-between gap-3 px-4 py-3">
+    <div class="min-w-0">
+      <p class="text-xs font-medium opacity-80">Local America · private</p>
+      <h1 class="text-lg font-bold leading-tight">Pins</h1>
+    </div>
+    <button id="signOutBtn" class="hidden rounded-full bg-white/15 px-3 py-1.5 text-sm font-semibold">Sign out</button>
+  </div>
+</header>
+
+<main id="view" class="mx-auto max-w-3xl px-4 pb-24 pt-5"></main>
+
+<script>
+// ================= CONFIG =================
+const CFG = {
+  SUPABASE_URL: 'https://ycdlxdijrlfsxvxksyrq.supabase.co',
+  SUPABASE_KEY: 'sb_publishable_2ExdXbNtW9HpuOGAq1Oa7g_gPdONH_s'
+};
+const SITE = 'https://localamerica.us';
+
+// Friendly place-type names (same as the Towns page and Home tiles)
+const TYPE_NAMES = {
+  'Established campsites': 'Campsite', 'Swimming holes': 'Swimming hole', 'Caves': 'Cave',
+  'Scenic views': 'Scenic view', 'Rappelling bluffs': 'Rappelling bluff', 'Forgotten grounds': 'Forgotten grounds',
+  'Frog ponds': 'Frog pond', 'Legends/lore': 'Legends & lore', 'Open Stores': 'Open store',
+  'Dead end trails': 'Dead-end trail', 'Mud holes/trails': 'Mud hole', 'Hiking Trails': 'Hiking trail',
+  'Popular locations': 'Popular location', 'Rocks/Flex': 'Rocks & flex', 'Unmarked trails': 'Unmarked trail',
+  'Long Shot Fields': 'Long Shot field', 'Water crossings': 'Water crossing'
+};
+
+// Starter description when the email had none. The owner can change it before approving.
+const STARTERS = {
+  'Caves': 'A cave worth checking out.', 'Established campsites': 'A good spot to set up camp.',
+  'Swimming holes': 'A nice spot to cool off and swim.', 'Scenic views': 'A great view worth the drive.',
+  'Rappelling bluffs': 'A bluff good for rappelling.', 'Forgotten grounds': 'An old forgotten spot worth seeing.',
+  'Frog ponds': 'A good pond for frogging.', 'Legends/lore': 'A spot with a story behind it.',
+  'Dead end trails': 'This trail is a dead end.', 'Mud holes/trails': 'A fun mud hole.',
+  'Hiking Trails': 'A good trail to hike.', 'Unmarked trails': 'An unmarked trail worth exploring.',
+  'Long Shot Fields': 'An open field more than 300 yards across.', 'Rocks/Flex': 'Good rocks to crawl.',
+  'Water crossings': 'A water crossing.', 'Popular locations': 'A popular spot.', 'Open Stores': 'A store that is open.'
+};
+
+// Same sign-in as the Traffic page, so signing in on one signs you in on the other.
+const sb = supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_KEY, {
+  auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: 'pkce', storageKey: 'la-traffic-auth' }
+});
+
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+const typeName = (c) => TYPE_NAMES[c] || c || '';
+const fmtDate = (d) => { try { return new Date(d).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }); } catch (e) { return ''; } };
+
+const state = { user: null, loading: false, error: null, pins: [], categories: [], busy: {}, msg: {}, done: null };
+
+// ================= SIGN IN =================
+function viewSignIn(msg) {
+  $('#signOutBtn').classList.add('hidden');
+  $('#view').innerHTML = `
+  <div class="mx-auto mt-6 max-w-md text-center">
+    <h2 class="text-xl font-bold">Sign in to see this page</h2>
+    <p class="mt-2 text-secondary">This page is private. It uses the same sign-in as the Traffic page. Sign in there, then come back here.</p>
+    ${msg ? `<p class="mt-4 rounded-lg bg-errweak p-3 text-sm text-errink">${esc(msg)}</p>` : ''}
+    <a href="/traffic.html" class="mt-5 inline-block w-full rounded-lg bg-accent px-4 py-3 font-semibold text-accentfg">Go to the Traffic page to sign in</a>
+  </div>`;
+}
+
+async function notAllowed() {
+  const email = state.user && state.user.email;
+  await sb.auth.signOut();
+  state.user = null;
+  viewSignIn(`${email || 'That account'} is not allowed to see this page. Sign in with the Local America Gmail.`);
+}
+
+// ================= DATA =================
+async function call(body) {
+  const { data, error } = await sb.functions.invoke('pin-review', { body });
+  if (error) {
+    let detail = null;
+    try { detail = await error.context.json(); } catch (e) { /* no body */ }
+    return { ok: false, status: error.context && error.context.status, error: (detail && detail.error) || error.message };
+  }
+  return data || { ok: false, error: 'No answer' };
+}
+
+async function load() {
+  state.loading = true; state.error = null; render();
+  const res = await call({ action: 'list' });
+  state.loading = false;
+  if (res.status === 403 || res.error === 'not_allowed') return notAllowed();
+  if (!res.ok) state.error = res.error || 'Could not load pins.';
+  else { state.pins = res.pins || []; state.categories = res.categories || []; }
+  render();
+}
+
+async function approve(id) {
+  const card = document.querySelector(`[data-pin="${id}"]`);
+  const category = card.querySelector('select').value;
+  const description = card.querySelector('textarea').value.trim();
+  if (!category) { state.msg[id] = 'Pick a place type first.'; return render(); }
+  if (!description) { state.msg[id] = 'Add a description first.'; return render(); }
+  // keep what was typed if the page redraws
+  const p = state.pins.find((x) => x.id === id); if (p) { p.description = description; p.pick = category; }
+  state.busy[id] = true; state.msg[id] = ''; render();
+  const res = await call({ action: 'approve', id, category, description });
+  state.busy[id] = false;
+  if (!res.ok) { state.msg[id] = res.error || 'Something went wrong.'; return render(); }
+  state.done = { name: res.name, slug: res.slug, photos: res.photos };
+  window.scrollTo(0, 0);
+  load();
+}
+
+async function reject(id) {
+  if (!confirm('Reject this pin? It will not go in the app.')) return;
+  state.busy[id] = true; state.msg[id] = ''; render();
+  const res = await call({ action: 'reject', id });
+  state.busy[id] = false;
+  if (!res.ok) { state.msg[id] = res.error || 'Something went wrong.'; return render(); }
+  state.done = null;
+  load();
+}
+
+// ================= VIEW =================
+function newCard(p) {
+  const pick = p.pick || p.suggested_category || '';
+  const desc = p.description || (pick ? STARTERS[pick] || '' : '');
+  const starter = !p.description && desc;
+  const gps = p.has_coords ? `${Number(p.latitude).toFixed(5)}, ${Number(p.longitude).toFixed(5)}` : '';
+  const busy = !!state.busy[p.id];
+  return `
+  <article data-pin="${p.id}" class="mb-6 rounded-xl border border-line bg-white p-4">
+    <h3 class="text-xl font-bold">${esc(p.subject || '(no subject)')}</h3>
+    <p class="mt-0.5 text-secondary">${esc(fmtDate(p.received_at))}${p.sender ? ` · from ${esc(p.sender)}` : ''}</p>
+
+    ${p.photos.length ? `<div class="mt-3 grid grid-cols-2 gap-2">${p.photos.map((u) => `
+      <a href="${esc(u)}" target="_blank" rel="noopener noreferrer"><img src="${esc(u)}" alt="" class="aspect-square w-full rounded-lg object-cover"></a>`).join('')}</div>`
+      : `<p class="mt-3 text-secondary">No photos came with this pin.</p>`}
+    ${p.skipped.length ? `<p class="mt-2 text-sm text-secondary">Left out: ${esc(p.skipped.join(', '))}</p>` : ''}
+
+    ${gps ? `<p class="mt-3"><span class="font-semibold">GPS:</span> <span class="select-all font-mono">${esc(gps)}</span>
+      · <a href="https://www.google.com/maps?q=${encodeURIComponent(gps)}" target="_blank" rel="noopener noreferrer" class="underline underline-offset-2">Map</a></p>`
+      : `<p class="mt-3 warn">No GPS was found in this email, so it can't go in the app. Reject it and send the pin again.</p>`}
+    ${p.near.length ? `<p class="mt-2 warn">Already in the app close by: ${p.near.map((n) => `${esc(n.name)} (${n.d < 0.1 ? 'under 0.1' : n.d.toFixed(1)} mi)`).join(', ')}</p>` : ''}
+    <p class="mt-2 text-secondary">Only approve spots on public land.</p>
+
+    <label class="mt-4 block font-semibold" for="cat-${p.id}">Place type</label>
+    ${!p.suggested_category && !p.pick ? `<p class="text-secondary">I couldn't tell the type from the email. Pick one.</p>` : ''}
+    <select id="cat-${p.id}" data-cat="${p.id}" class="mt-1">
+      <option value="">Choose…</option>
+      ${state.categories.map((c) => `<option value="${esc(c)}" ${c === pick ? 'selected' : ''}>${esc(typeName(c))}</option>`).join('')}
+    </select>
+
+    <label class="mt-4 block font-semibold" for="desc-${p.id}">Description</label>
+    <p class="text-secondary">${starter ? 'The email had no description, so here is a starter. Change it if you want.' : 'From your email, word for word. This is what people see in the app.'}</p>
+    <textarea id="desc-${p.id}" data-desc="${p.id}" ${starter ? 'data-starter="1"' : ''} class="mt-1">${esc(desc)}</textarea>
+
+    <p class="mt-3">It goes in the app as <span class="paid">Paid</span> and gets lined up for Facebook.</p>
+    ${state.msg[p.id] ? `<p class="mt-3 rounded-lg bg-errweak p-3 text-errink">${esc(state.msg[p.id])}</p>` : ''}
+    <div class="mt-4 flex gap-3">
+      <button data-approve="${p.id}" ${busy || !p.has_coords ? 'disabled' : ''} class="flex-1 rounded-lg bg-accent px-4 py-3 font-semibold text-accentfg disabled:opacity-50">${busy ? 'Working…' : 'Approve'}</button>
+      <button data-reject="${p.id}" ${busy ? 'disabled' : ''} class="rounded-lg border border-linestrong bg-white px-4 py-3 font-semibold text-primary disabled:opacity-50">Reject</button>
+    </div>
+  </article>`;
+}
+
+function oldRow(p) {
+  const label = p.status === 'approved'
+    ? `<span class="paid">Approved</span>${p.place_name ? ` as <a href="${SITE}/places/${esc(String(p.place_name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, ''))}" target="_blank" rel="noopener" class="underline underline-offset-2">${esc(p.place_name)}</a>` : ''}`
+    : p.status === 'rejected' ? '<span class="text-secondary">Rejected</span>' : '<span class="text-secondary">Working on it…</span>';
+  return `<li class="border-b border-lineweak py-3 last:border-0">
+    <p class="font-semibold">${esc(p.subject || '(no subject)')}</p>
+    <p class="text-secondary">${esc(fmtDate(p.received_at))} · ${label}</p></li>`;
+}
+
+function render() {
+  if (!state.user) return;
+  $('#signOutBtn').classList.remove('hidden');
+  let body;
+  if (state.loading && !state.pins.length) body = `<p class="mt-2 text-secondary">Loading pins…</p>`;
+  else if (state.error) body = `<p class="mt-2 rounded-lg bg-errweak p-3 text-errink">${esc(state.error)}</p><button id="retry" class="mt-3 rounded-full bg-accent px-4 py-2 font-semibold text-accentfg">Try again</button>`;
+  else {
+    const fresh = state.pins.filter((p) => p.status === 'new');
+    const old = state.pins.filter((p) => p.status !== 'new');
+    body = `
+      ${state.done ? `<p class="mb-5 rounded-lg border border-line bg-white p-3"><span class="paid">Added:</span>
+        <a href="${SITE}/places/${esc(state.done.slug)}" target="_blank" rel="noopener" class="font-semibold underline underline-offset-2">${esc(state.done.name)}</a>
+        with ${state.done.photos} ${state.done.photos === 1 ? 'photo' : 'photos'}. It's in the app now and will be added to the Facebook line within a day.</p>` : ''}
+      ${fresh.length ? fresh.map(newCard).join('') : `<p class="mb-6 text-secondary">No new pins. Email a pin to Local America Pins and it shows up here.</p>`}
+      ${old.length ? `<h2 class="mt-2 text-lg font-bold">Recent</h2><ul>${old.map(oldRow).join('')}</ul>` : ''}`;
+  }
+  $('#view').innerHTML = body;
+}
+
+document.addEventListener('click', (e) => {
+  const a = e.target.closest('[data-approve]'); if (a) return approve(Number(a.dataset.approve));
+  const r = e.target.closest('[data-reject]'); if (r) return reject(Number(r.dataset.reject));
+  if (e.target.closest('#retry')) return load();
+});
+document.addEventListener('change', (e) => {
+  const sel = e.target.closest('[data-cat]');
+  if (sel) {
+    const id = Number(sel.dataset.cat);
+    const p = state.pins.find((x) => x.id === id); if (p) p.pick = sel.value;
+    // If the box still holds a starter line, swap it for the new type's starter
+    const ta = document.querySelector(`[data-desc="${id}"]`);
+    if (ta && (ta.dataset.starter === '1' || !ta.value.trim())) { ta.value = STARTERS[sel.value] || ''; ta.dataset.starter = '1'; }
+  }
+});
+document.addEventListener('input', (e) => {
+  const ta = e.target.closest('[data-desc]');
+  if (ta) { delete ta.dataset.starter; const p = state.pins.find((x) => x.id === Number(ta.dataset.desc)); if (p) p.description = ta.value; }
+});
+$('#signOutBtn').onclick = async () => { await sb.auth.signOut(); state.user = null; state.pins = []; viewSignIn(); };
+
+// ================= START =================
+(async function start() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) return viewSignIn('');
+  state.user = session.user;
+  load();
+})();
+</script>
+</body>
+</html>

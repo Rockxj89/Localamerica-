@@ -2,6 +2,7 @@ User-agent: *
 Disallow: /traffic.html
 Disallow: /cards.html
 Disallow: /towns.html
+Disallow: /pins.html
 Disallow: /api/
 
 Sitemap: https://localamerica.us/sitemap.xml
