@@ -24,7 +24,7 @@ function cors(req: Request) {
 const CATEGORIES = [
   "Caves", "Established campsites", "Swimming holes", "Scenic views", "Rappelling bluffs",
   "Forgotten grounds", "Frog ponds", "Legends/lore", "Dead end trails", "Mud holes/trails",
-  "Hiking Trails", "Unmarked trails", "Long Shot Fields", "Rocks/Flex", "Water crossings",
+  "Hiking Trails", "Unmarked trails", "Long Shot Fields", "Wheeling", "Water crossings",
   "Popular locations", "Open Stores",
 ];
 
@@ -34,7 +34,7 @@ const PREFIX: Record<string, string> = {
   "Scenic views": "Scenic View", "Rappelling bluffs": "Bluff", "Forgotten grounds": "Forgotten Grounds",
   "Frog ponds": "Pond", "Legends/lore": "Legends and Lore", "Dead end trails": "Dead End",
   "Mud holes/trails": "Mud Hole", "Hiking Trails": "Hike", "Unmarked trails": "Trail",
-  "Long Shot Fields": "Long Shot", "Rocks/Flex": "Flex", "Water crossings": "Water",
+  "Long Shot Fields": "Long Shot", "Wheeling": "Wheeling", "Water crossings": "Water",
   "Popular locations": "Popular Location",
 };
 
@@ -52,7 +52,7 @@ const GUESS: [RegExp, string][] = [
   [/legend|\blore\b|haunted/i, "Legends/lore"],
   [/long[\s-]*shot|\bshooting\b|\bfield\b/i, "Long Shot Fields"],
   [/water crossing|low water|\bford\b|creek crossing/i, "Water crossings"],
-  [/\bflex\b|\brocks?\b|boulder/i, "Rocks/Flex"],
+  [/\bflex\b|\brocks?\b|boulder/i, "Wheeling"],
   [/\bhik(e|ing)\b|foot trail|walking trail/i, "Hiking Trails"],
   [/unmarked|\btrail\b/i, "Unmarked trails"],
   [/\bstore\b|\bshop\b/i, "Open Stores"],

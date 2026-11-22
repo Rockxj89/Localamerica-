@@ -298,9 +298,9 @@ module.exports = async (req, res) => {
   }
 
   const p = places.find((x) => x.slug === slug);
-  // Renamed places (Yardage #3 is now Long Shot #3, Non Vehicle #1 is now Hike #1): old links forward to the new page
-  const OLD_PREFIX = { 'yardage-': 'long-shot-', 'non-vehicle-': 'hike-' };
-  const oldMatch = !p && slug.match(/^(yardage-|non-vehicle-)(\d+)$/);
+  // Renamed places (Yardage #3 is now Long Shot #3, Non Vehicle #1 is now Hike #1, Flex #3 is now Wheeling #3): old links forward to the new page
+  const OLD_PREFIX = { 'yardage-': 'long-shot-', 'non-vehicle-': 'hike-', 'flex-': 'wheeling-' };
+  const oldMatch = !p && slug.match(/^(yardage-|non-vehicle-|flex-)(\d+)$/);
   const renamed = oldMatch && places.find((x) => x.slug === OLD_PREFIX[oldMatch[1]] + oldMatch[2]);
   if (renamed) {
     res.statusCode = 301;

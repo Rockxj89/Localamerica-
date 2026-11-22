@@ -21,12 +21,12 @@ const CATS = {
   mud:         ['Mud holes and trails', 'Rough tracks and muddy routes for off-roading on public land in the Ozarks.'],
   hiking:      ['Hiking Trails', 'Walking-only routes on public land in the Ozarks.'],
   popular:     ['Popular locations', 'Well-known Ozarks places on public land, a good place to start.'],
-  rocks:       ['Rocks and flex', 'Rock formations and flex spots for off-roading on public land in the Ozarks.'],
+  wheeling:    ['Wheeling', 'Rock formations and flex spots for off-roading on public land in the Ozarks.'],
   unmarked:    ['Unmarked trails', 'Routes without a formal trail marker on public land in the Ozarks.'],
   'long-shot': ['Long Shot Fields', 'Open fields more than 300 yards across on public land in the Ozarks.']
 };
 // Renamed place types: the old short link forwards to the new one
-const OLD = { yardage: 'long-shot' };
+const OLD = { yardage: 'long-shot', rocks: 'wheeling' };
 
 let shell = null;
 function page() {

@@ -331,6 +331,7 @@ const CATEGORY_DESCRIPTIONS = {
   'Non-vehicle trails': 'Routes intended for walking',
   'Popular locations': 'Well-known places worth starting with',
   'Rappelling bluffs': 'Cliffs and rock faces for vertical routes',
+  'Wheeling': 'Rock formations and flexible-use spots',
   'Rocks/Flex': 'Rock formations and flexible-use spots',
   'Scenic views': 'Lookouts and wide-open views',
   'Swimming holes': 'Creeks, pools, and water spots',
@@ -411,19 +412,19 @@ const roadInfo = (l) => ROAD[ROAD_BY_CATEGORY[l.category] || 'rough'];
 const CATEGORY_LABELS = {
   'Buildings and stores': 'Buildings & stores', 'Dead end trails': 'Dead-end trails',
   'Established campsites': 'Campsites', 'Legends/lore': 'Legends & lore',
-  'Mud holes/trails': 'Mud holes & trails', 'Rocks/Flex': 'Rocks & flex'
+  'Mud holes/trails': 'Mud holes & trails', 'Rocks/Flex': 'Wheeling'
 };
 const catLabel = (c) => CATEGORY_LABELS[c] || c;
 const CATEGORY_SLUGS = {
   'Buildings and stores': 'buildings', 'Caves': 'caves', 'Dead end trails': 'dead-ends',
   'Established campsites': 'camp', 'Forgotten grounds': 'forgotten', 'Frog ponds': 'frogs',
   'Legends/lore': 'legends', 'Mud holes/trails': 'mud', 'Hiking Trails': 'hiking', 'Non-vehicle trails': 'hiking',
-  'Popular locations': 'popular', 'Rappelling bluffs': 'bluffs', 'Rocks/Flex': 'rocks',
+  'Popular locations': 'popular', 'Rappelling bluffs': 'bluffs', 'Wheeling': 'wheeling', 'Rocks/Flex': 'wheeling',
   'Scenic views': 'views', 'Swimming holes': 'swimming', 'Unmarked trails': 'unmarked',
   'Long Shot Fields': 'long-shot', 'Yardage fields': 'long-shot'
 };
 // Old links (#/c/yardage) still open the renamed place type
-const OLD_CAT_SLUGS = { yardage: 'long-shot' };
+const OLD_CAT_SLUGS = { yardage: 'long-shot', rocks: 'wheeling' };
 const catSlug = (c) => CATEGORY_SLUGS[c] || toSlug(c);
 const catBySlug = (s) => { s = OLD_CAT_SLUGS[s] || s; return state.cats.find((c) => catSlug(c.name) === s || toSlug(c.name) === s); };
 
