@@ -25,22 +25,52 @@ function b64Text(b64: string | undefined): string {
   try { return new TextDecoder().decode(b64ToBytes(b64)); } catch { return ""; }
 }
 
-// Remove every APP1..APP15 segment (EXIF incl. GPS, XMP, Photoshop) from a JPEG. Keeps APP0 (JFIF) and image data.
+// Rebuild a JPEG keeping only what's needed to show the picture, so no location data can ride along
+// (these photos end up public once the place is approved, and pins are paid places):
+// - APP0 (JFIF) is kept; every other APPn (EXIF incl. GPS, XMP, ICC, MPF, Photoshop) and COM is dropped,
+//   before the first scan AND between scans (progressive JPEGs).
+// - Everything after the end-of-image marker is cut off. Phones hang extra data there: Samsung's trailer
+//   (edit history, capture info), Ultra HDR gain-map images with their own metadata, motion-photo videos.
+// Returns null if this isn't a whole JPEG it can read safely; the photo is then skipped, never stored as-is.
 function stripJpeg(src: Uint8Array): Uint8Array | null {
   if (src.length < 4 || src[0] !== 0xff || src[1] !== 0xd8) return null;
   const parts: Uint8Array[] = [src.subarray(0, 2)];
-  let i = 2;
-  while (i + 4 <= src.length) {
+  let i = 2, scans = 0, eoi = false;
+  while (i + 2 <= src.length) {
     if (src[i] !== 0xff) return null;
     const marker = src[i + 1];
-    if (marker === 0xda) { parts.push(src.subarray(i)); break; } // start of scan: rest is image data
+    if (marker === 0xff) { i++; continue; } // fill byte
+    if (marker === 0xd9) { // end of image: keep the marker, drop everything after it
+      if (scans === 0) return null;
+      parts.push(src.subarray(i, i + 2));
+      eoi = true;
+      break;
+    }
+    if (i + 4 > src.length) return null;
     const len = (src[i + 2] << 8) | src[i + 3];
     const end = i + 2 + len;
-    if (end > src.length) return null;
-    const isAppJunk = marker >= 0xe1 && marker <= 0xef;
-    if (!isAppJunk) parts.push(src.subarray(i, end));
+    if (len < 2 || end > src.length) return null;
+    if (marker === 0xda) { // start of scan: its header, then image data up to the next real marker
+      scans++;
+      let j = end;
+      while (j + 1 < src.length) {
+        if (src[j] === 0xff) {
+          const n = src[j + 1];
+          if (n === 0x00 || (n >= 0xd0 && n <= 0xd7)) { j += 2; continue; } // stuffed byte or restart marker
+          break;
+        }
+        j++;
+      }
+      if (j + 1 >= src.length) return null; // image data never ends: not a whole JPEG
+      parts.push(src.subarray(i, j));
+      i = j;
+      continue;
+    }
+    const junk = (marker >= 0xe1 && marker <= 0xef) || marker === 0xfe;
+    if (!junk) parts.push(src.subarray(i, end));
     i = end;
   }
+  if (!eoi) return null;
   const total = parts.reduce((n, p) => n + p.length, 0);
   const out = new Uint8Array(total);
   let o = 0;
@@ -48,10 +78,14 @@ function stripJpeg(src: Uint8Array): Uint8Array | null {
   return out;
 }
 
+// Last check on the cleaned photo: any EXIF header left anywhere in the whole file means it is skipped.
 function hasExifGps(b: Uint8Array): boolean {
-  // crude check: look for an "Exif" header anywhere before image data
-  const s = new TextDecoder("latin1").decode(b.subarray(0, Math.min(b.length, 200000)));
-  return s.includes("Exif\0\0");
+  const sig = [0x45, 0x78, 0x69, 0x66, 0x00, 0x00]; // "Exif\0\0"
+  outer: for (let i = 0; i + sig.length <= b.length; i++) {
+    for (let k = 0; k < sig.length; k++) if (b[i + k] !== sig[k]) continue outer;
+    return true;
+  }
+  return false;
 }
 
 function decodeXml(s: string) {
