@@ -140,6 +140,8 @@ const ROAD_FACTOR = 1.4;
 
 // Miles from every town to every place: straight-line miles from the app's existing public
 // poi_distances function (the same one Near me uses) x ROAD_FACTOR. Only whole-mile numbers come back, no coordinates.
+// Paid places are measured to a hidden point 1 to 2 miles from the real spot, so their miles (and their
+// nearest town) can be a little off on purpose (supabase/sql/2026-11-22-paid-distance-hidden-points.sql).
 let distCache = null;
 let distFailedAt = 0;
 async function loadTownDistances() {
