@@ -13,7 +13,9 @@
 -- The offsets live in poi_locations next to the real GPS, so they get exactly the same protection
 -- (the public can't read that table) and go into the same backup. They are as secret as the GPS.
 -- Never reset them: a second hidden point for the same place would narrow down the real spot.
--- If a place's GPS is corrected, its offset stays the same and the hidden point moves with it.
+-- If a place's GPS is corrected, its offset stays the same and the hidden point moves with it, except
+-- when a place that shares its offset is moved more than about 1/4 mile from its twin (then it gets a new one).
+-- An update can't clear an offset.
 -- Places within about 100 ft of each other share one offset (several pairs share a GPS), because two
 -- different hidden points for one spot would let someone overlap the two rings. For the same reason:
 -- archive places instead of deleting and re-adding them, and only restore poi_locations from a backup
@@ -47,7 +49,30 @@ declare
   near_n double precision;
   near_e double precision;
 begin
+  if tg_op = 'UPDATE' and old.distance_offset_north_miles is not null and old.distance_offset_east_miles is not null then
+    -- An update never clears an offset (a stray empty write must not give a place a second hidden point).
+    if new.distance_offset_north_miles is null or new.distance_offset_east_miles is null then
+      new.distance_offset_north_miles := old.distance_offset_north_miles;
+      new.distance_offset_east_miles := old.distance_offset_east_miles;
+    end if;
+    -- A place that shares its hidden point with another place and is moved more than about 1/4 mile away
+    -- from it gets a new one (copied at the new spot if a place is there, otherwise random). If it kept the
+    -- shared one, anyone who knows the other place's real spot could work out the moved place's new GPS.
+    -- Smaller GPS fixes, and places that share with nobody, keep their offset (the hidden point moves with the spot).
+    if (new.latitude, new.longitude) is distinct from (old.latitude, old.longitude)
+       and exists (select 1 from public.poi_locations o
+                   where o.id <> new.id
+                     and o.distance_offset_north_miles = new.distance_offset_north_miles
+                     and o.distance_offset_east_miles = new.distance_offset_east_miles
+                     and (abs(o.latitude - new.latitude) > 0.0036 or abs(o.longitude - new.longitude) > 0.0045)) then
+      new.distance_offset_north_miles := null;
+      new.distance_offset_east_miles := null;
+    end if;
+  end if;
+
   if new.distance_offset_north_miles is null or new.distance_offset_east_miles is null then
+    -- One place at a time, so two places added at the same spot at the same moment still share.
+    perform pg_advisory_xact_lock(hashtext('poi_fill_distance_offset'));
     select o.distance_offset_north_miles, o.distance_offset_east_miles
       into near_n, near_e
       from public.poi_locations o
