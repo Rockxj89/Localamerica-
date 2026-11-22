@@ -17,14 +17,14 @@ const isFreeAccess = (a) => String(a || '').toLowerCase() === 'free';
 const CATEGORY_LABELS = {
   'Buildings and stores': 'Buildings & stores', 'Dead end trails': 'Dead-end trails',
   'Established campsites': 'Campsites', 'Legends/lore': 'Legends & lore',
-  'Mud holes/trails': 'Mud holes & trails', 'Rocks/Flex': 'Rocks & flex'
+  'Mud holes/trails': 'Mud holes & trails', 'Rocks/Flex': 'Wheeling'
 };
 const catLabel = (c) => CATEGORY_LABELS[c] || c;
 const CATEGORY_SLUGS = {
   'Buildings and stores': 'buildings', 'Caves': 'caves', 'Dead end trails': 'dead-ends',
   'Established campsites': 'camp', 'Forgotten grounds': 'forgotten', 'Frog ponds': 'frogs',
   'Legends/lore': 'legends', 'Mud holes/trails': 'mud', 'Hiking Trails': 'hiking', 'Non-vehicle trails': 'hiking',
-  'Popular locations': 'popular', 'Rappelling bluffs': 'bluffs', 'Rocks/Flex': 'rocks',
+  'Popular locations': 'popular', 'Rappelling bluffs': 'bluffs', 'Wheeling': 'wheeling', 'Rocks/Flex': 'wheeling',
   'Scenic views': 'views', 'Swimming holes': 'swimming', 'Unmarked trails': 'unmarked',
   'Long Shot Fields': 'long-shot', 'Yardage fields': 'long-shot'
 };
@@ -44,6 +44,7 @@ const CATEGORY_DESCRIPTIONS = {
   'Non-vehicle trails': 'Routes intended for walking',
   'Popular locations': 'Well-known places worth starting with',
   'Rappelling bluffs': 'Cliffs and rock faces for vertical routes',
+  'Wheeling': 'Rock formations and flexible-use spots',
   'Rocks/Flex': 'Rock formations and flexible-use spots',
   'Scenic views': 'Lookouts and wide-open views',
   'Swimming holes': 'Creeks, pools, and water spots',
@@ -191,7 +192,7 @@ const CATEGORY_SINGULAR = {
   'Buildings and stores': 'Old building', 'Open Stores': 'Store', 'Caves': 'Cave', 'Dead end trails': 'Dead-end trail',
   'Established campsites': 'Campsite', 'Forgotten grounds': 'Forgotten grounds spot', 'Frog ponds': 'Frog pond',
   'Legends/lore': 'Legends and lore spot', 'Mud holes/trails': 'Mud hole', 'Hiking Trails': 'Hiking trail',
-  'Popular locations': 'Popular spot', 'Rappelling bluffs': 'Rappelling bluff', 'Rocks/Flex': 'Rocks and flex spot',
+  'Popular locations': 'Popular spot', 'Rappelling bluffs': 'Rappelling bluff', 'Wheeling': 'Wheeling spot', 'Rocks/Flex': 'Wheeling spot',
   'Scenic views': 'Scenic view', 'Swimming holes': 'Swimming hole', 'Unmarked trails': 'Unmarked trail',
   'Long Shot Fields': 'Long Shot field', 'Water crossings': 'Water crossing'
 };

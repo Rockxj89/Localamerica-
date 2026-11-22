@@ -8,7 +8,7 @@
   ],
   "rewrites": [
     {
-      "source": "/:slug(camp|swimming|caves|views|bluffs|forgotten|frogs|legends|buildings|dead-ends|mud|hiking|popular|rocks|unmarked|yardage|long-shot)",
+      "source": "/:slug(camp|swimming|caves|views|bluffs|forgotten|frogs|legends|buildings|dead-ends|mud|hiking|popular|rocks|wheeling|unmarked|yardage|long-shot)",
       "destination": "/api/category?c=:slug"
     },
     {
