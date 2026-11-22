@@ -14,6 +14,10 @@
 -- (the public can't read that table) and go into the same backup. They are as secret as the GPS.
 -- Never reset them: a second hidden point for the same place would narrow down the real spot.
 -- If a place's GPS is corrected, its offset stays the same and the hidden point moves with it.
+-- Places within about 100 ft of each other share one offset (several pairs share a GPS), because two
+-- different hidden points for one spot would let someone overlap the two rings. For the same reason:
+-- archive places instead of deleting and re-adding them, and only restore poi_locations from a backup
+-- made after this change (older backups have no offsets, so every place would get a second one).
 --
 -- Applied to the live database with the Supabase connector on Nov 22, 2026
 -- (migration "paid_distance_hidden_points").
@@ -28,8 +32,9 @@ comment on column public.poi_locations.distance_offset_north_miles is
 comment on column public.poi_locations.distance_offset_east_miles is
   'SECRET, as secret as the GPS. Paid places are measured (Near me, town pages) from a hidden point this many miles east of the real spot (negative = west). Never reset.';
 
--- 2) Every new place gets its own random offset automatically: 1 to 2 miles, any direction,
---    spread evenly over the ring, from a strong random source (gen_random_uuid).
+-- 2) Every new place gets an offset automatically. If another place is within about 100 ft, it copies
+--    that place's offset (same spot, same hidden point). Otherwise it draws a random one: 1 to 2 miles,
+--    any direction, spread evenly over the ring, from a strong random source (gen_random_uuid).
 create or replace function public.poi_fill_distance_offset()
 returns trigger
 language plpgsql
@@ -39,8 +44,25 @@ declare
   h text;
   r double precision;
   t double precision;
+  near_n double precision;
+  near_e double precision;
 begin
   if new.distance_offset_north_miles is null or new.distance_offset_east_miles is null then
+    select o.distance_offset_north_miles, o.distance_offset_east_miles
+      into near_n, near_e
+      from public.poi_locations o
+      where o.id is distinct from new.id
+        and o.distance_offset_north_miles is not null
+        and o.distance_offset_east_miles is not null
+        and abs(o.latitude - new.latitude) < 0.0003      -- about 110 ft north-south
+        and abs(o.longitude - new.longitude) < 0.0004    -- about 115 ft east-west here
+      order by (o.latitude - new.latitude) ^ 2 + ((o.longitude - new.longitude) * cos(radians(new.latitude))) ^ 2, o.id
+      limit 1;
+    if found then
+      new.distance_offset_north_miles := near_n;
+      new.distance_offset_east_miles := near_e;
+      return new;
+    end if;
     h := replace(gen_random_uuid()::text, '-', '');
     -- two independent random numbers between 0 and 1 (48 random bits each; the uuid's fixed digits are skipped)
     r := sqrt(1 + 3 * (('x' || substr(h, 1, 12))::bit(48)::bigint::double precision / 281474976710656));
@@ -58,7 +80,8 @@ create trigger poi_fill_distance_offset
   before insert or update on public.poi_locations
   for each row execute function public.poi_fill_distance_offset();
 
--- 3) Give every existing place its own offset (the trigger fills each row separately).
+-- 3) Give every existing place an offset (the trigger fills each row separately, and later rows in this
+--    same update can see the earlier ones, so places at the same spot end up sharing one).
 --    No trigger touches updated_at, so place pages and the sitemap don't change.
 update public.poi_locations
   set distance_offset_north_miles = null
