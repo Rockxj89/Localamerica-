@@ -14,22 +14,27 @@ const PRICE = '$4.99';
 // Owner's rule (Nov 21 and Nov 23, 2026): no caves in the app, not as places and not in the wording.
 const CAVE_WORD = /\bcav(e|es|ern|erns)\b/i;
 
-// Numbers that look like GPS in Missouri: a latitude like 36.95201 or a longitude like -92.66050
-// (4 or more decimals). Every one found on a public page must be a FREE place's GPS.
-const LAT_RE = /(?<![\d.])(?:3[5-9]|40)\.\d{4,}/g;
-const LNG_RE = /-\s?(?:8[89]|9[0-6])\.\d{4,}/g;
+// Numbers that look like GPS in Missouri: a latitude like 36.952 or a longitude like -92.6605 or 92.6605
+// (3 or more decimals). Every one found on a public page must be a FREE place's GPS.
+const LAT_RE = /(?<![\d.])(?:3[5-9]|40)\.\d{3,}/g;
+const LNG_RE = /(?<![\d.])-?\s?(?:8[89]|9[0-6])\.\d{3,}/g;
 
 const toSlug = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 const isFree = (p) => String(p.access || '').toLowerCase() === 'free';
 
 // GPS-looking numbers on a page that don't belong to any free place (should always be empty)
+// (A number shown with fewer decimals still matches the free place it was rounded from.)
 function strayCoordinates(text, freePlaces) {
-  const lats = freePlaces.map((p) => Number(p.latitude));
-  const lngs = freePlaces.map((p) => Number(p.longitude));
-  const near = (list, v) => list.some((x) => Math.abs(x - v) < 0.000011);
+  const lats = freePlaces.map((p) => Math.abs(Number(p.latitude)));
+  const lngs = freePlaces.map((p) => Math.abs(Number(p.longitude)));
+  const near = (list, raw) => {
+    const v = Math.abs(Number(raw.replace(/\s/g, '')));
+    const tol = 0.5 * 10 ** -raw.split('.')[1].length + 1e-9;
+    return list.some((x) => Math.abs(x - v) <= tol);
+  };
   const out = [];
-  for (const m of String(text).matchAll(LAT_RE)) if (!near(lats, Number(m[0]))) out.push(m[0]);
-  for (const m of String(text).matchAll(LNG_RE)) if (!near(lngs, Number(m[0].replace(/\s/g, '')))) out.push(m[0]);
+  for (const m of String(text).matchAll(LAT_RE)) if (!near(lats, m[0])) out.push(m[0]);
+  for (const m of String(text).matchAll(LNG_RE)) if (!near(lngs, m[0])) out.push(m[0]);
   return out;
 }
 // Any GPS-looking number at all (town pages and the page list should have none)

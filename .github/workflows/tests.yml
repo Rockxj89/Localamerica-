@@ -16,7 +16,8 @@ permissions:
 
 concurrency:
   group: tests-${{ github.event_name }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  # A newer push or pull request update replaces an older run (daily runs always finish)
+  cancel-in-progress: ${{ github.event_name != 'schedule' }}
 
 defaults:
   run:
@@ -49,7 +50,9 @@ jobs:
           --test-reporter=./tests/gh-reporter.mjs --test-reporter-destination=stdout "tests/unit/*.test.js"
       - name: Install the test browser
         working-directory: tests
-        run: npm ci --no-audit --no-fund && npx playwright install --with-deps chromium
+        run: |
+          for i in 1 2 3; do npm ci --no-audit --no-fund && npx playwright install --with-deps chromium && exit 0; sleep 20; done
+          exit 1
       - name: The app in a real browser (this branch's files, live public data, nothing sent anywhere)
         working-directory: tests
         run: npx playwright test
@@ -59,12 +62,17 @@ jobs:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    permissions:
+      contents: read
+      statuses: read
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
         with:
           node-version: 22
-      - name: Wait for the live site to serve this version
+      - name: Wait for this version to be live
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: node tests/live/wait-for-deploy.js
       - name: Live data, checkout refusals and every page
         run: >-
@@ -72,7 +80,9 @@ jobs:
           --test-reporter=./tests/gh-reporter.mjs --test-reporter-destination=stdout "tests/live/*.test.js"
       - name: Install the test browser
         working-directory: tests
-        run: npm ci --no-audit --no-fund && npx playwright install --with-deps chromium
+        run: |
+          for i in 1 2 3; do npm ci --no-audit --no-fund && npx playwright install --with-deps chromium && exit 0; sleep 20; done
+          exit 1
       - name: The live app in a real browser (nothing sent anywhere)
         working-directory: tests
         env:
@@ -81,7 +91,7 @@ jobs:
 
   alert:
     name: Tell the owner
-    needs: [code, live]
+    needs: [live]
     if: failure() && (github.event_name == 'schedule' || github.event_name == 'push')
     runs-on: ubuntu-latest
     permissions:

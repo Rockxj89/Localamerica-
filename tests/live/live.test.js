@@ -2,6 +2,8 @@
 // Read only: it asks the live checkout only questions that are refused before Stripe is ever contacted,
 // and it never starts a checkout for a paid place. Plain page loads run no scripts, so nothing is counted.
 // Run from the repo root: node --test "tests/live/*.test.js"   (LIVE_URL to point it somewhere else)
+// The run log is public, so failure messages never print coordinates or name a readable private table
+// (set LA_VERBOSE=1 on a private run to see names).
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
@@ -67,17 +69,19 @@ test('no cave places and no cave words in the public data', () => {
 test("the public can't read private tables or use owner tools", async () => {
   const tables = ['poi_locations', 'poi_location_photos', 'poi_customer_access', 'poi_pin_inbox', 'poi_traffic_events',
     'poi_card_maker_cards', 'poi_admins', 'poi_owner_browsers', 'post_images', 'post_image_tokens', 'post_image_settings'];
+  const open = [];
   for (const t of tables) {
     const res = await get(`${S.SUPABASE_URL}/rest/v1/${t}?select=*&limit=1`, { headers: { apikey: S.SUPABASE_KEY, Authorization: `Bearer ${S.SUPABASE_KEY}` } });
     const body = await res.text();
-    assert.ok(res.status >= 400 || body.trim() === '[]', `the public can read ${t} (answered ${res.status})`);
+    if (!(res.status >= 400 || body.trim() === '[]')) open.push(t);
   }
   for (const fn of ['owner_place_coords', 'traffic_summary', 'card_maker_cards', 'backup_structure', 'mint_post_image_token']) {
     const res = await get(`${S.SUPABASE_URL}/rest/v1/rpc/${fn}`, {
       method: 'POST', headers: { apikey: S.SUPABASE_KEY, Authorization: `Bearer ${S.SUPABASE_KEY}`, 'Content-Type': 'application/json' }, body: '{}'
     });
-    assert.ok(res.status >= 400, `the public can run ${fn} (answered ${res.status})`);
+    if (res.status < 400) open.push(fn);
   }
+  assert.ok(open.length === 0, `${open.length} private table(s) or owner tool(s) are open to the public` + (process.env.LA_VERBOSE ? ': ' + open.join(', ') : ''));
 });
 
 test('distances: every live place, and free places measured to their real spot', async () => {
@@ -96,7 +100,8 @@ test('checkout refuses what it should, and never opens a Stripe checkout here', 
   const t = S.randomToken();
   let res = await checkout({ action: 'unlocked', token: t });
   assert.equal(res.status, 200);
-  assert.deepEqual((await res.json()).places, [], 'a brand-new browser has unlocked places');
+  const got = (await res.json()).places || [];
+  assert.ok(got.length === 0, `a brand-new browser got ${got.length} unlocked place(s)`);
   const freeOne = freePlaces[0];
   res = await checkout({ action: 'start', token: t, locationId: freeOne.id, returnUrl: S.LIVE_URL + '/' });
   assert.equal(res.status, 400, 'a free place could be sold');
@@ -127,7 +132,7 @@ test('every live page: no paid GPS and no caves', async () => {
     if (res.status !== 200) out.push(`answered ${res.status}`);
     if (S.CAVE_WORD.test(html)) out.push('mentions caves');
     const stray = S.strayCoordinates(html, freePlaces);
-    if (stray.length) out.push('GPS that is not a free place: ' + stray.slice(0, 3).join(' '));
+    if (stray.length) out.push(`${stray.length} GPS-looking number(s) that aren't a free place's`);
     const m = /\/places\/([^/]+)$/.exec(url);
     if (m) {
       const p = bySlug[m[1]];

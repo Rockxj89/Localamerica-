@@ -22,11 +22,13 @@ test.beforeAll(async () => {
 // Sends test traffic only where it's harmless, and answers checkout calls with a pretend checkout.
 async function guard(context, baseURL) {
   const base = new URL(baseURL).origin;
-  const state = { calls: [], unlocked: {}, sessionId: 'cs_test_pretend123', placeId: null, stopped: [], errors: [] };
-  // Any script error on a page fails the test (checked by noErrors at the end of each test)
+  const state = { calls: [], unlocked: {}, sessionId: 'cs_test_pretend123', placeId: null, stopped: [], errors: [], leaked: [] };
+  // Any script error on a page fails the test, and so does any visit-counting or pixel request that
+  // got through (both checked by noErrors at the end of each test)
   const watch = (pg) => pg.on('pageerror', (e) => state.errors.push(String(e.message || e)));
   context.pages().forEach(watch);
   context.on('page', watch);
+  context.on('requestfinished', (r) => { if (/poi_traffic_events|facebook\.(com|net)/.test(r.url())) state.leaked.push(r.method() + ' ' + new URL(r.url()).hostname); });
   await context.route('**/*', async (route) => {
     const req = route.request();
     const url = new URL(req.url());
@@ -71,7 +73,13 @@ async function guard(context, baseURL) {
   return state;
 }
 
-const noErrors = (state) => expect(state.errors, 'script errors on the page').toEqual([]);
+const noErrors = (state) => {
+  expect(state.errors, 'script errors on the page').toEqual([]);
+  expect(state.leaked, 'visit counting or the pixel got through').toEqual([]);
+};
+// The run log is public: these checks report counts and yes/no, never the page's numbers or text
+const strayCount = async (page) => S.strayCoordinates(await page.content(), freePlaces).length;
+const mentionsCaves = async (page) => S.CAVE_WORD.test(await bodyText(page)) || S.CAVE_WORD.test(await page.content());
 const bodyText = (page) => page.evaluate(() => document.body.innerText);
 const token = (page) => page.evaluate(() => localStorage.getItem('la_access_token'));
 const gpsText = (p) => `${Number(p.latitude).toFixed(5)}, ${Number(p.longitude).toFixed(5)}`;
@@ -92,7 +100,7 @@ test('a paid place shows no GPS, only the $4.99 unlock', async ({ page, context,
   await expect(page.locator('h1', { hasText: paid.name })).toBeVisible();
   await expect(page.getByRole('button', { name: `Unlock GPS for ${S.PRICE}` })).toBeVisible();
   await expect(page.getByText('Paid access').first()).toBeVisible();
-  expect(S.strayCoordinates(await page.content(), freePlaces), 'GPS that is not a free place').toEqual([]);
+  expect(await strayCount(page), 'GPS-looking numbers that are not a free place').toBe(0);
   noErrors(state);
 });
 
@@ -137,7 +145,7 @@ test('after paying, the GPS shows, stays after a reload, and only in that browse
   const page2 = await other.newPage();
   await page2.goto(`/#/p/${paid.id}`);
   await expect(page2.getByRole('button', { name: `Unlock GPS for ${S.PRICE}` })).toBeVisible();
-  expect(await bodyText(page2)).not.toContain(gpsText(FAKE_GPS));
+  expect((await bodyText(page2)).includes(gpsText(FAKE_GPS)), 'the other browser shows the GPS').toBe(false);
   expect(await token(page2)).not.toBe(t);
   noErrors(state);
   noErrors(otherState);
@@ -172,14 +180,13 @@ test('no caves: not on Home, not on About, and /caves goes to Home', async ({ pa
   const state = await guard(context, baseURL);
   await page.goto('/');
   await expect(page.locator('a[href^="#/c/"]').first()).toBeVisible();
-  expect(await bodyText(page)).not.toMatch(S.CAVE_WORD);
-  expect(await page.content()).not.toMatch(S.CAVE_WORD);
+  expect(await mentionsCaves(page), 'Home mentions caves').toBe(false);
   await page.goto('/#/about');
   await expect(page.getByText('Our mission')).toBeVisible();
-  expect(await bodyText(page)).not.toMatch(S.CAVE_WORD);
+  expect(await mentionsCaves(page), 'About mentions caves').toBe(false);
   await page.goto('/#/c/caves');
   await page.waitForTimeout(1000);
-  expect(await bodyText(page)).not.toMatch(S.CAVE_WORD);
+  expect(S.CAVE_WORD.test(await bodyText(page)), '#/c/caves mentions caves').toBe(false);
   const r = await request.get('/caves', { maxRedirects: 0 });
   expect([301, 302, 307, 308]).toContain(r.status());
   expect(new URL(r.headers().location, baseURL).pathname).toBe('/');
@@ -190,7 +197,7 @@ test('a paid place page for Google shows no GPS, and its unlock opens checkout f
   const state = await guard(context, baseURL);
   await page.goto(`/places/${S.toSlug(paid.name)}`);
   await expect(page.locator('h1', { hasText: paid.name })).toBeVisible();
-  expect(S.strayCoordinates(await page.content(), freePlaces), 'GPS that is not a free place').toEqual([]);
+  expect(await strayCount(page), 'GPS-looking numbers that are not a free place').toBe(0);
   await page.getByRole('button', { name: `Unlock GPS for ${S.PRICE}` }).click();
   await page.waitForURL(/^https:\/\/checkout\.stripe\.com\//);
   const start = state.calls.find((c) => c.action === 'start');
@@ -202,6 +209,6 @@ test('a free place page for Google shows its GPS', async ({ page, context, baseU
   const state = await guard(context, baseURL);
   await page.goto(`/places/${S.toSlug(free.name)}`);
   await expect(page.locator('h1', { hasText: free.name })).toBeVisible();
-  expect(await page.content()).toContain(String(free.latitude));
+  expect((await page.content()).includes(String(free.latitude)), 'the free GPS is missing').toBe(true);
   noErrors(state);
 });
