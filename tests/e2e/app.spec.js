@@ -217,17 +217,17 @@ test('a free place page for Google shows its GPS', async ({ page, context, baseU
 });
 
 
-test('a link tag (?s=) goes with every visit event, and a place type link with Facebook\'s ?fbclid still opens', async ({ page, context, baseURL }) => {
+test('a link tag (?from=) goes with every visit event, and a place type link with Facebook\'s ?fbclid still opens', async ({ page, context, baseURL }) => {
   const state = await guard(context, baseURL);
   // Facebook adds ?fbclid=... to links; the place type page used to send that visitor to Home
-  await page.goto('/camp?s=Test-Tag_1&fbclid=test123');
+  await page.goto('/camp?from=Test-Tag_1&fbclid=test123');
   await expect.poll(() => state.traffic.some((r) => r.event_type === 'category_view' && r.event_metadata && r.event_metadata.category),
     { message: 'the place type list did not open' }).toBe(true);
   expect(new URL(page.url()).hash, 'the page moved away from the place type list').toMatch(/^#\/c\/[a-z-]+$/);
   expect(state.traffic.every((r) => r.event_metadata && r.event_metadata.src === 'test-tag-1'), 'an event is missing the link tag').toBe(true);
   // The place pages for Google keep the tag too (a new tab, so the visit starts fresh)
   const other = await context.newPage();
-  await other.goto(`/places/${S.toSlug(free.name)}?s=place-test`);
+  await other.goto(`/places/${S.toSlug(free.name)}?from=place-test`);
   await expect(other.locator('h1', { hasText: free.name })).toBeVisible();
   await expect.poll(() => state.traffic.some((r) => r.event_metadata && r.event_metadata.src === 'place-test'),
     { message: 'the place page did not send the link tag' }).toBe(true);

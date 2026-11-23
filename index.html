@@ -494,7 +494,7 @@ const visitorId = (() => {
 
 // Facebook adds "?fbclid=..." to links it opens, and the place type short links (/camp and the others)
 // carry that after the "#", which sent visitors to Home instead of the list. Anything after a "?" in the
-// "#" part moves back into the normal query, so the right page opens and a link tag (?s=...) is still read.
+// "#" part moves back into the normal query, so the right page opens and a link tag (?from=...) is still read.
 (function moveQueryOutOfHash() {
   try {
     const h = location.hash, i = h.indexOf('?');
@@ -506,14 +506,14 @@ const visitorId = (() => {
   } catch (e) { /* never break the app */ }
 })();
 
-// Link tag: ?s=<name> at the end of a link made with the link maker on the Traffic page
-// (localamerica.us/r forwards to ?s=r). Saved with every event of the visit, so the Traffic
-// scoreboard can rank where visitors come from. Only lowercase letters, numbers and dashes are kept.
+// Link tag: ?from=<name> at the end of a link made with the link maker on the Traffic page (not ?s=,
+// which the place pages already use). Saved with every event of the visit, so the Traffic scoreboard can
+// rank where visitors come from. Only lowercase letters, numbers and dashes are kept.
 const linkTag = (() => {
   try {
     const stored = sessionStorage.getItem('la_src');
     if (stored !== null) return stored || null;
-    let t = ''; try { t = new URLSearchParams(location.search).get('s') || ''; } catch (e) { t = ''; }
+    let t = ''; try { t = new URLSearchParams(location.search).get('from') || ''; } catch (e) { t = ''; }
     t = t.toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40).replace(/-+$/, '');
     sessionStorage.setItem('la_src', t);
     return t || null;

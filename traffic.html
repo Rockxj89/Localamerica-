@@ -562,21 +562,21 @@ function render() {
 
 // ================= LINK MAKER (scoreboard) =================
 // A tag is the name cut down to lowercase letters, numbers and dashes. The app (index.html) and the place
-// pages (place-page.js) save ?s=<tag> with every event of the visit; traffic_links() counts them.
+// pages (place-page.js) save ?from=<tag> with every event of the visit; traffic_links() counts them.
 const makeTag = (name) => String(name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40).replace(/-+$/, '');
-const linkName = (t) => (t === 'r' ? 'Reddit short link (/r)' : String(t || '').split('-').filter(Boolean).map((w) => w[0].toUpperCase() + w.slice(1)).join(' '));
+const linkName = (t) => (String(t || '').split('-').filter(Boolean).map((w) => w[0].toUpperCase() + w.slice(1)).join(' '));
 
 function taggedLink(name, raw) {
   const tag = makeTag(name);
   if (!tag) return { error: String(name || '').trim() ? 'Use letters or numbers in the name.' : '' };
-  if (tag === 'r') return { error: 'Pick a longer name ("r" is the Reddit short link).' };
   const text = String(raw || '').trim();
   let u;
   try { u = new URL(/^https?:\/\//i.test(text) ? text : 'https://' + (text || 'localamerica.us/')); } catch (e) { return { error: "That doesn't look like a link." }; }
   if (!/^(www\.)?localamerica\.us$/i.test(u.hostname)) return { error: 'Paste a localamerica.us link.' };
   if (u.pathname === '/r') return { error: 'That is the Reddit short link. Paste a place or place type link instead.' };
+  if (u.pathname.startsWith('/near/')) return { error: "Town pages don't count visits. Paste a place or place type link instead." };
   const out = new URL('https://localamerica.us' + u.pathname);
-  out.searchParams.set('s', tag);
+  out.searchParams.set('from', tag);
   const hash = u.hash.split('?')[0];
   return { tag, link: out.toString() + (hash.length > 2 ? hash : '') };
 }

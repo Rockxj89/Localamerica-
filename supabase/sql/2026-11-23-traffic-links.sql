@@ -1,6 +1,6 @@
 -- Scoreboard (Nov 23, 2026): traffic_links() feeds the "Scoreboard" section of the private Traffic page.
 --
--- Links made with the Traffic page's link maker end in ?s=<tag> (localamerica.us/r is ?s=r). The app
+-- Links made with the Traffic page's link maker end in ?from=<tag> (?s= is taken by the place pages). The app
 -- (index.html) and the place pages (place-page.js) save that tag as event_metadata.src on every event of
 -- the visit. This function counts visits, people, place views and unlock taps per tag, next to each site's
 -- visits without a tag (the same site names as "Where visitors come from" in traffic_summary), for the

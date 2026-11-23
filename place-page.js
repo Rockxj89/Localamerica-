@@ -60,13 +60,13 @@
     } catch (e) { return null; }
   })();
 
-  // Link tag (?s=...) from the link maker on the Traffic page, kept for the whole visit, same as the app
+  // Link tag (?from=...) from the link maker on the Traffic page, kept for the whole visit, same as the app
   var linkTag = (function () {
     try {
       var stored = sessionStorage.getItem('la_src');
       if (stored !== null) return stored || null;
       var t = '';
-      try { t = new URLSearchParams(location.search).get('s') || ''; } catch (e) { t = ''; }
+      try { t = new URLSearchParams(location.search).get('from') || ''; } catch (e) { t = ''; }
       t = t.toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40).replace(/-+$/, '');
       sessionStorage.setItem('la_src', t);
       return t || null;
