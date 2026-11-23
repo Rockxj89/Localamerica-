@@ -5,12 +5,15 @@
 -- the page (the app shows photos in row order). The storage file behind row 206 stays in the
 -- bucket; nothing points to it.
 -- Card Maker cards point at photo rows and are deleted along with them (ON DELETE CASCADE),
--- so this refuses to run if any card uses row 206 (none did on Nov 23).
+-- so this refuses to run if any card uses row 206 (none did on Nov 23), and it locks the row
+-- first so no card can be saved on it while this runs.
 -- Undo: 2026-11-23-mud-hole-8-duplicate-photo.undo.sql
 do $$
 declare
   n int;
 begin
+  perform 1 from public.poi_location_photos where id = 206 for update;
+
   if exists (select 1 from public.poi_card_maker_cards where photo_id = 206) then
     raise exception 'a Card Maker card uses photo row 206; not removing it';
   end if;
