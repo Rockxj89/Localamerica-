@@ -22,7 +22,11 @@ test.beforeAll(async () => {
 // Sends test traffic only where it's harmless, and answers checkout calls with a pretend checkout.
 async function guard(context, baseURL) {
   const base = new URL(baseURL).origin;
-  const state = { calls: [], unlocked: {}, sessionId: 'cs_test_pretend123', placeId: null, stopped: [] };
+  const state = { calls: [], unlocked: {}, sessionId: 'cs_test_pretend123', placeId: null, stopped: [], errors: [] };
+  // Any script error on a page fails the test (checked by noErrors at the end of each test)
+  const watch = (pg) => pg.on('pageerror', (e) => state.errors.push(String(e.message || e)));
+  context.pages().forEach(watch);
+  context.on('page', watch);
   await context.route('**/*', async (route) => {
     const req = route.request();
     const url = new URL(req.url());
@@ -55,7 +59,7 @@ async function guard(context, baseURL) {
       return route.fulfill({ path: require('path').join(process.env.LA_LOCAL_CDN_DIR, 'supabase.js'), contentType: 'text/javascript' });
     }
     if (process.env.LA_LOCAL_CDN_DIR && (url.hostname === 'cdn.tailwindcss.com' || url.hostname.startsWith('fonts.'))) {
-      return route.fulfill({ status: 200, contentType: 'text/javascript', body: '' });
+      return route.fulfill({ status: 200, contentType: 'text/javascript', body: 'window.tailwind = window.tailwind || {};' });
     }
     if (url.origin === base || ALLOWED_HOSTS.has(url.hostname)) {
       if (req.resourceType() === 'image' || url.pathname.startsWith('/_vercel/image')) return route.abort();
@@ -67,26 +71,29 @@ async function guard(context, baseURL) {
   return state;
 }
 
+const noErrors = (state) => expect(state.errors, 'script errors on the page').toEqual([]);
 const bodyText = (page) => page.evaluate(() => document.body.innerText);
 const token = (page) => page.evaluate(() => localStorage.getItem('la_access_token'));
 const gpsText = (p) => `${Number(p.latitude).toFixed(5)}, ${Number(p.longitude).toFixed(5)}`;
 
 test('a free place shows its GPS', async ({ page, context, baseURL }) => {
-  await guard(context, baseURL);
+  const state = await guard(context, baseURL);
   await page.goto(`/#/p/${free.id}`);
   await expect(page.locator('h1', { hasText: free.name })).toBeVisible();
   await expect(page.getByText(gpsText(free)).first()).toBeVisible();
   await expect(page.getByText('Free access').first()).toBeVisible();
   await expect(page.getByText(`Unlock GPS for ${S.PRICE}`)).toHaveCount(0);
+  noErrors(state);
 });
 
 test('a paid place shows no GPS, only the $4.99 unlock', async ({ page, context, baseURL }) => {
-  await guard(context, baseURL);
+  const state = await guard(context, baseURL);
   await page.goto(`/#/p/${paid.id}`);
   await expect(page.locator('h1', { hasText: paid.name })).toBeVisible();
   await expect(page.getByRole('button', { name: `Unlock GPS for ${S.PRICE}` })).toBeVisible();
   await expect(page.getByText('Paid access').first()).toBeVisible();
   expect(S.strayCoordinates(await page.content(), freePlaces), 'GPS that is not a free place').toEqual([]);
+  noErrors(state);
 });
 
 test('the unlock button opens a Stripe checkout for that place, tied to this browser', async ({ page, context, baseURL }) => {
@@ -99,6 +106,7 @@ test('the unlock button opens a Stripe checkout for that place, tied to this bro
   expect(Number(start.locationId)).toBe(Number(paid.id));
   expect(start.token).toMatch(/^[a-f0-9]{64}$/);
   expect(start.returnUrl.startsWith(new URL(baseURL).origin)).toBe(true);
+  noErrors(state);
 });
 
 test('after paying, the GPS shows, stays after a reload, and only in that browser', async ({ browser, baseURL }) => {
@@ -131,13 +139,15 @@ test('after paying, the GPS shows, stays after a reload, and only in that browse
   await expect(page2.getByRole('button', { name: `Unlock GPS for ${S.PRICE}` })).toBeVisible();
   expect(await bodyText(page2)).not.toContain(gpsText(FAKE_GPS));
   expect(await token(page2)).not.toBe(t);
+  noErrors(state);
+  noErrors(otherState);
   await buyer.close();
   await other.close();
 });
 
 test('Near me shows only the closest 5, nearest first', async ({ browser, baseURL }) => {
   const context = await browser.newContext({ geolocation: S.AVA, permissions: ['geolocation'] });
-  await guard(context, baseURL);
+  const state = await guard(context, baseURL);
   const page = await context.newPage();
   await page.goto('/#/c/camp');
   await page.getByRole('button', { name: 'Near me' }).click();
@@ -154,11 +164,12 @@ test('Near me shows only the closest 5, nearest first', async ({ browser, baseUR
   const camps = places.filter((p) => p.category === 'Established campsites' && miles[p.id] != null && miles[p.id] <= S.NEAR_MILES);
   const farthestShown = Math.max(...shownIds.map((id) => miles[id]));
   for (const p of camps) if (!shownIds.includes(p.id)) expect(miles[p.id], `${p.name} is closer than a place shown`).toBeGreaterThanOrEqual(farthestShown);
+  noErrors(state);
   await context.close();
 });
 
 test('no caves: not on Home, not on About, and /caves goes to Home', async ({ page, context, baseURL, request }) => {
-  await guard(context, baseURL);
+  const state = await guard(context, baseURL);
   await page.goto('/');
   await expect(page.locator('a[href^="#/c/"]').first()).toBeVisible();
   expect(await bodyText(page)).not.toMatch(S.CAVE_WORD);
@@ -172,6 +183,7 @@ test('no caves: not on Home, not on About, and /caves goes to Home', async ({ pa
   const r = await request.get('/caves', { maxRedirects: 0 });
   expect([301, 302, 307, 308]).toContain(r.status());
   expect(new URL(r.headers().location, baseURL).pathname).toBe('/');
+  noErrors(state);
 });
 
 test('a paid place page for Google shows no GPS, and its unlock opens checkout for that place', async ({ page, context, baseURL }) => {
@@ -183,11 +195,13 @@ test('a paid place page for Google shows no GPS, and its unlock opens checkout f
   await page.waitForURL(/^https:\/\/checkout\.stripe\.com\//);
   const start = state.calls.find((c) => c.action === 'start');
   expect(Number(start.locationId)).toBe(Number(paid.id));
+  noErrors(state);
 });
 
 test('a free place page for Google shows its GPS', async ({ page, context, baseURL }) => {
-  await guard(context, baseURL);
+  const state = await guard(context, baseURL);
   await page.goto(`/places/${S.toSlug(free.name)}`);
   await expect(page.locator('h1', { hasText: free.name })).toBeVisible();
   expect(await page.content()).toContain(String(free.latitude));
+  noErrors(state);
 });
