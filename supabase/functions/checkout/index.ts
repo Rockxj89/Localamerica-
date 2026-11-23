@@ -110,9 +110,10 @@ async function verifyRow(row: any, tokenHash: string) {
     console.error("Paid session with unexpected amount", s.id, s.amount_total, s.currency);
     return false;
   }
+  // The buyer's email stays with Stripe only (owner, Nov 23, 2026): the Privacy page says purchase
+  // records hold no name or email, so nothing from customer_details is saved here.
   await db.from("poi_customer_access").update({
     status: "active",
-    user_email: s.customer_details?.email ?? row.user_email ?? null,
     stripe_customer_id: typeof s.customer === "string" ? s.customer : s.customer?.id ?? null,
     stripe_payment_intent_id: typeof s.payment_intent === "string" ? s.payment_intent : s.payment_intent?.id ?? null,
     granted_at: row.granted_at ?? new Date().toISOString(),

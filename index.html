@@ -1179,7 +1179,7 @@ function viewAbout() {
 function viewSafety() {
   const sections = [
     ['1. Informational purposes only', 'Local America provides field notes, GPS coordinates, maps, route suggestions, and links to media for general informational and entertainment purposes only. Information may be incomplete, inaccurate, outdated, or affected by changing conditions. No guarantee is made about accuracy, completeness, safety, access, or reliability.'],
-    ['2. Outdoor activities involve serious risk', 'Off-roading, four-wheeling, hiking, camping, swimming, caving, and other outdoor activities can result in property damage, serious injury, or death. By using this Service, you knowingly and voluntarily accept the risks connected with these activities and with traveling to any location listed here.'],
+    ['2. Outdoor activities involve serious risk', 'Off-roading, four-wheeling, hiking, camping, swimming, rappelling, target shooting, and other outdoor activities can result in property damage, serious injury, or death. By using this Service, you knowingly and voluntarily accept the risks connected with these activities and with traveling to any location listed here.'],
     ['3. Verify everything before you travel', 'GPS readings can vary because of weather, terrain, device hardware, and signal conditions. Never rely only on this Service for navigation. Check current official forestry maps, closures, access rules, trail and road conditions, and weather. Carry appropriate navigation, communication, recovery, and emergency supplies. Evaluate conditions in person before proceeding.'],
     ['4. Respect boundaries and access rules', 'This Service does not grant permission, a license, or a right to enter any property. Land ownership, public and private boundaries, closures, and access regulations can change. Obey posted signs and all applicable federal, state, and local laws. You are responsible for avoiding trespass and for any fines, citations, or legal consequences related to your conduct.'],
     ['5. Responsibility and limitation of liability', 'To the fullest extent permitted by law, the creator, owners, and developers of this Service are not responsible for injury, death, loss, damage, accidents, vehicle damage, property damage, emergency or rescue costs, fines, citations, or other consequences arising directly or indirectly from use of, or reliance on, the information in this Service. You are solely responsible for your own safety and the safety of your passengers and companions.'],
@@ -1218,20 +1218,22 @@ function viewSafety() {
       <p class="mt-3 t-base leading-8 text-secondary">By accessing or using this Service, you acknowledge that you have read and understood this notice and agree to use the information at your own risk. If you do not agree, do not use the Service.</p>
       <p class="mt-4 t-sm text-secondary">This notice is general information, not legal advice. Consider having a licensed attorney review it for your specific situation.</p>
     </section>
-    <a href="#/" class="${btnTertiary}">${icon('back', 'ico-sm')} Return to the map</a>
+    <a href="#/" class="${btnTertiary}">${icon('back', 'ico-sm')} Back to Home</a>
   </article>`;
 }
 
 // Plain-language privacy page (linked from the footer of every page)
 function viewPrivacy() {
   const sections = [
-    ['What the app records', 'Local America records basic usage events so the owner can see how the app is used. These include opening the app, viewing a place or place type, tapping Near me, and the purchase steps. Each record can include the kind of event, the place it was about, the browser and device type (for example, Safari on iPhone), the website you came from if your browser shares it (such as Facebook), and random codes for your browser and visit. Records do not include your name or email address.'],
+    ['What the app records', 'Local America records basic usage events so the owner can see how the app is used. These include opening the app, viewing a place or place type, tapping Near me, and the purchase steps. Each record can include the kind of event, the place it was about, the browser and device type (for example, Safari on iPhone), the website you came from if your browser shares it (such as Facebook), and random codes for your browser and visit. If something on a page breaks, the app also records the error message and the page it happened on, with anything that could be GPS removed, so it can be fixed. Records do not include your name or email address.'],
     ['Your location', 'Near me asks your phone for its location. Your browser asks for permission first, and you can say no. Your location is sent to our database only to work out how far away each place is. The app does not save your location, and the coordinates are never shown to other visitors.'],
     ['Meta (Facebook) Pixel', 'The app uses the Meta Pixel, which reports page views and key steps, such as viewing a place or starting checkout, to Meta. Meta uses this to measure ads and may use it to show ads. Meta may set its own cookies to do this. You can adjust ad settings in your Facebook account, or block the pixel with a browser privacy or ad-blocking tool. Meta’s own privacy policy explains what it does with this information.'],
     ['Payments', 'Paid GPS unlocks are processed by Stripe through Stripe Checkout. Local America never sees or stores your card number. Stripe handles payment details under its own privacy policy. After you pay, a random code is saved in your browser so the unlock works on that device. Only a scrambled version of that code is kept on our side. Clearing your browser data removes the saved unlock.'],
     ['Stored items in your browser', 'The app saves a few items in your browser: a random visitor code, a random unlock code, and a visit code that lasts until you close the tab. A visit count also stays in your browser so the app knows when to show the home-screen card. These help the app remember your unlock and count visits without using your name.'],
+    ['Internet (IP) addresses', 'Like any website, the companies that run the app and supply its fonts and code (such as Vercel, Supabase and Google) see your device’s IP address when the app loads, and may keep it in their logs. Stripe and Meta see it too, under their own privacy policies. Local America’s own records don’t include it.'],
+    ['How long things are kept', 'Visit and error records are deleted automatically after 2 years. Purchase records (the place you unlocked, when, and Stripe’s payment reference) are kept as long as the app runs, so your unlock keeps working. Private backup copies may be kept longer.'],
     ['Your choices', `You can turn off location access in your phone or browser settings, block the Meta Pixel with a privacy tool, or clear your browser data to remove the saved items above. For questions about this page or your information, email ${CFG.CONTACT_EMAIL}.`],
-    ['Changes to this page', 'If the way the app collects information changes, this page will be updated. Last updated November 12, 2026.']
+    ['Changes to this page', 'If the way the app collects information changes, this page will be updated. Last updated November 23, 2026.']
   ];
   return `
   <article class="mx-auto max-w-3xl space-y-8 text-primary">
@@ -1252,7 +1254,7 @@ function viewPrivacy() {
         <p class="t-base leading-8 text-secondary">${s[1]}</p>
       </section>`).join('')}
     </div>
-    <a href="#/" class="${btnTertiary}">${icon('back', 'ico-sm')} Return to the map</a>
+    <a href="#/" class="${btnTertiary}">${icon('back', 'ico-sm')} Back to Home</a>
   </article>`;
 }
 
