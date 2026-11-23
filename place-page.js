@@ -1,4 +1,4 @@
-// Runs on the Google place pages (/places/cave-4): visit counting for the Traffic page,
+// Runs on the Google place pages (/places/campsite-8): visit counting for the Traffic page,
 // the Meta pixel sales steps, error logging, and the Unlock GPS button.
 // Uses the same browser codes as the app (la_vid, la_sid, la_access_token), so a visitor who
 // lands here from Google and then opens the app is one visitor, and an unlock bought here

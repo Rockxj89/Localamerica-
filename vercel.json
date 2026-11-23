@@ -4,11 +4,16 @@
       "source": "/r",
       "destination": "/?s=r",
       "permanent": false
+    },
+    {
+      "source": "/caves",
+      "destination": "/",
+      "permanent": true
     }
   ],
   "rewrites": [
     {
-      "source": "/:slug(camp|swimming|caves|views|bluffs|forgotten|frogs|legends|buildings|dead-ends|mud|hiking|popular|rocks|wheeling|unmarked|yardage|long-shot)",
+      "source": "/:slug(camp|swimming|views|bluffs|forgotten|frogs|legends|buildings|dead-ends|mud|hiking|popular|rocks|wheeling|unmarked|yardage|long-shot)",
       "destination": "/api/category?c=:slug"
     },
     {

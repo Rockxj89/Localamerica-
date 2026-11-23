@@ -7,12 +7,12 @@
 <meta name="theme-color" content="#f7f9fa">
 <meta name="mobile-web-app-capable" content="yes">
 <title>Local America</title>
-<meta name="description" content="Local America helps you find public-land spots in the Mark Twain National Forest: campsites, caves, swimming holes, scenic views and more. Browse photos and descriptions, and find the 10 places closest to you.">
+<meta name="description" content="Local America helps you find public-land spots in the Mark Twain National Forest: campsites, swimming holes, scenic views and more. Browse photos and descriptions, and find the 5 places closest to you.">
 <!-- Link preview (Facebook, Messenger, texts): shows the logo when the link is shared -->
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Local America">
 <meta property="og:title" content="Local America">
-<meta property="og:description" content="Local America helps you find public-land spots in the Mark Twain National Forest: campsites, caves, swimming holes, scenic views and more. Browse photos and descriptions, and find the 10 places closest to you.">
+<meta property="og:description" content="Local America helps you find public-land spots in the Mark Twain National Forest: campsites, swimming holes, scenic views and more. Browse photos and descriptions, and find the 5 places closest to you.">
 <meta property="og:url" content="https://localamerica.us/">
 <meta property="og:image" content="https://localamerica.us/Notes_261110_202947_da0.jpg">
 <meta property="og:image:width" content="512">
@@ -258,8 +258,8 @@ const CFG = {
   FACEBOOK_URL: 'https://www.facebook.com/share/1QRkXzhmJo/',
   NEAR_MILES: 75,
   PAGE_SIZE: 24,
-  // Near me inside a place type shows only the closest 10 (no "show more")
-  NEAR_PAGE_SIZE: 10
+  // Near me inside a place type shows only the closest 5 (no "show more")
+  NEAR_PAGE_SIZE: 5
 };
 
 // ================= ICONS (same set as the Glide guide) =================
@@ -305,7 +305,6 @@ document.querySelectorAll('[data-icon]').forEach((el) => {
 function categoryIcon(c) {
   if (c === 'Swimming holes') return 'waves';
   if (c === 'Established campsites') return 'tent';
-  if (c === 'Caves') return 'mountain';
   if (c === 'Scenic views') return 'tree';
   if (String(c).includes('trail')) return 'feet';
   if (c === 'Buildings and stores') return 'landmark';
@@ -320,7 +319,6 @@ const CATEGORY_HOME_PHOTOS = {
 
 const CATEGORY_DESCRIPTIONS = {
   'Buildings and stores': 'Old buildings, shops, and structures',
-  'Caves': 'Caverns, overhangs, and tucked-away openings',
   'Dead end trails': 'Trails that finish away from a through route',
   'Established campsites': 'Known places to set up camp',
   'Forgotten grounds': 'Overgrown or quiet places with a story',
@@ -416,7 +414,7 @@ const CATEGORY_LABELS = {
 };
 const catLabel = (c) => CATEGORY_LABELS[c] || c;
 const CATEGORY_SLUGS = {
-  'Buildings and stores': 'buildings', 'Caves': 'caves', 'Dead end trails': 'dead-ends',
+  'Buildings and stores': 'buildings', 'Dead end trails': 'dead-ends',
   'Established campsites': 'camp', 'Forgotten grounds': 'forgotten', 'Frog ponds': 'frogs',
   'Legends/lore': 'legends', 'Mud holes/trails': 'mud', 'Hiking Trails': 'hiking', 'Non-vehicle trails': 'hiking',
   'Popular locations': 'popular', 'Rappelling bluffs': 'bluffs', 'Wheeling': 'wheeling', 'Rocks/Flex': 'wheeling',
@@ -985,7 +983,7 @@ function viewList(cat) {
   const nearOn = !!cat && state.catNear;
   const ready = state.locStatus === 'ready' && !!state.distances;
   if (nearOn && ready) {
-    // Near me inside a place type: only the closest 10 within the radius, no "show more"
+    // Near me inside a place type: only the closest 5 within the radius, no "show more"
     items = items.filter((l) => (state.distances[l.id] ?? Infinity) <= CFG.NEAR_MILES)
                  .sort((a, b) => state.distances[a.id] - state.distances[b.id])
                  .slice(0, CFG.NEAR_PAGE_SIZE);
@@ -1148,7 +1146,7 @@ function viewAbout() {
     ${logoSvg('0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 6 6 6 0 -4.2')}
     <section class="space-y-3">
       <h2 class="${h2}">Our mission</h2>
-      <p class="t-sm text-secondary">Local America helps anyone find the closest place to get outside today, whether that’s a swimming hole, a campsite, a cave, a bluff, or a muddy trail for the truck. It isn’t a trip planner. It’s built for the spur-of-the-moment “let’s go” outing.</p>
+      <p class="t-sm text-secondary">Local America helps anyone find the closest place to get outside today, whether that’s a swimming hole, a campsite, a bluff, or a muddy trail for the truck. It isn’t a trip planner. It’s built for the spur-of-the-moment “let’s go” outing.</p>
       <p class="t-sm text-secondary">We start in the Mark Twain National Forest region and will grow to other areas over time. We ask everyone to explore safely and responsibly: leave no trash, and don’t make new trails.</p>
     </section>
     ${principles.map((p) => `

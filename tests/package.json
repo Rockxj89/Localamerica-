@@ -1,0 +1,13 @@
+{
+  "name": "localamerica-tests",
+  "private": true,
+  "description": "Automatic checks for Local America (see README.md). Not part of the website.",
+  "scripts": {
+    "unit": "cd .. && node --test \"tests/unit/*.test.js\" && deno test --allow-env tests/unit/checkout.test.ts",
+    "browser": "playwright test",
+    "live": "cd .. && node --test \"tests/live/*.test.js\""
+  },
+  "devDependencies": {
+    "@playwright/test": "1.65.1"
+  }
+}
