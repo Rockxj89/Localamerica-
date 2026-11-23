@@ -492,6 +492,34 @@ const visitorId = (() => {
   } catch (e) { return null; }
 })();
 
+// Facebook adds "?fbclid=..." to links it opens, and the place type short links (/camp and the others)
+// carry that after the "#", which sent visitors to Home instead of the list. Anything after a "?" in the
+// "#" part moves back into the normal query, so the right page opens and a link tag (?from=...) is still read.
+(function moveQueryOutOfHash() {
+  try {
+    const h = location.hash, i = h.indexOf('?');
+    if (i < 0) return;
+    const q = new URLSearchParams(location.search);
+    new URLSearchParams(h.slice(i + 1)).forEach((v, k) => { if (!q.has(k)) q.set(k, v); });
+    const qs = q.toString();
+    history.replaceState(null, '', location.pathname + (qs ? '?' + qs : '') + h.slice(0, i));
+  } catch (e) { /* never break the app */ }
+})();
+
+// Link tag: ?from=<name> at the end of a link made with the link maker on the Traffic page (not ?s=,
+// which the place pages already use). Saved with every event of the visit, so the Traffic scoreboard can
+// rank where visitors come from. Only lowercase letters, numbers and dashes are kept.
+const linkTag = (() => {
+  try {
+    const stored = sessionStorage.getItem('la_src');
+    if (stored !== null) return stored || null;
+    let t = ''; try { t = new URLSearchParams(location.search).get('from') || ''; } catch (e) { t = ''; }
+    t = t.toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40).replace(/-+$/, '');
+    sessionStorage.setItem('la_src', t);
+    return t || null;
+  } catch (e) { return null; }
+})();
+
 // Where this visit came from (Facebook, Instagram...), remembered for the whole visit.
 const landingReferrer = (() => {
   try {
@@ -537,6 +565,7 @@ async function logEvent(type, locationId = null, meta = {}) {
   const dbLocation = ['place_view', 'open_in_maps', 'unlock_gps_click', 'checkout_start'].includes(type) ? locationId : null;
   if (dbLocation == null && locationId != null) meta = { ...meta, location_id: locationId };
   if (visitorId) meta = { ...meta, vid: visitorId };
+  if (linkTag) meta = { ...meta, src: linkTag };
   const row = {
     event_type: type, location_id: dbLocation, visitor_session_hash: sessionId,
     browser_type: browserLabel, referrer_host: landingReferrer,
@@ -1225,7 +1254,7 @@ function viewSafety() {
 // Plain-language privacy page (linked from the footer of every page)
 function viewPrivacy() {
   const sections = [
-    ['What the app records', 'Local America records basic usage events so the owner can see how the app is used. These include opening the app, viewing a place or place type, tapping Near me, and the purchase steps. Each record can include the kind of event, the place it was about, the browser and device type (for example, Safari on iPhone), the website you came from if your browser shares it (such as Facebook), and random codes for your browser and visit. If something on a page breaks, the app also records the error message and the page it happened on, with anything that could be GPS removed, so it can be fixed. Records do not include your name or email address.'],
+    ['What the app records', 'Local America records basic usage events so the owner can see how the app is used. These include opening the app, viewing a place or place type, tapping Near me, and the purchase steps. Each record can include the kind of event, the place it was about, the browser and device type (for example, Safari on iPhone), the website you came from if your browser shares it (such as Facebook), the short tag at the end of the link you followed if it had one (such as a link posted in a Facebook group), and random codes for your browser and visit. If something on a page breaks, the app also records the error message and the page it happened on, with anything that could be GPS removed, so it can be fixed. Records do not include your name or email address.'],
     ['Your location', 'Near me asks your phone for its location. Your browser asks for permission first, and you can say no. Your location is sent to our database only to work out how far away each place is. The app does not save your location, and the coordinates are never shown to other visitors.'],
     ['Meta (Facebook) Pixel', 'The app uses the Meta Pixel, which reports page views and key steps, such as viewing a place or starting checkout, to Meta. Meta uses this to measure ads and may use it to show ads. Meta may set its own cookies to do this. You can adjust ad settings in your Facebook account, or block the pixel with a browser privacy or ad-blocking tool. Meta’s own privacy policy explains what it does with this information.'],
     ['Payments', 'Paid GPS unlocks are processed by Stripe through Stripe Checkout. Local America never sees or stores your card number. Stripe handles payment details under its own privacy policy. After you pay, a random code is saved in your browser so the unlock works on that device. Only a scrambled version of that code is kept on our side. Clearing your browser data removes the saved unlock.'],
