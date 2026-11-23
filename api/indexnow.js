@@ -22,11 +22,13 @@ function allowed(req) {
   return got.length === want.length && crypto.timingSafeEqual(got, want);
 }
 
-async function fetchWithTimeout(url, opts) {
+// Fetches a link and reads its answer, all within TIMEOUT_MS.
+async function call(url, opts, read) {
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), TIMEOUT_MS);
   try {
-    return await fetch(url, { ...opts, signal: ctl.signal });
+    const r = await fetch(url, { ...opts, signal: ctl.signal });
+    return { ok: r.ok, status: r.status, body: await read(r) };
   } finally {
     clearTimeout(timer);
   }
@@ -48,9 +50,9 @@ module.exports = async (req, res) => {
   // 1. The page list, exactly as the sitemap builds it.
   let list;
   try {
-    const r = await fetchWithTimeout(PAGE_LIST, { headers: { Accept: 'application/json' } });
-    if (!r.ok) throw new Error(`page list answered ${r.status}`);
-    list = await r.json();
+    const a = await call(PAGE_LIST, { headers: { Accept: 'application/json' } }, (r) => (r.ok ? r.json() : null));
+    if (!a.ok) throw new Error(`page list answered ${a.status}`);
+    list = a.body;
   } catch (e) {
     console.error('IndexNow: could not get the page list:', e.message);
     return reply(res, 502, { ok: false, step: 'page list' });
@@ -65,9 +67,9 @@ module.exports = async (req, res) => {
   }
 
   // 2. Send it. 200 = received, 202 = received (key check still pending); anything else is a problem.
-  let status;
+  let status, why;
   try {
-    const r = await fetchWithTimeout(INDEXNOW, {
+    const a = await call(INDEXNOW, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json; charset=utf-8' },
       body: JSON.stringify({
@@ -76,13 +78,15 @@ module.exports = async (req, res) => {
         keyLocation: `${SITE}/${INDEXNOW_KEY}.txt`,
         urlList: urls
       })
-    });
-    status = r.status;
+    }, (r) => r.text().catch(() => ''));
+    status = a.status;
+    why = String(a.body || '').replace(/\s+/g, ' ').trim().slice(0, 300);
   } catch (e) {
     console.error('IndexNow: sending failed:', e.message);
     return reply(res, 502, { ok: false, step: 'send' });
   }
   const ok = status === 200 || status === 202;
-  (ok ? console.log : console.error)(`IndexNow: sent ${urls.length} pages, IndexNow answered ${status}`);
+  if (ok) console.log(`IndexNow: sent ${urls.length} pages, IndexNow answered ${status}`);
+  else console.error(`IndexNow: sent ${urls.length} pages, IndexNow answered ${status}${why ? ': ' + why : ''}`);
   return reply(res, ok ? 200 : 502, { ok, indexnow: status, pages: urls.length });
 };
