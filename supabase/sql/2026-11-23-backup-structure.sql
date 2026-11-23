@@ -8,7 +8,7 @@
 -- Returns {"sql": <script>, "tables": [public tables], "buckets": [storage buckets]}.
 -- The script rebuilds the public schema (sequences, tables, keys, checks, indexes, foreign keys,
 -- functions, views, triggers, row security, policies, grants, notes, default rights) and the
--- storage bucket settings in a fresh Supabase project. It holds no rows and no secrets.
+-- storage bucket settings in a fresh Supabase project, as one transaction. It holds no rows and no secrets.
 --
 -- Only the service role (the backup-export function) may run it.
 -- Undo: supabase/sql/2026-11-23-backup-structure.undo.sql
@@ -35,8 +35,9 @@ begin
        || to_char(now() at time zone 'UTC', 'YYYY-MM-DD HH24:MI') || ' UTC.' || nl
        || '-- Rebuilds the public schema and the storage bucket settings in a fresh Supabase project.' || nl
        || '-- Run it as postgres in an empty project, then load data/*.json (see RECOVERY.md).' || nl
-       || '-- No rows and no secrets in here.' || nl || nl
-       || 'set check_function_bodies = false;' || nl;
+       || '-- No rows and no secrets in here. It runs as one transaction: all of it or nothing.' || nl || nl
+       || 'begin;' || nl
+       || 'set local check_function_bodies = false;' || nl;
 
   s := s || nl || '-- Extensions' || nl;
   for r in select e.extname, n.nspname
@@ -312,6 +313,8 @@ begin
                      r.id, r.name, r.public, coalesce(r.file_size_limit::text, 'null'),
                      coalesce(quote_literal(r.allowed_mime_types::text) || '::text[]', 'null')) || nl;
   end loop;
+
+  s := s || nl || 'commit;' || nl;
 
   select coalesce(jsonb_agg(c.relname order by c.relname), '[]'::jsonb) into tbls
     from pg_class c join pg_namespace n on n.oid = c.relnamespace
