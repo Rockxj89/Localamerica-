@@ -11,5 +11,13 @@ select cron.unschedule('delete-old-visits')
 
 drop function if exists public.poi_delete_old_traffic();
 
--- Only if nothing else uses Supabase Cron by then (this also removes its run history):
-drop extension if exists pg_cron;
+-- Turn Supabase Cron off again only if no other job uses it by then (this also removes its run history):
+do $$
+begin
+  if to_regclass('cron.job') is not null then
+    if not exists (select 1 from cron.job) then
+      drop extension pg_cron;
+    end if;
+  end if;
+end
+$$;

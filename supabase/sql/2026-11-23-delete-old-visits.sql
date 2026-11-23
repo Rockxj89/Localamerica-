@@ -9,8 +9,9 @@
 --      job "delete-old-visits". Its run history is in cron.job_run_details.
 --   3. public.backup_structure() now writes the job too: pg_cron is left out of its plain extension
 --      list, and structure.sql ends with a block that turns pg_cron on and schedules the job again in
---      a restored Supabase project. Where pg_cron can't be used (plain Postgres, as in the restore
---      test) that block only warns, so the restore still works.
+--      a restored Supabase project. Where pg_cron isn't installed (plain Postgres, as in the restore
+--      test) that block only warns, so the restore test still works; in a Supabase project an error
+--      there stops the restore, so a missing job can't go unnoticed.
 --
 -- Nothing else changes: purchases, places, photos and the tracker limits are untouched.
 -- Visits started Nov 13, 2026, so the first rows go on Nov 13, 2028.
@@ -349,22 +350,24 @@ begin
   end loop;
 
   -- Scheduled job (pg_cron, added Nov 23, 2026): the daily delete of visit records older than 2 years.
-  -- pg_cron is only in Supabase, so the block turns it on and schedules the job there, and only warns
-  -- on plain Postgres (the restore test). Keep this schedule the same as the live job.
+  -- pg_cron is only in Supabase. The block skips it with a warning where pg_cron isn't installed
+  -- (plain Postgres, the restore test); in a Supabase project any error stops the restore, so a
+  -- missing job can't go unnoticed. Keep this schedule the same as the live job.
   if to_regprocedure('public.poi_delete_old_traffic()') is not null then
     s := s || nl || '-- Scheduled job (pg_cron): delete visit records older than 2 years, every day at 09:41 UTC.' || nl
-           || '-- Where pg_cron can''t be used (plain Postgres, as in the restore test) this only warns.' || nl
+           || '-- Skipped with a warning where pg_cron isn''t installed (plain Postgres, as in the restore test).' || nl
+           || '-- In a Supabase project it must work: an error here stops the restore. Afterwards' || nl
+           || '-- "select jobname from cron.job" should list delete-old-visits.' || nl
            || 'do $cron$' || nl
            || 'begin' || nl
+           || '  if not exists (select 1 from pg_available_extensions where name = ''pg_cron'') then' || nl
+           || '    raise warning ''pg_cron is not installed here, so the daily delete of old visit records was not scheduled'';' || nl
+           || '    return;' || nl
+           || '  end if;' || nl
            || '  create extension if not exists pg_cron with schema pg_catalog;' || nl
-           || '  begin' || nl
-           || '    grant usage on schema cron to postgres;' || nl
-           || '    grant all privileges on all tables in schema cron to postgres;' || nl
-           || '  exception when others then null; -- postgres may have these already' || nl
-           || '  end;' || nl
+           || '  grant usage on schema cron to postgres;' || nl
+           || '  grant all privileges on all tables in schema cron to postgres;' || nl
            || '  perform cron.schedule(''delete-old-visits'', ''41 9 * * *'', ''select public.poi_delete_old_traffic()'');' || nl
-           || 'exception when others then' || nl
-           || '  raise warning ''pg_cron is not available here, so the daily delete of old visit records was not scheduled (%)'', sqlerrm;' || nl
            || 'end' || nl
            || '$cron$;' || nl;
   end if;
