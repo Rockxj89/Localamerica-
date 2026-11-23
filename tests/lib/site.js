@@ -11,8 +11,9 @@ const NEAR_COUNT = 5;
 const NEAR_MILES = 75;
 const PRICE = '$4.99';
 
-// Owner's rule (Nov 21 and Nov 23, 2026): no caves in the app, not as places and not in the wording.
-const CAVE_WORD = /\bcav(e|es|ern|erns)\b/i;
+// Owner's rule (Nov 21 and Nov 23, 2026): no caves in the app, not as places and not in the wording
+// ("caving" added Nov 23, when it came out of Safety & Terms section 2).
+const CAVE_WORD = /\bcav(e|es|ern|erns|ing)\b/i;
 
 // Numbers that look like GPS in Missouri: a latitude like 36.952 or a longitude like -92.6605 or 92.6605
 // (3 or more decimals). Every one found on a public page must be a FREE place's GPS.

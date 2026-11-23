@@ -1,0 +1,392 @@
+-- 2026-11-23: visit and error records are deleted after 2 years (owner's go, Nov 23, 2026).
+--
+-- The Privacy page now says "Visit and error records are deleted automatically after 2 years."
+-- This makes it true:
+--   1. public.poi_delete_old_traffic() deletes poi_traffic_events rows (visits and page errors)
+--      older than 2 years and returns how many went. Nobody can run it through the app; only the
+--      database's own timer does.
+--   2. pg_cron (Supabase Cron) runs it every day at 09:41 UTC (3:41 a.m. Central in winter) as the
+--      job "delete-old-visits". Its run history is in cron.job_run_details.
+--   3. public.backup_structure() now writes the job too: pg_cron is left out of its plain extension
+--      list, and structure.sql ends with a block that turns pg_cron on and schedules the job again in
+--      a restored Supabase project. Where pg_cron isn't installed (plain Postgres, as in the restore
+--      test) that block only warns, so the restore test still works; in a Supabase project an error
+--      there stops the restore, so a missing job can't go unnoticed.
+--
+-- Nothing else changes: purchases, places, photos and the tracker limits are untouched.
+-- Visits started Nov 13, 2026, so the first rows go on Nov 13, 2028.
+-- Undo: supabase/sql/2026-11-23-delete-old-visits.undo.sql
+
+-- 1. Supabase Cron
+create extension if not exists pg_cron with schema pg_catalog;
+grant usage on schema cron to postgres;
+grant all privileges on all tables in schema cron to postgres;
+
+-- 2. The delete
+create or replace function public.poi_delete_old_traffic()
+returns bigint
+language plpgsql
+set search_path = pg_catalog
+as $fn$
+declare
+  n bigint;
+begin
+  delete from public.poi_traffic_events where created_at < now() - interval '2 years';
+  get diagnostics n = row_count;
+  return n;
+end
+$fn$;
+
+revoke all on function public.poi_delete_old_traffic() from public, anon, authenticated, service_role;
+
+comment on function public.poi_delete_old_traffic() is
+  'Deletes visit and error records (poi_traffic_events) older than 2 years, as the Privacy page says. Run every day by the pg_cron job delete-old-visits. Nobody else may run it.';
+
+-- 3. Every day at 09:41 UTC (scheduling the same name again only updates the job)
+select cron.schedule('delete-old-visits', '41 9 * * *', 'select public.poi_delete_old_traffic()');
+
+-- 4. backup_structure() writes the job too. Same as supabase/sql/2026-11-23-backup-structure.sql except
+--    'pg_cron' is in the skipped extensions and the "Scheduled job" block comes before commit.
+create or replace function public.backup_structure()
+returns jsonb
+language plpgsql
+stable
+set search_path = pg_catalog
+as $fn$
+declare
+  nl constant text := chr(10);
+  s text := '';
+  r record;
+  g record;
+  cols text;
+  obj text;
+  who text;
+  tbls jsonb;
+  bkts jsonb;
+begin
+  -- search_path is pg_catalog only, so every name below comes out schema-qualified (public.x).
+  s := '-- Local America database structure, written by public.backup_structure() at '
+       || to_char(now() at time zone 'UTC', 'YYYY-MM-DD HH24:MI') || ' UTC.' || nl
+       || '-- Rebuilds the public schema and the storage bucket settings in a fresh Supabase project.' || nl
+       || '-- Run it as postgres in an empty project, then load data/*.json (see RECOVERY.md).' || nl
+       || '-- No rows and no secrets in here. It runs as one transaction: all of it or nothing.' || nl || nl
+       || 'begin;' || nl
+       || 'set local check_function_bodies = false;' || nl;
+
+  s := s || nl || '-- Extensions' || nl;
+  -- pg_cron is left out here: the "Scheduled job" block at the end turns it on (plain Postgres has none).
+  for r in select e.extname, n.nspname
+             from pg_extension e join pg_namespace n on n.oid = e.extnamespace
+            where e.extname not in ('plpgsql', 'pg_stat_statements', 'supabase_vault', 'pg_graphql', 'pgsodium', 'pg_cron')
+            order by e.extname loop
+    s := s || format('create extension if not exists %I with schema %I;', r.extname, r.nspname) || nl;
+  end loop;
+
+  s := s || nl || '-- Sequences' || nl;
+  for r in select c.relname, format_type(q.seqtypid, null) as typ, q.seqincrement, q.seqmin, q.seqmax,
+                  q.seqstart, q.seqcache, q.seqcycle
+             from pg_class c
+             join pg_namespace n on n.oid = c.relnamespace
+             join pg_sequence q on q.seqrelid = c.oid
+            where n.nspname = 'public' and c.relkind = 'S'
+              and not exists (select 1 from pg_depend d
+                               where d.classid = 'pg_class'::regclass and d.objid = c.oid and d.deptype in ('i', 'e'))
+            order by c.relname loop
+    s := s || format('create sequence public.%I as %s increment by %s minvalue %s maxvalue %s start with %s cache %s%s;',
+                     r.relname, r.typ, r.seqincrement, r.seqmin, r.seqmax, r.seqstart, r.seqcache,
+                     case when r.seqcycle then ' cycle' else ' no cycle' end) || nl;
+  end loop;
+
+  s := s || nl || '-- Tables' || nl;
+  for r in select c.oid, c.relname
+             from pg_class c join pg_namespace n on n.oid = c.relnamespace
+            where n.nspname = 'public' and c.relkind = 'r'
+              and not exists (select 1 from pg_depend d
+                               where d.classid = 'pg_class'::regclass and d.objid = c.oid and d.deptype = 'e')
+            order by c.relname loop
+    select string_agg('  ' || quote_ident(a.attname) || ' ' || format_type(a.atttypid, a.atttypmod)
+                      || case when a.attgenerated = 's' then ' generated always as (' || pg_get_expr(d.adbin, d.adrelid) || ') stored'
+                              when d.adbin is not null then ' default ' || pg_get_expr(d.adbin, d.adrelid)
+                              else '' end
+                      || case a.attidentity when 'a' then ' generated always as identity'
+                                            when 'd' then ' generated by default as identity'
+                                            else '' end
+                      || case when a.attnotnull then ' not null' else '' end,
+                      ',' || nl order by a.attnum)
+      into cols
+      from pg_attribute a
+      left join pg_attrdef d on d.adrelid = a.attrelid and d.adnum = a.attnum
+     where a.attrelid = r.oid and a.attnum > 0 and not a.attisdropped;
+    s := s || format('create table public.%I (', r.relname) || nl || coalesce(cols, '') || nl || ');' || nl;
+  end loop;
+
+  s := s || nl || '-- Keys and checks' || nl;
+  for r in select c.relname, k.conname, pg_get_constraintdef(k.oid) as def
+             from pg_constraint k
+             join pg_class c on c.oid = k.conrelid
+             join pg_namespace n on n.oid = c.relnamespace
+            where n.nspname = 'public' and c.relkind = 'r' and k.contype in ('p', 'u', 'x', 'c')
+            order by c.relname, case k.contype when 'p' then 0 when 'u' then 1 when 'x' then 2 else 3 end, k.conname loop
+    s := s || format('alter table public.%I add constraint %I %s;', r.relname, r.conname, r.def) || nl;
+  end loop;
+
+  s := s || nl || '-- Indexes' || nl;
+  for r in select pg_get_indexdef(x.indexrelid) as def
+             from pg_index x
+             join pg_class i on i.oid = x.indexrelid
+             join pg_class t on t.oid = x.indrelid
+             join pg_namespace n on n.oid = t.relnamespace
+            where n.nspname = 'public' and t.relkind = 'r'
+              and not exists (select 1 from pg_constraint k
+                               where k.conindid = x.indexrelid and k.contype in ('p', 'u', 'x'))
+            order by i.relname loop
+    s := s || r.def || ';' || nl;
+  end loop;
+
+  s := s || nl || '-- Foreign keys' || nl;
+  for r in select c.relname, k.conname, pg_get_constraintdef(k.oid) as def
+             from pg_constraint k
+             join pg_class c on c.oid = k.conrelid
+             join pg_namespace n on n.oid = c.relnamespace
+            where n.nspname = 'public' and c.relkind = 'r' and k.contype = 'f'
+            order by c.relname, k.conname loop
+    s := s || format('alter table public.%I add constraint %I %s;', r.relname, r.conname, r.def) || nl;
+  end loop;
+
+  s := s || nl || '-- Which column each sequence counts for' || nl;
+  for r in select c.relname as seq, t.relname as tab, a.attname as col
+             from pg_class c
+             join pg_namespace n on n.oid = c.relnamespace
+             join pg_depend d on d.classid = 'pg_class'::regclass and d.objid = c.oid
+                             and d.refclassid = 'pg_class'::regclass and d.deptype = 'a'
+             join pg_class t on t.oid = d.refobjid
+             join pg_attribute a on a.attrelid = t.oid and a.attnum = d.refobjsubid
+            where n.nspname = 'public' and c.relkind = 'S'
+            order by 1 loop
+    s := s || format('alter sequence public.%I owned by public.%I.%I;', r.seq, r.tab, r.col) || nl;
+  end loop;
+
+  s := s || nl || '-- Functions' || nl;
+  for r in select pg_get_functiondef(p.oid) as def
+             from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+            where n.nspname = 'public' and p.prokind in ('f', 'p')
+              and not exists (select 1 from pg_depend d
+                               where d.classid = 'pg_proc'::regclass and d.objid = p.oid and d.deptype = 'e')
+            order by p.proname, p.oid loop
+    s := s || rtrim(r.def, nl || ' ') || ';' || nl || nl;
+  end loop;
+
+  s := s || '-- Views (a view that reads another view comes after it)' || nl;
+  for r in with recursive
+             vdep as (
+               select distinct rw.ev_class as v, d.refobjid as dep
+                 from pg_rewrite rw
+                 join pg_depend d on d.classid = 'pg_rewrite'::regclass and d.objid = rw.oid
+                                 and d.refclassid = 'pg_class'::regclass
+                 join pg_class dc on dc.oid = d.refobjid and dc.relkind in ('v', 'm')
+                where d.refobjid <> rw.ev_class),
+             pv as (
+               select c.oid, c.relname, c.reloptions
+                 from pg_class c join pg_namespace n on n.oid = c.relnamespace
+                where n.nspname = 'public' and c.relkind = 'v'
+                  and not exists (select 1 from pg_depend d
+                                   where d.classid = 'pg_class'::regclass and d.objid = c.oid and d.deptype = 'e')),
+             lvl (oid, depth) as (
+               select pv.oid, 0 from pv
+               union all
+               select vdep.v, lvl.depth + 1 from vdep join lvl on lvl.oid = vdep.dep where lvl.depth < 50)
+           select pv.relname, pv.reloptions, pg_get_viewdef(pv.oid, true) as def,
+                  (select max(lvl.depth) from lvl where lvl.oid = pv.oid) as depth
+             from pv
+            order by 4, 1 loop
+    s := s || format('create view public.%I%s as', r.relname,
+                     case when r.reloptions is null then ''
+                          else ' with (' || array_to_string(r.reloptions, ', ') || ')' end)
+           || nl || rtrim(rtrim(r.def, nl || ' '), ';') || ';' || nl || nl;
+  end loop;
+
+  s := s || '-- Triggers' || nl;
+  for r in select c.relname, t.tgname, t.tgenabled, pg_get_triggerdef(t.oid) as def
+             from pg_trigger t
+             join pg_class c on c.oid = t.tgrelid
+             join pg_namespace n on n.oid = c.relnamespace
+            where n.nspname = 'public' and not t.tgisinternal
+            order by c.relname, t.tgname loop
+    s := s || r.def || ';' || nl;
+    if r.tgenabled = 'D' then
+      s := s || format('alter table public.%I disable trigger %I;', r.relname, r.tgname) || nl;
+    elsif r.tgenabled = 'A' then
+      s := s || format('alter table public.%I enable always trigger %I;', r.relname, r.tgname) || nl;
+    elsif r.tgenabled = 'R' then
+      s := s || format('alter table public.%I enable replica trigger %I;', r.relname, r.tgname) || nl;
+    end if;
+  end loop;
+
+  s := s || nl || '-- Row security and policies' || nl;
+  for r in select c.relname, c.relrowsecurity, c.relforcerowsecurity
+             from pg_class c join pg_namespace n on n.oid = c.relnamespace
+            where n.nspname = 'public' and c.relkind = 'r'
+            order by 1 loop
+    if r.relrowsecurity then
+      s := s || format('alter table public.%I enable row level security;', r.relname) || nl;
+    end if;
+    if r.relforcerowsecurity then
+      s := s || format('alter table public.%I force row level security;', r.relname) || nl;
+    end if;
+  end loop;
+  for r in select p.schemaname, p.tablename, p.policyname, p.permissive, p.cmd, p.qual, p.with_check,
+                  (select string_agg(case when x = 'public' then 'public' else quote_ident(x) end, ', ')
+                     from unnest(p.roles) as x) as roles
+             from pg_policies p
+            where p.schemaname in ('public', 'storage')
+            order by 1, 2, 3 loop
+    s := s || format('create policy %I on %I.%I as %s for %s to %s%s%s;',
+                     r.policyname, r.schemaname, r.tablename, r.permissive, r.cmd, r.roles,
+                     case when r.qual is not null then ' using (' || r.qual || ')' else '' end,
+                     case when r.with_check is not null then ' with check (' || r.with_check || ')' else '' end) || nl;
+  end loop;
+
+  s := s || nl || '-- Grants: exactly who may read, write or run what (everything else is revoked)' || nl;
+  for r in select c.relname, c.relkind, c.relacl, c.relowner
+             from pg_class c join pg_namespace n on n.oid = c.relnamespace
+            where n.nspname = 'public' and c.relkind in ('r', 'v', 'm', 'S')
+              and not exists (select 1 from pg_depend d
+                               where d.classid = 'pg_class'::regclass and d.objid = c.oid and d.deptype = 'e')
+            order by case c.relkind when 'r' then 0 when 'S' then 1 else 2 end, c.relname loop
+    obj := case when r.relkind = 'S' then 'sequence' else 'table' end || ' public.' || quote_ident(r.relname);
+    s := s || format('revoke all on %s from public, anon, authenticated, service_role;', obj) || nl;
+    for g in select a.grantee, string_agg(a.privilege_type, ', ' order by a.privilege_type) as privs
+               from aclexplode(coalesce(r.relacl,
+                      acldefault(case when r.relkind = 'S' then 's'::"char" else 'r'::"char" end, r.relowner))) a
+              where a.grantee <> r.relowner
+              group by a.grantee
+              order by 1 loop
+      who := case when g.grantee = 0 then 'public' else quote_ident(pg_get_userbyid(g.grantee)) end;
+      s := s || format('grant %s on %s to %s;', g.privs, obj, who) || nl;
+    end loop;
+  end loop;
+  for r in select c.relname, x.grantee, x.privilege_type,
+                  string_agg(quote_ident(a.attname), ', ' order by a.attnum) as cols
+             from pg_attribute a
+             join pg_class c on c.oid = a.attrelid
+             join pg_namespace n on n.oid = c.relnamespace
+             cross join lateral aclexplode(a.attacl) x
+            where n.nspname = 'public' and a.attacl is not null and a.attnum > 0 and not a.attisdropped
+              and x.grantee <> c.relowner
+            group by c.relname, x.grantee, x.privilege_type
+            order by 1, 2, 3 loop
+    who := case when r.grantee = 0 then 'public' else quote_ident(pg_get_userbyid(r.grantee)) end;
+    s := s || format('grant %s (%s) on table public.%I to %s;', r.privilege_type, r.cols, r.relname, who) || nl;
+  end loop;
+  for r in select p.oid::regprocedure::text as sig, p.proacl, p.proowner
+             from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+            where n.nspname = 'public' and p.prokind in ('f', 'p')
+              and not exists (select 1 from pg_depend d
+                               where d.classid = 'pg_proc'::regclass and d.objid = p.oid and d.deptype = 'e')
+            order by 1 loop
+    s := s || format('revoke all on routine %s from public, anon, authenticated, service_role;', r.sig) || nl;
+    for g in select distinct a.grantee
+               from aclexplode(coalesce(r.proacl, acldefault('f'::"char", r.proowner))) a
+              where a.grantee <> r.proowner and a.privilege_type = 'EXECUTE'
+              order by 1 loop
+      who := case when g.grantee = 0 then 'public' else quote_ident(pg_get_userbyid(g.grantee)) end;
+      s := s || format('grant execute on routine %s to %s;', r.sig, who) || nl;
+    end loop;
+  end loop;
+
+  s := s || nl || '-- Notes on tables, columns and functions' || nl;
+  for r in select c.relname, c.relkind, a.attname, d.description
+             from pg_description d
+             join pg_class c on d.classoid = 'pg_class'::regclass and c.oid = d.objoid
+             join pg_namespace n on n.oid = c.relnamespace
+             left join pg_attribute a on d.objsubid > 0 and a.attrelid = c.oid and a.attnum = d.objsubid
+            where n.nspname = 'public'
+            order by 1, d.objsubid loop
+    if r.attname is null then
+      s := s || format('comment on %s public.%I is %L;',
+                       case r.relkind when 'v' then 'view' when 'm' then 'materialized view' when 'S' then 'sequence'
+                                      when 'i' then 'index' else 'table' end,
+                       r.relname, r.description) || nl;
+    else
+      s := s || format('comment on column public.%I.%I is %L;', r.relname, r.attname, r.description) || nl;
+    end if;
+  end loop;
+  for r in select p.oid::regprocedure::text as sig, d.description
+             from pg_description d
+             join pg_proc p on d.classoid = 'pg_proc'::regclass and p.oid = d.objoid
+             join pg_namespace n on n.oid = p.pronamespace
+            where n.nspname = 'public'
+            order by 1 loop
+    s := s || format('comment on routine %s is %L;', r.sig, r.description) || nl;
+  end loop;
+
+  s := s || nl || '-- Default rights for tables, sequences and functions made later' || nl;
+  for r in select d.defaclobjtype as t, d.defaclacl
+             from pg_default_acl d join pg_namespace n on n.oid = d.defaclnamespace
+            where n.nspname = 'public' and d.defaclrole = 'postgres'::regrole
+            order by 1 loop
+    obj := case r.t when 'r' then 'tables' when 'S' then 'sequences' when 'f' then 'functions' when 'T' then 'types' end;
+    continue when obj is null;
+    s := s || format('alter default privileges for role postgres in schema public revoke all on %s from public, anon, authenticated, service_role;', obj) || nl;
+    for g in select a.grantee, string_agg(a.privilege_type, ', ' order by a.privilege_type) as privs
+               from aclexplode(r.defaclacl) a
+              where a.grantee <> 'postgres'::regrole
+              group by a.grantee
+              order by 1 loop
+      who := case when g.grantee = 0 then 'public' else quote_ident(pg_get_userbyid(g.grantee)) end;
+      s := s || format('alter default privileges for role postgres in schema public grant %s on %s to %s;', g.privs, obj, who) || nl;
+    end loop;
+  end loop;
+
+  s := s || nl || '-- Storage buckets (the files themselves are in files/)' || nl;
+  for r in select b.id, b.name, b.public, b.file_size_limit, b.allowed_mime_types
+             from storage.buckets b
+            order by b.id loop
+    s := s || format('insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types) values (%L, %L, %L, %s, %s)'
+                     || ' on conflict (id) do update set public = excluded.public, file_size_limit = excluded.file_size_limit,'
+                     || ' allowed_mime_types = excluded.allowed_mime_types;',
+                     r.id, r.name, r.public, coalesce(r.file_size_limit::text, 'null'),
+                     coalesce(quote_literal(r.allowed_mime_types::text) || '::text[]', 'null')) || nl;
+  end loop;
+
+  -- Scheduled job (pg_cron, added Nov 23, 2026): the daily delete of visit records older than 2 years.
+  -- pg_cron is only in Supabase. The block skips it with a warning where pg_cron isn't installed
+  -- (plain Postgres, the restore test); in a Supabase project any error stops the restore, so a
+  -- missing job can't go unnoticed. Keep this schedule the same as the live job.
+  if to_regprocedure('public.poi_delete_old_traffic()') is not null then
+    s := s || nl || '-- Scheduled job (pg_cron): delete visit records older than 2 years, every day at 09:41 UTC.' || nl
+           || '-- Skipped with a warning where pg_cron isn''t installed (plain Postgres, as in the restore test).' || nl
+           || '-- In a Supabase project it must work: an error here stops the restore. Afterwards' || nl
+           || '-- "select jobname from cron.job" should list delete-old-visits.' || nl
+           || 'do $cron$' || nl
+           || 'begin' || nl
+           || '  if not exists (select 1 from pg_available_extensions where name = ''pg_cron'') then' || nl
+           || '    raise warning ''pg_cron is not installed here, so the daily delete of old visit records was not scheduled'';' || nl
+           || '    return;' || nl
+           || '  end if;' || nl
+           || '  create extension if not exists pg_cron with schema pg_catalog;' || nl
+           || '  grant usage on schema cron to postgres;' || nl
+           || '  grant all privileges on all tables in schema cron to postgres;' || nl
+           || '  perform cron.schedule(''delete-old-visits'', ''41 9 * * *'', ''select public.poi_delete_old_traffic()'');' || nl
+           || 'end' || nl
+           || '$cron$;' || nl;
+  end if;
+
+  s := s || nl || 'commit;' || nl;
+
+  select coalesce(jsonb_agg(c.relname order by c.relname), '[]'::jsonb) into tbls
+    from pg_class c join pg_namespace n on n.oid = c.relnamespace
+   where n.nspname = 'public' and c.relkind = 'r'
+     and not exists (select 1 from pg_depend d
+                      where d.classid = 'pg_class'::regclass and d.objid = c.oid and d.deptype = 'e');
+  select coalesce(jsonb_agg(b.id order by b.id), '[]'::jsonb) into bkts from storage.buckets b;
+
+  return jsonb_build_object('sql', s, 'tables', tbls, 'buckets', bkts);
+end
+$fn$;
+
+revoke all on function public.backup_structure() from public, anon, authenticated;
+grant execute on function public.backup_structure() to service_role;
+
+comment on function public.backup_structure() is
+  'Backup only: returns the database structure as SQL for the private backup repo. Run by the backup-export edge function (service role). Nobody else may run it.';

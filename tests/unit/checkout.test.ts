@@ -266,6 +266,9 @@ Deno.test({ name: "unlocks only after Stripe says the $4.99 was paid", sanitizeO
   r = await call({ action: "complete", token: t, sessionId: id });
   assertEquals(r.json, { ok: true, locationId: 10 });
   assertEquals(purchases()[0].status, "active");
+  // Privacy page (Nov 23, 2026): the buyer's email stays with Stripe; our purchase record never holds it.
+  assertEquals(purchases()[0].user_email ?? null, null);
+  assert(!JSON.stringify(db).includes("buyer@example.com"), "the buyer's email from Stripe was saved");
   const u = await call({ action: "unlocked", token: t });
   assertEquals(u.json.places, [{ id: 10, latitude: 37.1, longitude: -92.2 }]);
 } });
