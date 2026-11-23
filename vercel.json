@@ -29,6 +29,12 @@
       "includeFiles": "index.html"
     }
   },
+  "crons": [
+    {
+      "path": "/api/indexnow",
+      "schedule": "0 16 * * 1"
+    }
+  ],
   "images": {
     "sizes": [
       640,

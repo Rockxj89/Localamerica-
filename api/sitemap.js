@@ -28,7 +28,7 @@ module.exports = async (req, res) => {
     ...S.TOWNS.map((t) => ({ loc: `${S.SITE}/near/${t.slug}` })),
     ...places.map((p) => ({ loc: `${S.SITE}/places/${p.slug}`, images: (photos[p.id] || []).slice(0, 5) }))
   ];
-  // ?format=indexnow returns the same page list as a ready-to-send IndexNow message (used by the weekly Make scenario).
+  // ?format=indexnow returns the same page list as a ready-to-send IndexNow message (used by the weekly timer, api/indexnow.js).
   if (req.query && req.query.format === 'indexnow') {
     res.statusCode = 200;
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
