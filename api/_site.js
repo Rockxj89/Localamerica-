@@ -1,4 +1,4 @@
-// Shared helpers for the Google place pages (/places/cave-4) and the sitemap.
+// Shared helpers for the Google place pages (/places/campsite-8) and the sitemap.
 // Files starting with "_" are not their own web address on Vercel; they are only used by the others.
 //
 // SAFETY: places are read only from poi_public_locations, the public view that already blanks
@@ -21,19 +21,18 @@ const CATEGORY_LABELS = {
 };
 const catLabel = (c) => CATEGORY_LABELS[c] || c;
 const CATEGORY_SLUGS = {
-  'Buildings and stores': 'buildings', 'Caves': 'caves', 'Dead end trails': 'dead-ends',
+  'Buildings and stores': 'buildings', 'Dead end trails': 'dead-ends',
   'Established campsites': 'camp', 'Forgotten grounds': 'forgotten', 'Frog ponds': 'frogs',
   'Legends/lore': 'legends', 'Mud holes/trails': 'mud', 'Hiking Trails': 'hiking', 'Non-vehicle trails': 'hiking',
   'Popular locations': 'popular', 'Rappelling bluffs': 'bluffs', 'Wheeling': 'wheeling', 'Rocks/Flex': 'wheeling',
   'Scenic views': 'views', 'Swimming holes': 'swimming', 'Unmarked trails': 'unmarked',
   'Long Shot Fields': 'long-shot', 'Yardage fields': 'long-shot'
 };
-// Place types with their own short link (/caves) use it; any other type opens the app's list.
+// Place types with their own short link (/camp) use it; any other type opens the app's list.
 const catUrl = (c) => (CATEGORY_SLUGS[c] ? '/' + CATEGORY_SLUGS[c] : '/#/c/' + toSlug(c));
 
 const CATEGORY_DESCRIPTIONS = {
   'Buildings and stores': 'Old buildings, shops, and structures',
-  'Caves': 'Caverns, overhangs, and tucked-away openings',
   'Dead end trails': 'Trails that finish away from a through route',
   'Established campsites': 'Known places to set up camp',
   'Forgotten grounds': 'Overgrown or quiet places with a story',
@@ -113,15 +112,15 @@ const TOWNS = [
   ['Willow Springs', 36.9923, -91.9696, 'More places close to town than anywhere else in the app: mud holes, campsites and trails just minutes out of Willow Springs.'],
   ['Cabool', 37.1237, -92.1013, 'Campsites, trails and mud holes a short drive from Cabool, all in the Mark Twain National Forest.'],
   ['Mountain Grove', 37.1306, -92.2635, 'Dead end trails, campsites, swimming and bluffs within reach of Mountain Grove.'],
-  ['Winona', 37.0092, -91.3229, 'Caves, ponds and trails right outside Winona, some only a few miles from town.'],
-  ['Eminence', 37.1506, -91.3576, 'Caves, ponds and dead end trails close to Eminence, all on public land.'],
+  ['Winona', 37.0092, -91.3229, 'Ponds and trails right outside Winona, some only a few miles from town.'],
+  ['Eminence', 37.1506, -91.3576, 'Ponds and dead end trails close to Eminence, all on public land.'],
   ['West Plains', 36.7281, -91.8524, 'Trails, campsites, ponds and bluffs within 35 miles of West Plains.'],
   ['Gainesville', 36.6034, -92.4282, 'Campsites, ponds, swimming and bluffs near Gainesville, all on public land.'],
   ['Ava', 36.9520, -92.6605, 'Campsites, swimming holes, bluffs and mud holes within an easy drive of Ava, all on public land.'],
-  ['Mountain View', 36.9953, -91.7035, 'Caves, ponds, campsites and mud holes within reach of Mountain View.'],
+  ['Mountain View', 36.9953, -91.7035, 'Ponds, campsites and mud holes within reach of Mountain View.'],
   ['Mansfield', 37.1067, -92.5807, 'Hiking, campsites, bluffs and swimming a short drive from Mansfield.'],
   ['Hartville', 37.2506, -92.5102, 'Hiking trails, campsites and ponds within 35 miles of Hartville.'],
-  ['Lebanon', 37.6806, -92.6638, 'Dead end trails, ponds, caves and campsites within reach of Lebanon, in the Mark Twain National Forest.'],
+  ['Lebanon', 37.6806, -92.6638, 'Dead end trails, ponds and campsites within reach of Lebanon, in the Mark Twain National Forest.'],
   ['Forsyth', 36.6851, -93.1199, 'Campsites, mud holes, ponds and trails a short drive from Forsyth.'],
   ['Licking', 37.4995, -91.8571, 'Campsites, ponds and trails within 35 miles of Licking, all on public land.'],
   ['Houston', 37.3262, -91.9560, 'Campsites, trails and mud holes a short drive from Houston, Missouri.']
@@ -191,7 +190,7 @@ async function loadAllPhotos() {
 
 // One-of-a-kind name for each place type, for photo labels like "Swimming hole near Ava, Missouri"
 const CATEGORY_SINGULAR = {
-  'Buildings and stores': 'Old building', 'Open Stores': 'Store', 'Caves': 'Cave', 'Dead end trails': 'Dead-end trail',
+  'Buildings and stores': 'Old building', 'Open Stores': 'Store', 'Dead end trails': 'Dead-end trail',
   'Established campsites': 'Campsite', 'Forgotten grounds': 'Forgotten grounds spot', 'Frog ponds': 'Frog pond',
   'Legends/lore': 'Legends and lore spot', 'Mud holes/trails': 'Mud hole', 'Hiking Trails': 'Hiking trail',
   'Popular locations': 'Popular spot', 'Rappelling bluffs': 'Rappelling bluff', 'Wheeling': 'Wheeling spot', 'Rocks/Flex': 'Wheeling spot',

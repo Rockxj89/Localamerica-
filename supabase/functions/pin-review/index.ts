@@ -21,8 +21,10 @@ function cors(req: Request) {
 }
 
 // Place types a pin can become (same names as the app's database).
+// No caves: every cave on Mark Twain National Forest land is closed by Forest Order, so caves never go
+// in the app (owner, Nov 21 and Nov 23, 2026). Cave pins just stay private in the inbox.
 const CATEGORIES = [
-  "Caves", "Established campsites", "Swimming holes", "Scenic views", "Rappelling bluffs",
+  "Established campsites", "Swimming holes", "Scenic views", "Rappelling bluffs",
   "Forgotten grounds", "Frog ponds", "Legends/lore", "Dead end trails", "Mud holes/trails",
   "Hiking Trails", "Unmarked trails", "Long Shot Fields", "Wheeling", "Water crossings",
   "Popular locations", "Open Stores",
@@ -30,7 +32,7 @@ const CATEGORIES = [
 
 // Name prefix when a type has no places yet to copy from
 const PREFIX: Record<string, string> = {
-  "Caves": "Cave", "Established campsites": "Campsite", "Swimming holes": "Swimming",
+  "Established campsites": "Campsite", "Swimming holes": "Swimming",
   "Scenic views": "Scenic View", "Rappelling bluffs": "Bluff", "Forgotten grounds": "Forgotten Grounds",
   "Frog ponds": "Pond", "Legends/lore": "Legends and Lore", "Dead end trails": "Dead End",
   "Mud holes/trails": "Mud Hole", "Hiking Trails": "Hike", "Unmarked trails": "Trail",
@@ -40,7 +42,6 @@ const PREFIX: Record<string, string> = {
 
 // Guess the place type from the email's subject and notes. Order matters (mud hole before swimming hole).
 const GUESS: [RegExp, string][] = [
-  [/\bcaves?\b|\bcavern/i, "Caves"],
   [/\bmud\b/i, "Mud holes/trails"],
   [/dead[\s-]*end/i, "Dead end trails"],
   [/\bswim|swimming hole|\bblue hole\b/i, "Swimming holes"],
@@ -57,7 +58,10 @@ const GUESS: [RegExp, string][] = [
   [/unmarked|\btrail\b/i, "Unmarked trails"],
   [/\bstore\b|\bshop\b/i, "Open Stores"],
 ];
+// A pin that mentions a cave gets no guess, so nothing is picked for it by accident.
+const CAVE = /\bcav(e|es|ern|erns)\b/i;
 function guessCategory(text: string): string | null {
+  if (CAVE.test(text)) return null;
   for (const [re, c] of GUESS) if (re.test(text)) return c;
   return null;
 }
@@ -174,6 +178,7 @@ Deno.serve(async (req) => {
     if (!description) return json({ ok: false, error: "Add a description first." }, 400);
     if (description.length > 2000) return json({ ok: false, error: "The description is too long." }, 400);
     if (LEAKY.test(description)) return json({ ok: false, error: "Take the GPS numbers or web link out of the description first. Everyone can see the description, and this is a Paid place." }, 400);
+    if (CAVE.test(description)) return json({ ok: false, error: "Caves can't go in the app (they're closed on forest land). Take the cave out of the description, or reject this pin." }, 400);
 
     // Claim the pin so a double tap can't add it twice
     const { data: claimed, error: claimErr } = await admin.from("poi_pin_inbox")

@@ -1,0 +1,3 @@
+# Not part of the website: the automatic tests and their GitHub workflow
+/tests
+/.github

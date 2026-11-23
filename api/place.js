@@ -1,4 +1,4 @@
-// One page per place for Google: localamerica.us/places/cave-4
+// One page per place for Google: localamerica.us/places/campsite-8
 // Built fresh from the database (cached 5 minutes), so new places and edits show up by themselves.
 // Same look as the app's place page. Paid places never include GPS: see the SAFETY note in _site.js.
 const S = require('./_site');
@@ -311,7 +311,7 @@ module.exports = async (req, res) => {
     return send(res, 404, frame({ title: 'Local America', description: 'Local America', canonical: '', image: S.SITE + LOGO, body: notFoundBody(), robots: 'noindex' }),
       'public, max-age=0, s-maxage=300');
   }
-  // Someone typed /places/Cave-4 or /places/cave--4: send them to the one true address
+  // Someone typed /places/Campsite-8 or /places/campsite--8: send them to the one true address
   if ((req.query && req.query.s) !== p.slug) {
     res.statusCode = 301;
     res.setHeader('Location', '/places/' + p.slug);
@@ -332,7 +332,7 @@ module.exports = async (req, res) => {
   const sample = p.free ? null : places.find((x) => x.name === 'Popular Location #2' && hasGps(x));
   const catAbs = S.catUrl(p.category).startsWith('/#') ? S.SITE + '/' + S.catUrl(p.category).slice(1) : S.SITE + S.catUrl(p.category);
 
-  // Lets Google show "Home › Caves › Cave #4" in search results. No coordinates in here.
+  // Lets Google show "Home › Campsites › Campsite #8" in search results. No coordinates in here.
   // Also a hidden label for Google and AI answers: what kind of public-land place this is and which town
   // it's near. Never coordinates (not even for free places), so paid GPS can't leak through here.
   const placeLd = {

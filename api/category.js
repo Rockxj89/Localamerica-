@@ -10,7 +10,6 @@ const SITE = 'https://localamerica.us';
 const CATS = {
   camp:        ['Campsites', 'Known places to set up camp on public land in the Ozarks and Mark Twain National Forest.'],
   swimming:    ['Swimming holes', 'Creeks, pools and swimming holes on public land in the Ozarks.'],
-  caves:       ['Caves', 'Caverns, overhangs and tucked-away openings on public land in the Ozarks.'],
   views:       ['Scenic views', 'Lookouts and wide-open views on public land in the Ozarks.'],
   bluffs:      ['Rappelling bluffs', 'Cliffs and rock faces for rappelling on public land in the Ozarks.'],
   forgotten:   ['Forgotten grounds', 'Old homesteads and quiet, overgrown places on public land in the Ozarks.'],
