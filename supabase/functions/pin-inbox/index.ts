@@ -27,15 +27,17 @@ function b64Text(b64: string | undefined): string {
 
 // Rebuild a JPEG keeping only what's needed to show the picture, so no location data can ride along
 // (these photos end up public once the place is approved, and pins are paid places):
-// - APP0 (JFIF) is kept; every other APPn (EXIF incl. GPS, XMP, ICC, MPF, Photoshop) and COM is dropped,
-//   before the first scan AND between scans (progressive JPEGs).
+// - Only the parts a decoder needs are kept: frame header, Huffman/quantization tables, restart interval,
+//   scans, and a plain 16-byte JFIF APP0. Every other APPn (EXIF incl. GPS, XMP, ICC, MPF, Photoshop) and
+//   COM is dropped, before the first scan AND between scans (progressive JPEGs).
 // - Everything after the end-of-image marker is cut off. Phones hang extra data there: Samsung's trailer
 //   (edit history, capture info), Ultra HDR gain-map images with their own metadata, motion-photo videos.
-// Returns null if this isn't a whole JPEG it can read safely; the photo is then skipped, never stored as-is.
+// - Anything unexpected (unknown or malformed parts, a file that never ends) means null: the photo is
+//   skipped, never stored as-is.
 function stripJpeg(src: Uint8Array): Uint8Array | null {
   if (src.length < 4 || src[0] !== 0xff || src[1] !== 0xd8) return null;
   const parts: Uint8Array[] = [src.subarray(0, 2)];
-  let i = 2, scans = 0, eoi = false;
+  let i = 2, scans = 0, eoi = false, segments = 0;
   while (i + 2 <= src.length) {
     if (src[i] !== 0xff) return null;
     const marker = src[i + 1];
@@ -46,17 +48,20 @@ function stripJpeg(src: Uint8Array): Uint8Array | null {
       eoi = true;
       break;
     }
+    if (++segments > 2000) return null; // real photos have a few dozen parts at most
     if (i + 4 > src.length) return null;
     const len = (src[i + 2] << 8) | src[i + 3];
     const end = i + 2 + len;
     if (len < 2 || end > src.length) return null;
     if (marker === 0xda) { // start of scan: its header, then image data up to the next real marker
+      if (len !== 6 + 2 * src[i + 4]) return null;
       scans++;
       let j = end;
       while (j + 1 < src.length) {
         if (src[j] === 0xff) {
           const n = src[j + 1];
           if (n === 0x00 || (n >= 0xd0 && n <= 0xd7)) { j += 2; continue; } // stuffed byte or restart marker
+          if (n === 0xff) { j++; continue; } // fill byte before a marker
           break;
         }
         j++;
@@ -66,8 +71,14 @@ function stripJpeg(src: Uint8Array): Uint8Array | null {
       i = j;
       continue;
     }
-    const junk = (marker >= 0xe1 && marker <= 0xef) || marker === 0xfe;
-    if (!junk) parts.push(src.subarray(i, end));
+    const jfif = marker === 0xe0 && len === 16 &&
+      src[i + 4] === 0x4a && src[i + 5] === 0x46 && src[i + 6] === 0x49 && src[i + 7] === 0x46 && src[i + 8] === 0x00;
+    const sof = marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc;
+    const keep = jfif || (sof && len === 8 + 3 * src[i + 9]) || marker === 0xc4 || marker === 0xcc || marker === 0xdb ||
+      ((marker === 0xdd || marker === 0xdc) && len === 4);
+    const drop = (marker >= 0xe0 && marker <= 0xef) || marker === 0xfe;
+    if (!keep && !drop) return null;
+    if (keep) parts.push(src.subarray(i, end));
     i = end;
   }
   if (!eoi) return null;
