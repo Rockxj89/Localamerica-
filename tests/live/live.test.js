@@ -75,7 +75,7 @@ test("the public can't read private tables or use owner tools", async () => {
     const body = await res.text();
     if (!(res.status >= 400 || body.trim() === '[]')) open.push(t);
   }
-  for (const fn of ['owner_place_coords', 'traffic_summary', 'card_maker_cards', 'backup_structure', 'mint_post_image_token', 'poi_delete_old_traffic']) {
+  for (const fn of ['owner_place_coords', 'traffic_summary', 'traffic_links', 'card_maker_cards', 'backup_structure', 'mint_post_image_token', 'poi_delete_old_traffic']) {
     const res = await get(`${S.SUPABASE_URL}/rest/v1/rpc/${fn}`, {
       method: 'POST', headers: { apikey: S.SUPABASE_KEY, Authorization: `Bearer ${S.SUPABASE_KEY}`, 'Content-Type': 'application/json' }, body: '{}'
     });

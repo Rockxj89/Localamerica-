@@ -60,6 +60,19 @@
     } catch (e) { return null; }
   })();
 
+  // Link tag (?s=...) from the link maker on the Traffic page, kept for the whole visit, same as the app
+  var linkTag = (function () {
+    try {
+      var stored = sessionStorage.getItem('la_src');
+      if (stored !== null) return stored || null;
+      var t = '';
+      try { t = new URLSearchParams(location.search).get('s') || ''; } catch (e) { t = ''; }
+      t = t.toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40).replace(/-+$/, '');
+      sessionStorage.setItem('la_src', t);
+      return t || null;
+    } catch (e) { return null; }
+  })();
+
   var isBot = !!navigator.webdriver || /bot|crawl|spider|slurp|facebookexternalhit|facebot|preview|headless|lighthouse|vercel|pingdom|uptime|python-requests|curl|wget/i.test(ua);
   var inAppBrowser = /FBAN|FBAV|FB_IAB|FBIOS|Instagram|Messenger|Line\//i.test(ua);
   var browserLabel = (function () {
@@ -88,6 +101,7 @@
     var dbLocation = ['place_view', 'open_in_maps', 'unlock_gps_click', 'checkout_start'].indexOf(type) >= 0 ? locationId : null;
     if (dbLocation == null && locationId != null) meta.location_id = locationId;
     if (visitorId) meta.vid = visitorId;
+    if (linkTag) meta.src = linkTag;
     meta.page = 'place_page';
     var row = {
       event_type: type, location_id: dbLocation, visitor_session_hash: sessionId,

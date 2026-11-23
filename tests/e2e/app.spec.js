@@ -22,7 +22,7 @@ test.beforeAll(async () => {
 // Sends test traffic only where it's harmless, and answers checkout calls with a pretend checkout.
 async function guard(context, baseURL) {
   const base = new URL(baseURL).origin;
-  const state = { calls: [], unlocked: {}, sessionId: 'cs_test_pretend123', placeId: null, stopped: [], errors: [], leaked: [] };
+  const state = { calls: [], unlocked: {}, sessionId: 'cs_test_pretend123', placeId: null, stopped: [], errors: [], leaked: [], traffic: [] };
   // Any script error on a page fails the test, and so does any visit-counting or pixel request that
   // got through (both checked by noErrors at the end of each test)
   const watch = (pg) => pg.on('pageerror', (e) => state.errors.push(String(e.message || e)));
@@ -53,6 +53,9 @@ async function guard(context, baseURL) {
       if (url.pathname.startsWith('/storage/')) return route.abort(); // photos aren't needed; saves bandwidth
       const read = method === 'GET' || method === 'HEAD' || (method === 'POST' && url.pathname === '/rest/v1/rpc/poi_distances');
       if (read) return route.continue();
+      if (method === 'POST' && url.pathname === '/rest/v1/poi_traffic_events') {
+        try { state.traffic.push(...[].concat(JSON.parse(req.postData() || '[]'))); } catch (e) { /* not JSON */ }
+      }
       state.stopped.push(`${method} ${url.pathname}`); // visit counting and anything else that writes
       return route.abort();
     }
@@ -210,5 +213,23 @@ test('a free place page for Google shows its GPS', async ({ page, context, baseU
   await page.goto(`/places/${S.toSlug(free.name)}`);
   await expect(page.locator('h1', { hasText: free.name })).toBeVisible();
   expect((await page.content()).includes(String(free.latitude)), 'the free GPS is missing').toBe(true);
+  noErrors(state);
+});
+
+
+test('a link tag (?s=) goes with every visit event, and a place type link with Facebook\'s ?fbclid still opens', async ({ page, context, baseURL }) => {
+  const state = await guard(context, baseURL);
+  // Facebook adds ?fbclid=... to links; the place type page used to send that visitor to Home
+  await page.goto('/camp?s=Test-Tag_1&fbclid=test123');
+  await expect.poll(() => state.traffic.some((r) => r.event_type === 'category_view' && r.event_metadata && r.event_metadata.category),
+    { message: 'the place type list did not open' }).toBe(true);
+  expect(new URL(page.url()).hash, 'the page moved away from the place type list').toMatch(/^#\/c\/[a-z-]+$/);
+  expect(state.traffic.every((r) => r.event_metadata && r.event_metadata.src === 'test-tag-1'), 'an event is missing the link tag').toBe(true);
+  // The place pages for Google keep the tag too (a new tab, so the visit starts fresh)
+  const other = await context.newPage();
+  await other.goto(`/places/${S.toSlug(free.name)}?s=place-test`);
+  await expect(other.locator('h1', { hasText: free.name })).toBeVisible();
+  await expect.poll(() => state.traffic.some((r) => r.event_metadata && r.event_metadata.src === 'place-test'),
+    { message: 'the place page did not send the link tag' }).toBe(true);
   noErrors(state);
 });
