@@ -111,7 +111,7 @@
   /* Round dark buttons in the full-screen photo viewer */
   .pvb { display: flex; width: 2.75rem; height: 2.75rem; align-items: center; justify-content: center; border-radius: 9999px; background: rgba(0,0,0,.6); color: #fff; }
   .pvb.hidden { display: none; }
-  .vvplace { display: flex; min-height: 2.75rem; align-items: center; padding: 0 1rem; border-radius: 9999px; background: rgba(0,0,0,.45); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,.18); color: rgba(255,255,255,.92); font-weight: 500; font-size: .95rem; letter-spacing: .01em; white-space: nowrap; transition: background .2s ease; }
+  .vvplace { display: block; height: 2.75rem; line-height: calc(2.75rem - 2px); padding: 0 1rem; border-radius: 9999px; background: rgba(0,0,0,.45); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,.18); color: rgba(255,255,255,.92); font-weight: 500; font-size: .95rem; letter-spacing: .01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: calc(100% - 6.5rem); transition: background .2s ease; }
   .vvplace:hover, .vvplace:active { background: rgba(0,0,0,.6); }
   .vvplace.hidden { display: none; }
   /* Video player arrows show only with a mouse; on phones you swipe */
@@ -238,7 +238,7 @@
   <video id="vvVideo" class="vvclip" controls playsinline></video>
   <video id="vvVideo2" class="vvclip" controls playsinline style="visibility: hidden;"></video>
   <!-- Shown when the video belongs to a place (videos.json "place"); not when the player was opened from that place's own page -->
-  <a id="vvPlace" href="#/" class="vvplace hidden absolute left-4 top-4 z-10">Where this was filmed</a>
+  <a id="vvPlace" href="#/" class="vvplace hidden absolute left-4 top-4 z-10"></a>
   <button type="button" data-act="vv-close" aria-label="Close video" class="pvb absolute right-4 top-4 z-10"><span data-icon="x" class="contents"></span></button>
   <!-- Previous / next arrows: computers only (phones swipe left or right instead) -->
   <button type="button" id="vvPrev" data-act="vv-prev" aria-label="Previous video" class="pvb vvnav absolute left-4 top-1/2 z-10 -translate-y-1/2"><span data-icon="left" class="contents"></span></button>
@@ -1299,7 +1299,7 @@ function viewPrivacy() {
 
 // ================= VIDEOS (TikTok videos from @local_america, stored in the public "tiktok-videos" bucket) =================
 // The list lives in videos.json: [{ "file": "<filename in the bucket>", "place": <place id, optional> }, ...], newest first.
-// A video with a "place" shows on that place's page, and its full-screen player gets a "Where this was filmed" button.
+// A video with a "place" shows on that place's page, and its full-screen player gets a "Go to <place name>" button.
 const VIDEO_BATCH = 6;
 const VIDEO_BASE = 'https://ycdlxdijrlfsxvxksyrq.supabase.co/storage/v1/object/public/tiktok-videos/';
 const vid = { list: null, place: {}, failed: false, shown: VIDEO_BATCH, loading: false };
@@ -1344,13 +1344,14 @@ function vvStop(v) {
   try { v.pause(); } catch (err) { /* fine */ }
   v.removeAttribute('src'); v.load();
 }
-// The "Where this was filmed" button: points at the place of the video now showing
+// The "Go to <place name>" button: points at the place of the video now showing
 function vvPlaceLink(file) {
   const a = $('#vvPlace');
   const pid = !vv.solo && vid.place[file];
   const pl = pid ? state.locs.find((x) => String(x.id) === String(pid)) : null;
   a.classList.toggle('hidden', !pl);
   a.setAttribute('href', pl ? '#/p/' + pl.id : '#/');
+  a.textContent = pl ? 'Go to ' + (pl.name || 'this place') : '';
 }
 function vvLoad(file) {
   vvPlaceLink(file);
