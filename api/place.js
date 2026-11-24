@@ -269,6 +269,7 @@ function placeBody(p, photos, sample, near) {
       <p class="mt-2 t-sm text-secondary">All sales are final. No refunds once GPS is unlocked. See <a href="/#/safety" class="font-medium text-primary underline underline-offset-2 hover:no-underline">Safety &amp; Terms</a>.</p>
       <div class="mt-5">
         <button type="button" data-act="unlock" class="${btnPrimaryLg} w-full sm:w-auto">Unlock GPS for ${PRICE}</button>
+        <p class="mt-2 inline-flex items-center gap-1.5 t-sm text-secondary">${icon('lock', 'ico-xs')}<span>Secure checkout by Stripe</span></p>
       </div>
       <p class="mt-3 t-xs text-secondary">Your purchase is saved in the browser you pay in. If you opened this app from Facebook, open it in your regular browser first so your unlock is there next time. Payments are processed by Stripe.</p>
     </section>`;

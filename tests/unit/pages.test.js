@@ -49,6 +49,7 @@ test('a paid place page shows no GPS, even if the database sent it', async () =>
   assert.ok(!r.body.includes('37.111') && !r.body.includes('92.222'), 'the paid GPS is on the page');
   assert.deepEqual(S.strayCoordinates(r.body, FREE_ROWS), [], 'GPS that is not a free place is on the page');
   assert.ok(r.body.includes(`Unlock GPS for ${S.PRICE}`), 'the $4.99 unlock button is missing');
+  assert.ok(r.body.includes('Secure checkout by Stripe'), 'the secure checkout line is missing');
 });
 
 test('a free place page shows its GPS', async () => {

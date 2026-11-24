@@ -102,6 +102,7 @@ test('a paid place shows no GPS, only the $4.99 unlock', async ({ page, context,
   await page.goto(`/#/p/${paid.id}`);
   await expect(page.locator('h1', { hasText: paid.name })).toBeVisible();
   await expect(page.getByRole('button', { name: `Unlock GPS for ${S.PRICE}` })).toBeVisible();
+  await expect(page.getByText('Secure checkout by Stripe')).toBeVisible();
   await expect(page.getByText('Paid access').first()).toBeVisible();
   expect(await strayCount(page), 'GPS-looking numbers that are not a free place').toBe(0);
   noErrors(state);

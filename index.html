@@ -1154,6 +1154,7 @@ function viewPlace(id) {
       <p class="mt-2 t-sm text-secondary">All sales are final. No refunds once GPS is unlocked. See <a href="#/safety" class="font-medium text-primary underline underline-offset-2 hover:no-underline">Safety &amp; Terms</a>.</p>
       <div class="mt-5">
         <button type="button" data-act="unlock" data-id="${l.id}" class="${btnPrimaryLg} w-full sm:w-auto" ${state.busy ? 'disabled' : ''}>${busyHere ? 'Opening secure checkout…' : `Unlock GPS for ${CFG.UNLOCK_PRICE}`}</button>
+        <p class="mt-2 inline-flex items-center gap-1.5 t-sm text-secondary" data-testid="secure-checkout">${icon('lock', 'ico-xs')}<span>Secure checkout by Stripe</span></p>
       </div>
       <details class="mt-4 t-sm text-secondary">
         <summary class="inline-flex min-h-11 cursor-pointer items-center font-medium text-primary underline decoration-black/20 underline-offset-4 hover:decoration-current">More</summary>
