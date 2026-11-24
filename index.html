@@ -111,6 +111,8 @@
   /* Round dark buttons in the full-screen photo viewer */
   .pvb { display: flex; width: 2.75rem; height: 2.75rem; align-items: center; justify-content: center; border-radius: 9999px; background: rgba(0,0,0,.6); color: #fff; }
   .pvb.hidden { display: none; }
+  .vvplace { display: flex; min-height: 2.75rem; align-items: center; padding: 0 1.1rem; border-radius: 9999px; background: #fff; color: #1a1a1a; font-weight: 600; font-size: 1rem; box-shadow: 0 2px 10px rgba(0,0,0,.35); }
+  .vvplace.hidden { display: none; }
   /* Video player arrows show only with a mouse; on phones you swipe */
   .pvb.vvnav { display: none; }
   @media (hover: hover) and (pointer: fine) { .pvb.vvnav { display: flex; } .pvb.vvnav.hidden { display: none; } }
@@ -234,6 +236,8 @@
 <div id="vv" class="hidden fixed inset-0 z-[60] flex items-center justify-center overflow-hidden" style="background: rgba(0,0,0,.95); overscroll-behavior: contain;" role="dialog" aria-modal="true" aria-label="Video">
   <video id="vvVideo" class="vvclip" controls playsinline></video>
   <video id="vvVideo2" class="vvclip" controls playsinline style="visibility: hidden;"></video>
+  <!-- Shown when the video belongs to a place (videos.json "place"); not when the player was opened from that place's own page -->
+  <a id="vvPlace" href="#/" class="vvplace hidden absolute left-4 top-4 z-10">Where this was filmed</a>
   <button type="button" data-act="vv-close" aria-label="Close video" class="pvb absolute right-4 top-4 z-10"><span data-icon="x" class="contents"></span></button>
   <!-- Previous / next arrows: computers only (phones swipe left or right instead) -->
   <button type="button" id="vvPrev" data-act="vv-prev" aria-label="Previous video" class="pvb vvnav absolute left-4 top-1/2 z-10 -translate-y-1/2"><span data-icon="left" class="contents"></span></button>
@@ -1294,7 +1298,7 @@ function viewPrivacy() {
 
 // ================= VIDEOS (TikTok videos from @local_america, stored in the public "tiktok-videos" bucket) =================
 // The list lives in videos.json: [{ "file": "<filename in the bucket>", "place": <place id, optional> }, ...], newest first.
-// A video with a "place" shows on that place's page, and gets a "See this place" link on the Videos page.
+// A video with a "place" shows on that place's page, and its full-screen player gets a "Where this was filmed" button.
 const VIDEO_BATCH = 6;
 const VIDEO_BASE = 'https://ycdlxdijrlfsxvxksyrq.supabase.co/storage/v1/object/public/tiktok-videos/';
 const vid = { list: null, place: {}, failed: false, shown: VIDEO_BATCH, loading: false };
@@ -1320,12 +1324,7 @@ function placeVideo(id) {
 }
 // Small tile: a still from the start of the video (the "#t=0.1" makes phones show that frame instead of black).
 // Tapping it opens the full-screen player.
-const videoCard = (file) => {
-  const pid = vid.place[file];
-  const pl = pid ? state.locs.find((x) => String(x.id) === String(pid)) : null;
-  return `<div class="min-w-0">${videoTile(file, 'aspect-[4/5]')}${pl ? `
-  <a href="#/p/${pl.id}" class="mt-2 inline-flex min-h-11 items-center gap-1 t-sm font-medium text-primary underline underline-offset-2 hover:no-underline">See this place ${icon('arrow', 'ico-sm')}</a>` : ''}</div>`;
-};
+const videoCard = (file) => videoTile(file, 'aspect-[4/5]');
 const videoTile = (file, shape, solo) => `
   <button type="button" data-act="vv-open" data-f="${file}"${solo ? ' data-solo="1"' : ''} aria-label="Play video" class="lift press relative block ${shape} w-full min-w-0 overflow-hidden rounded-tile bg-black shadow-card">
     <video class="pointer-events-none absolute inset-0 h-full w-full object-cover" src="${VIDEO_BASE}${file}#t=0.1" muted playsinline preload="metadata" tabindex="-1" aria-hidden="true"></video>
@@ -1337,14 +1336,23 @@ const videoTile = (file, shape, solo) => `
   </button>`;
 // Which video in the list is open, so a swipe (or the arrows on a computer) can move to the next or previous one.
 // Two video players take turns, so on phones the next video can slide in while the old one slides away (TikTok style).
-const vv = { i: -1, sx: 0, sy: 0, t0: 0, dy: 0, track: false, drag: false, busy: false, timer: 0,
+const vv = { i: -1, solo: false, sx: 0, sy: 0, t0: 0, dy: 0, track: false, drag: false, busy: false, timer: 0,
   cur: document.getElementById('vvVideo'), spare: document.getElementById('vvVideo2') };
 const vvPlay = (v) => { const p = v.play(); if (p && p.catch) p.catch(() => {}); };
 function vvStop(v) {
   try { v.pause(); } catch (err) { /* fine */ }
   v.removeAttribute('src'); v.load();
 }
+// The "Where this was filmed" button: points at the place of the video now showing
+function vvPlaceLink(file) {
+  const a = $('#vvPlace');
+  const pid = !vv.solo && vid.place[file];
+  const pl = pid ? state.locs.find((x) => String(x.id) === String(pid)) : null;
+  a.classList.toggle('hidden', !pl);
+  a.setAttribute('href', pl ? '#/p/' + pl.id : '#/');
+}
 function vvLoad(file) {
+  vvPlaceLink(file);
   const v = vv.cur;
   try { v.pause(); } catch (err) { /* fine */ }
   v.src = VIDEO_BASE + file;
@@ -1360,6 +1368,7 @@ function vvReset() {
 function vvOpen(file, solo) {
   if (!safeFile(file)) return;
   vvReset(); vvStop(vv.spare);
+  vv.solo = !!solo;
   vv.i = vid.list && !solo ? vid.list.indexOf(file) : -1;
   const many = vv.i >= 0 && vid.list.length > 1;
   $('#vvPrev').classList.toggle('hidden', !many);
@@ -1385,6 +1394,7 @@ function vvSlide(step) {
   inc.style.transform = `translateY(${step > 0 ? h : -h}px)`;
   inc.style.visibility = '';
   inc.src = VIDEO_BASE + vid.list[vv.i];
+  vvPlaceLink(vid.list[vv.i]);
   vvPlay(inc);
   void inc.offsetWidth;
   out.classList.add('anim'); inc.classList.add('anim');
@@ -1406,6 +1416,7 @@ function vvClose() {
   vvReset();
   vvStop(vv.cur); vvStop(vv.spare);
   vv.i = -1;
+  $('#vvPlace').classList.add('hidden');
   $('#vv').classList.add('hidden'); document.body.style.overflow = '';
 }
 const vvOpenNow = () => !$('#vv').classList.contains('hidden');
