@@ -2,6 +2,24 @@
 // Built fresh from the database (cached 5 minutes), so new places and edits show up by themselves.
 // Same look as the app's place page. Paid places never include GPS: see the SAFETY note in _site.js.
 const S = require('./_site');
+const fs = require('fs');
+const path = require('path');
+
+// Videos that belong to a place (videos.json, "place": <place id>). Read once per server start.
+const VIDEO_BASE = 'https://ycdlxdijrlfsxvxksyrq.supabase.co/storage/v1/object/public/tiktok-videos/';
+let videoByPlace = null;
+function placeVideo(id) {
+  if (!videoByPlace) {
+    videoByPlace = {};
+    try {
+      const list = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'videos.json'), 'utf8'));
+      (Array.isArray(list) ? list : []).forEach((v) => {
+        if (v && Number.isInteger(v.place) && /^[A-Za-z0-9_-]{5,80}\.mp4$/.test(v.file || '') && !videoByPlace[v.place]) videoByPlace[v.place] = v.file;
+      });
+    } catch (e) { console.error(e); }
+  }
+  return videoByPlace[id] || null;
+}
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const PRICE = '$4.99';
@@ -223,6 +241,14 @@ function placeBody(p, photos, sample, near) {
       </div>
     </section>` : '';
 
+  const vfile = placeVideo(p.id);
+  const videoBox = vfile ? `
+    <section>
+      <div class="aspect-[16/10] w-full overflow-hidden rounded-tile bg-black shadow-card">
+        <video class="h-full w-full object-contain" src="${esc(VIDEO_BASE + vfile)}#t=0.1" controls playsinline preload="metadata" aria-label="${esc(p.name)} video"></video>
+      </div>
+    </section>` : '';
+
   const notes = p.description.trim();
 
   const unlockBox = gps ? `
@@ -262,6 +288,7 @@ function placeBody(p, photos, sample, near) {
       </header>
     </div>
     ${photoGrid}
+    ${videoBox}
     <section>
       <h2 class="font-display text-[length:var(--fs-h2)] font-semibold leading-[1.2] tracking-[-0.015em] text-primary">Field notes</h2>
       <p class="mt-4 whitespace-pre-line t-base leading-7 text-secondary">${notes ? esc(notes) : 'No field notes have been added for this location yet.'}</p>
