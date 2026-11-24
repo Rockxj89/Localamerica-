@@ -111,7 +111,7 @@
   /* Round dark buttons in the full-screen photo viewer */
   .pvb { display: flex; width: 2.75rem; height: 2.75rem; align-items: center; justify-content: center; border-radius: 9999px; background: rgba(0,0,0,.6); color: #fff; }
   .pvb.hidden { display: none; }
-  .vvplace { display: block; height: 2.75rem; line-height: calc(2.75rem - 2px); padding: 0 1rem; border-radius: 9999px; background: rgba(0,0,0,.45); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,.18); color: rgba(255,255,255,.92); font-weight: 500; font-size: .95rem; letter-spacing: .01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: calc(100% - 6.5rem); transition: background .2s ease; }
+  .vvplace { top: 20%; display: block; height: 2.75rem; line-height: calc(2.75rem - 2px); padding: 0 1rem; border-radius: 9999px; background: rgba(0,0,0,.45); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,.18); color: #4ADE80; font-weight: 600; font-size: .95rem; letter-spacing: .01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: calc(100% - 6.5rem); transition: background .2s ease; }
   .vvplace:hover, .vvplace:active { background: rgba(0,0,0,.6); }
   .vvplace.hidden { display: none; }
   /* Video player arrows show only with a mouse; on phones you swipe */
@@ -238,7 +238,7 @@
   <video id="vvVideo" class="vvclip" controls playsinline></video>
   <video id="vvVideo2" class="vvclip" controls playsinline style="visibility: hidden;"></video>
   <!-- Shown when the video belongs to a place (videos.json "place"); not when the player was opened from that place's own page -->
-  <a id="vvPlace" href="#/" class="vvplace hidden absolute left-4 top-4 z-10"></a>
+  <a id="vvPlace" href="#/" class="vvplace hidden absolute left-4 z-10"></a>
   <button type="button" data-act="vv-close" aria-label="Close video" class="pvb absolute right-4 top-4 z-10"><span data-icon="x" class="contents"></span></button>
   <!-- Previous / next arrows: computers only (phones swipe left or right instead) -->
   <button type="button" id="vvPrev" data-act="vv-prev" aria-label="Previous video" class="pvb vvnav absolute left-4 top-1/2 z-10 -translate-y-1/2"><span data-icon="left" class="contents"></span></button>
