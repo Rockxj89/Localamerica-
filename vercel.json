@@ -32,6 +32,9 @@
   "functions": {
     "api/category.js": {
       "includeFiles": "index.html"
+    },
+    "api/place.js": {
+      "includeFiles": "videos.json"
     }
   },
   "crons": [

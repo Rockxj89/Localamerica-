@@ -1081,6 +1081,8 @@ function viewPlace(id) {
   const coords = gps ? `${Number(l.latitude).toFixed(5)}, ${Number(l.longitude).toFixed(5)}` : '';
   const maps = gps ? `https://www.google.com/maps/search/?api=1&query=${l.latitude},${l.longitude}` : '';
   const busyHere = String(state.busy) === String(l.id);
+  loadVideos();
+  const pvid = placeVideo(l.id);
   // A free place whose coordinates show openly, used as the "here's what you get" example
   const sample = state.locs.find((x) => x.name === 'Popular Location #2' && isFree(x) && hasCoords(x));
 
@@ -1122,6 +1124,9 @@ function viewPlace(id) {
         ${keys.map((k, i) => `<button type="button" data-act="pv-open" data-id="${l.id}" data-i="${i}" aria-label="Enlarge photo ${i + 1}" class="lift press block overflow-hidden rounded-tile bg-inset shadow-card ${i === 0 ? 'col-span-2' : ''}"><div class="${i === 0 ? 'aspect-[16/10]' : 'aspect-[4/3]'} w-full"><img loading="lazy" src="${esc(sizedUrl(k, i === 0 ? 1080 : 640))}" data-full="${esc(photoUrl(k))}" alt="${esc(l.name)} field photo" class="img-zoom h-full w-full object-cover"></div></button>`).join('')}
       </div>
     </section>` : ''}
+
+    ${pvid ? `
+    <section>${videoTile(pvid, 'aspect-[16/10]', true)}</section>` : ''}
 
     <section>
       <h2 class="font-display text-[length:var(--fs-h2)] font-semibold leading-[1.2] tracking-[-0.015em] text-primary">Field notes</h2>
@@ -1288,24 +1293,41 @@ function viewPrivacy() {
 }
 
 // ================= VIDEOS (TikTok videos from @local_america, stored in the public "tiktok-videos" bucket) =================
-// The list lives in videos.json: [{ "file": "<filename in the bucket>" }, ...], newest first.
+// The list lives in videos.json: [{ "file": "<filename in the bucket>", "place": <place id, optional> }, ...], newest first.
+// A video with a "place" shows on that place's page, and gets a "See this place" link on the Videos page.
 const VIDEO_BATCH = 6;
 const VIDEO_BASE = 'https://ycdlxdijrlfsxvxksyrq.supabase.co/storage/v1/object/public/tiktok-videos/';
-const vid = { list: null, failed: false, shown: VIDEO_BATCH, loading: false };
+const vid = { list: null, place: {}, failed: false, shown: VIDEO_BATCH, loading: false };
 const safeFile = (f) => typeof f === 'string' && /^[A-Za-z0-9_-]{5,80}\.mp4$/.test(f);
 function loadVideos() {
-  if (vid.list || vid.loading) return;
+  if (vid.list || vid.loading || vid.failed) return;
   vid.loading = true;
   fetch('videos.json', { cache: 'no-cache' })
     .then((r) => r.ok ? r.json() : Promise.reject(new Error('videos ' + r.status)))
-    .then((d) => { vid.list = (Array.isArray(d) ? d : []).map((v) => v && v.file).filter(safeFile); })
+    .then((d) => {
+      const rows = (Array.isArray(d) ? d : []).filter((v) => v && safeFile(v.file));
+      vid.list = rows.map((v) => v.file);
+      vid.place = {};
+      rows.forEach((v) => { if (Number.isInteger(v.place) && v.place > 0) vid.place[v.file] = v.place; });
+    })
     .catch(() => { vid.failed = true; })
-    .finally(() => { vid.loading = false; if ((location.hash.slice(1) || '/').split('/')[1] === 'videos') render(); });
+    .finally(() => { vid.loading = false; const pg = (location.hash.slice(1) || '/').split('/')[1]; if (pg === 'videos' || pg === 'p') render(); });
+}
+// The video that belongs to a place (first one in the list), or null
+function placeVideo(id) {
+  if (!vid.list) return null;
+  return vid.list.find((f) => String(vid.place[f]) === String(id)) || null;
 }
 // Small tile: a still from the start of the video (the "#t=0.1" makes phones show that frame instead of black).
 // Tapping it opens the full-screen player.
-const videoCard = (file) => `
-  <button type="button" data-act="vv-open" data-f="${file}" aria-label="Play video" class="lift press relative block aspect-[4/5] w-full min-w-0 overflow-hidden rounded-tile bg-black shadow-card">
+const videoCard = (file) => {
+  const pid = vid.place[file];
+  const pl = pid ? state.locs.find((x) => String(x.id) === String(pid)) : null;
+  return `<div class="min-w-0">${videoTile(file, 'aspect-[4/5]')}${pl ? `
+  <a href="#/p/${pl.id}" class="mt-2 inline-flex min-h-11 items-center gap-1 t-sm font-medium text-primary underline underline-offset-2 hover:no-underline">See this place ${icon('arrow', 'ico-sm')}</a>` : ''}</div>`;
+};
+const videoTile = (file, shape, solo) => `
+  <button type="button" data-act="vv-open" data-f="${file}"${solo ? ' data-solo="1"' : ''} aria-label="Play video" class="lift press relative block ${shape} w-full min-w-0 overflow-hidden rounded-tile bg-black shadow-card">
     <video class="pointer-events-none absolute inset-0 h-full w-full object-cover" src="${VIDEO_BASE}${file}#t=0.1" muted playsinline preload="metadata" tabindex="-1" aria-hidden="true"></video>
     <span class="absolute inset-0 flex items-center justify-center">
       <span class="flex h-14 w-14 items-center justify-center rounded-full text-white" style="background: rgba(0,0,0,.55);">
@@ -1334,10 +1356,11 @@ function vvReset() {
   [vv.cur, vv.spare].forEach((v) => { v.classList.remove('anim'); v.style.transform = ''; });
   vv.cur.style.visibility = ''; vv.spare.style.visibility = 'hidden';
 }
-function vvOpen(file) {
+// solo: opened from a place page, so just that one video (no next / previous)
+function vvOpen(file, solo) {
   if (!safeFile(file)) return;
   vvReset(); vvStop(vv.spare);
-  vv.i = vid.list ? vid.list.indexOf(file) : -1;
+  vv.i = vid.list && !solo ? vid.list.indexOf(file) : -1;
   const many = vv.i >= 0 && vid.list.length > 1;
   $('#vvPrev').classList.toggle('hidden', !many);
   $('#vvNext').classList.toggle('hidden', !many);
@@ -1685,7 +1708,7 @@ document.addEventListener('click', async (e) => {
   if (act === 'cat-near-on') { state.catNear = true; state.shown = CFG.PAGE_SIZE; return state.distances ? render() : findMe(); }
   if (act === 'cat-near-off') { state.catNear = false; state.shown = CFG.PAGE_SIZE; return render(); }
   if (act === 'more-videos') return moreVideos(el);
-  if (act === 'vv-open') return vvOpen(el.dataset.f);
+  if (act === 'vv-open') return vvOpen(el.dataset.f, el.dataset.solo === '1');
   if (act === 'vv-close') return vvClose();
   if (act === 'vv-prev') return vvGo(-1);
   if (act === 'vv-next') return vvGo(1);
