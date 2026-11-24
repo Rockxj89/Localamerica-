@@ -111,8 +111,8 @@
   /* Round dark buttons in the full-screen photo viewer */
   .pvb { display: flex; width: 2.75rem; height: 2.75rem; align-items: center; justify-content: center; border-radius: 9999px; background: rgba(0,0,0,.6); color: #fff; }
   .pvb.hidden { display: none; }
-  .vvplace { top: 20%; display: block; height: 2.75rem; line-height: calc(2.75rem - 2px); padding: 0 1rem; border-radius: 9999px; background: rgba(0,0,0,.45); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,.18); color: #4ADE80; font-weight: 600; font-size: .95rem; letter-spacing: .01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: calc(100% - 6.5rem); transition: background .2s ease; }
-  .vvplace:hover, .vvplace:active { background: rgba(0,0,0,.6); }
+  .vvplace { top: calc(0.5rem + 10%); display: block; height: 2.75rem; line-height: 2.75rem; padding: 0; color: #4ADE80; font-weight: 700; font-size: 1.35rem; letter-spacing: .01em; text-shadow: 0 1px 3px rgba(0,0,0,.9), 0 0 8px rgba(0,0,0,.6); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: calc(100% - 6.5rem); transition: opacity .2s ease; }
+  .vvplace:hover, .vvplace:active { opacity: .8; }
   .vvplace.hidden { display: none; }
   /* Video player arrows show only with a mouse; on phones you swipe */
   .pvb.vvnav { display: none; }
