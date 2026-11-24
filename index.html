@@ -111,7 +111,8 @@
   /* Round dark buttons in the full-screen photo viewer */
   .pvb { display: flex; width: 2.75rem; height: 2.75rem; align-items: center; justify-content: center; border-radius: 9999px; background: rgba(0,0,0,.6); color: #fff; }
   .pvb.hidden { display: none; }
-  .vvplace { display: flex; min-height: 2.75rem; align-items: center; padding: 0 1.1rem; border-radius: 9999px; background: #fff; color: #1a1a1a; font-weight: 600; font-size: 1rem; white-space: nowrap; box-shadow: 0 2px 10px rgba(0,0,0,.35); }
+  .vvplace { display: flex; min-height: 2.75rem; align-items: center; padding: 0 1rem; border-radius: 9999px; background: rgba(0,0,0,.45); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,.18); color: rgba(255,255,255,.92); font-weight: 500; font-size: .95rem; letter-spacing: .01em; white-space: nowrap; transition: background .2s ease; }
+  .vvplace:hover, .vvplace:active { background: rgba(0,0,0,.6); }
   .vvplace.hidden { display: none; }
   /* Video player arrows show only with a mouse; on phones you swipe */
   .pvb.vvnav { display: none; }
