@@ -111,8 +111,10 @@
   /* Round dark buttons in the full-screen photo viewer */
   .pvb { display: flex; width: 2.75rem; height: 2.75rem; align-items: center; justify-content: center; border-radius: 9999px; background: rgba(0,0,0,.6); color: #fff; }
   .pvb.hidden { display: none; }
-  .vvplace { top: calc(0.5rem + 10%); display: block; height: 2.75rem; line-height: 2.75rem; padding: 0; color: #4ADE80; font-weight: 700; font-size: 1.35rem; letter-spacing: .01em; text-shadow: 0 1px 3px rgba(0,0,0,.9), 0 0 8px rgba(0,0,0,.6); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: calc(100% - 6.5rem); transition: opacity .2s ease; }
-  .vvplace:hover, .vvplace:active { opacity: .8; }
+  .vvplace { left: 50%; bottom: calc(4.5rem + 8%); transform: translateX(-50%); display: inline-flex; align-items: center; gap: .6rem; max-width: calc(100% - 2rem); padding: .7rem 1.25rem; border: 3px solid #FFFFFF; border-radius: 9999px; background: #15803D; color: #FFFFFF; font-weight: 700; font-size: 1.3rem; line-height: 1.2; box-shadow: 0 4px 14px rgba(0,0,0,.5); transition: background-color .2s ease; }
+  .vvplace .vvname { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .vvplace .ico { width: 1.5rem; height: 1.5rem; stroke-width: 2.5; }
+  .vvplace:hover, .vvplace:active { background: #166534; }
   .vvplace.hidden { display: none; }
   /* Video player arrows show only with a mouse; on phones you swipe */
   .pvb.vvnav { display: none; }
@@ -238,7 +240,7 @@
   <video id="vvVideo" class="vvclip" controls playsinline></video>
   <video id="vvVideo2" class="vvclip" controls playsinline style="visibility: hidden;"></video>
   <!-- Shown when the video belongs to a place (videos.json "place"); not when the player was opened from that place's own page -->
-  <a id="vvPlace" href="#/" class="vvplace hidden absolute left-4 z-10"></a>
+  <a id="vvPlace" href="#/" class="vvplace hidden absolute z-10"></a>
   <button type="button" data-act="vv-close" aria-label="Close video" class="pvb absolute right-4 top-4 z-10"><span data-icon="x" class="contents"></span></button>
   <!-- Previous / next arrows: computers only (phones swipe left or right instead) -->
   <button type="button" id="vvPrev" data-act="vv-prev" aria-label="Previous video" class="pvb vvnav absolute left-4 top-1/2 z-10 -translate-y-1/2"><span data-icon="left" class="contents"></span></button>
@@ -1351,7 +1353,7 @@ function vvPlaceLink(file) {
   const pl = pid ? state.locs.find((x) => String(x.id) === String(pid)) : null;
   a.classList.toggle('hidden', !pl);
   a.setAttribute('href', pl ? '#/p/' + pl.id : '#/');
-  a.textContent = pl ? 'Go to ' + (pl.name || 'this place') : '';
+  a.innerHTML = pl ? icon('pin') + '<span class="vvname">' + esc('Go to ' + (pl.name || 'this place')) + '</span>' + icon('arrow') : '';
 }
 function vvLoad(file) {
   vvPlaceLink(file);
