@@ -111,10 +111,12 @@
   /* Round dark buttons in the full-screen photo viewer */
   .pvb { display: flex; width: 2.75rem; height: 2.75rem; align-items: center; justify-content: center; border-radius: 9999px; background: rgba(0,0,0,.6); color: #fff; }
   .pvb.hidden { display: none; }
-  .vvplace { left: 50%; bottom: calc(4.5rem + 8%); transform: translateX(-50%); display: inline-flex; align-items: center; gap: .6rem; max-width: calc(100% - 2rem); padding: .7rem 1.25rem; border: 3px solid #FFFFFF; border-radius: 9999px; background: #15803D; color: #FFFFFF; font-weight: 700; font-size: 1.3rem; line-height: 1.2; box-shadow: 0 4px 14px rgba(0,0,0,.5); transition: background-color .2s ease; }
+  .vvplace { left: 1rem; bottom: 5rem; display: flex; flex-direction: column; align-items: flex-start; max-width: calc(100% - 2rem); padding: .25rem 0; color: #FFFFFF; text-shadow: 0 1px 3px rgba(0,0,0,.85), 0 0 8px rgba(0,0,0,.5); transition: opacity .2s ease; }
+  .vvplace .vvrow { display: flex; align-items: center; gap: .3rem; max-width: 100%; font-weight: 700; font-size: 1.2rem; line-height: 1.3; }
   .vvplace .vvname { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-  .vvplace .ico { width: 1.5rem; height: 1.5rem; stroke-width: 2.5; }
-  .vvplace:hover, .vvplace:active { background: #166534; }
+  .vvplace .vvarea { font-size: .95rem; font-weight: 500; opacity: .9; margin-top: .1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  .vvplace .ico { width: 1.25rem; height: 1.25rem; stroke-width: 2.5; filter: drop-shadow(0 1px 2px rgba(0,0,0,.8)); }
+  .vvplace:hover, .vvplace:active { opacity: .8; }
   .vvplace.hidden { display: none; }
   /* Video player arrows show only with a mouse; on phones you swipe */
   .pvb.vvnav { display: none; }
@@ -1301,10 +1303,10 @@ function viewPrivacy() {
 
 // ================= VIDEOS (TikTok videos from @local_america, stored in the public "tiktok-videos" bucket) =================
 // The list lives in videos.json: [{ "file": "<filename in the bucket>", "place": <place id, optional> }, ...], newest first.
-// A video with a "place" shows on that place's page, and its full-screen player gets a "Go to <place name>" button.
+// A video with a "place" shows on that place's page, and its full-screen player gets a place tag (pin, name, arrow, optional "area" line).
 const VIDEO_BATCH = 6;
 const VIDEO_BASE = 'https://ycdlxdijrlfsxvxksyrq.supabase.co/storage/v1/object/public/tiktok-videos/';
-const vid = { list: null, place: {}, failed: false, shown: VIDEO_BATCH, loading: false };
+const vid = { list: null, place: {}, area: {}, failed: false, shown: VIDEO_BATCH, loading: false };
 const safeFile = (f) => typeof f === 'string' && /^[A-Za-z0-9_-]{5,80}\.mp4$/.test(f);
 function loadVideos() {
   if (vid.list || vid.loading || vid.failed) return;
@@ -1314,8 +1316,8 @@ function loadVideos() {
     .then((d) => {
       const rows = (Array.isArray(d) ? d : []).filter((v) => v && safeFile(v.file));
       vid.list = rows.map((v) => v.file);
-      vid.place = {};
-      rows.forEach((v) => { if (Number.isInteger(v.place) && v.place > 0) vid.place[v.file] = v.place; });
+      vid.place = {}; vid.area = {};
+      rows.forEach((v) => { if (Number.isInteger(v.place) && v.place > 0) { vid.place[v.file] = v.place; if (typeof v.area === 'string' && v.area.trim()) vid.area[v.file] = v.area.trim().slice(0, 60); } });
     })
     .catch(() => { vid.failed = true; })
     .finally(() => { vid.loading = false; const pg = (location.hash.slice(1) || '/').split('/')[1]; if (pg === 'videos' || pg === 'p') render(); });
@@ -1346,14 +1348,16 @@ function vvStop(v) {
   try { v.pause(); } catch (err) { /* fine */ }
   v.removeAttribute('src'); v.load();
 }
-// The "Go to <place name>" button: points at the place of the video now showing
+// The place tag (pin, place name, arrow, optional area line from videos.json "area"): points at the place of the video now showing
 function vvPlaceLink(file) {
   const a = $('#vvPlace');
   const pid = !vv.solo && vid.place[file];
   const pl = pid ? state.locs.find((x) => String(x.id) === String(pid)) : null;
   a.classList.toggle('hidden', !pl);
   a.setAttribute('href', pl ? '#/p/' + pl.id : '#/');
-  a.innerHTML = pl ? icon('pin') + '<span class="vvname">' + esc('Go to ' + (pl.name || 'this place')) + '</span>' + icon('arrow') : '';
+  const area = pl && vid.area[file];
+  a.innerHTML = pl ? '<span class="vvrow">' + icon('pin') + '<span class="vvname">' + esc(pl.name || 'this place') + '</span>' + icon('right') + '</span>' + (area ? '<span class="vvarea">' + esc(area) + '</span>' : '') : '';
+  a.setAttribute('aria-label', pl ? 'Go to ' + (pl.name || 'this place') : '');
 }
 function vvLoad(file) {
   vvPlaceLink(file);
