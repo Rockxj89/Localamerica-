@@ -160,7 +160,7 @@ from (values
   (177, 'Easyish access in, with lots of rock outcroppings to explore. Swim a while, then go climb around.'),
   (178, 'The road in is a little rough. It’s a big hole, but it doesn’t seem deep, so check before you jump.'),
   (179, 'Easy access and a large hole, so it can get crowded. Get there early to stake your claim.'),
-  (180, 'My family has jumped from this rock for generations. Now it’s your turn to make the leap.'),
+  (180, 'My family has jumped from this rock for generations. Check the water first, then make some memories of your own.'),
   (181, 'A great swimming hole with a multi tiered bluff to jump from. Start low, work your way up, and always check the water first.'),
   (182, 'Easy access off a highway, so it can get crowded. Come early on hot weekends.'),
   (183, 'A nice big swimming hole with an easy drive in and lots of creekside access. Plenty of room to spread out along the water.'),
