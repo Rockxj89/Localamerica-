@@ -26,6 +26,8 @@ module.exports = async (req, res) => {
   const entries = [
     { loc: S.SITE + '/' },
     ...S.TOWNS.map((t) => ({ loc: `${S.SITE}/near/${t.slug}` })),
+    // Place-type pages (/camp, /swimming, ...), only types that have places right now
+    ...[...new Set(places.map((p) => S.CATEGORY_SLUGS[p.category]).filter(Boolean))].sort().map((c) => ({ loc: `${S.SITE}/${c}` })),
     ...places.map((p) => ({ loc: `${S.SITE}/places/${p.slug}`, images: (photos[p.id] || []).slice(0, 5) }))
   ];
   // ?format=indexnow returns the same page list as a ready-to-send IndexNow message (used by the weekly timer, api/indexnow.js).

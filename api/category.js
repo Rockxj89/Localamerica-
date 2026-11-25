@@ -61,6 +61,8 @@ module.exports = (req, res) => {
   html = setMeta(html, 'property', 'og:description', desc);
   html = setMeta(html, 'property', 'og:url', url);
   html = setMeta(html, 'name', 'twitter:title', title);
+  // Google lists this category under its own address, not as a copy of the home page
+  html = html.replace(/(<link rel="canonical" href=")[^"]*(")/, (m, a, b) => a + url + b);
 
   // Open the guide's own category view. Done before the app starts, so it loads straight there.
   const jump = '<script>try{history.replaceState(null,"","/#/c/' + slug + '"+location.search)}catch(e){location.replace("/#/c/' + slug + '")}</script>';

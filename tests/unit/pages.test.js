@@ -82,6 +82,8 @@ test('the page list for Google has no coordinates and no caves', async () => {
   assert.ok(!S.hasAnyCoordinates(r.body));
   assert.ok(!S.CAVE_WORD.test(r.body));
   for (const p of ROWS) assert.ok(r.body.includes(`/places/${S.toSlug(p.name)}<`), `${p.name} is missing`);
+  for (const c of ['dead-ends', 'popular', 'camp', 'wheeling']) assert.ok(r.body.includes(`https://localamerica.us/${c}<`), `/${c} is missing`);
+  assert.ok(!r.body.includes('/caves<'), 'the page list has /caves');
 });
 
 test('category pages work, and /caves is not one of them', async () => {
@@ -90,6 +92,7 @@ test('category pages work, and /caves is not one of them', async () => {
     const r = await call('category', { c });
     assert.equal(r.status, 200, `/${c}`);
     assert.ok(!S.CAVE_WORD.test(r.body), `/${c} mentions caves`);
+    assert.ok(r.body.includes(`<link rel="canonical" href="https://localamerica.us/${c}">`), `/${c} should be its own address for Google`);
   }
   const caves = await call('category', { c: 'caves' });
   assert.ok([301, 302, 307, 308].includes(caves.status) && caves.headers.location === '/', '/caves should go to Home');
@@ -98,6 +101,7 @@ test('category pages work, and /caves is not one of them', async () => {
 test('the app file: Near me shows 5, the link preview matches, no caves anywhere', () => {
   const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
   assert.match(html, /NEAR_PAGE_SIZE:\s*5\b/);
+  assert.ok(html.includes('<link rel="canonical" href="https://localamerica.us/">'), 'home page has no canonical address');
   const previews = [...html.matchAll(/<meta (?:name="description"|property="og:description") content="([^"]*)"/g)].map((m) => m[1]);
   assert.equal(previews.length, 2);
   for (const d of previews) assert.ok(d.includes(`find the ${S.NEAR_COUNT} places closest to you`), 'link preview: ' + d);
