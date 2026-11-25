@@ -201,7 +201,7 @@ const catSingular = (c) => CATEGORY_SINGULAR[c] || catLabel(c);
 const photoLabel = (p, town) => `${catSingular(p.category)} near ${town}, Missouri – Local America`;
 
 module.exports = {
-  SITE, toSlug, catLabel, catUrl, CATEGORY_DESCRIPTIONS, photoUrl, sizedUrl,
+  SITE, toSlug, catLabel, catUrl, CATEGORY_SLUGS, CATEGORY_DESCRIPTIONS, photoUrl, sizedUrl,
   loadPlaces, loadPhotos, byTypeThenNumber,
   TOWNS, NEAR_MILES, PER_TYPE, roundMiles, loadTownDistances, loadNearestTowns, loadAllPhotos, catSingular, photoLabel
 };
