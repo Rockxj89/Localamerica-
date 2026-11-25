@@ -460,6 +460,21 @@ const state = {
 };
 
 let sb = null;
+// True only when the owner is signed in on this browser (same sign-in as Traffic). Shows video numbers; changes nothing else.
+let isOwner = false;
+async function checkOwner() {
+  try {
+    // Reads the sign-in saved by the owner pages (Traffic, Card Maker), which keep it under their own name.
+    // A separate client, so the public app's own requests never carry the owner's sign-in.
+    const ob = supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_KEY, {
+      auth: { persistSession: true, autoRefreshToken: false, detectSessionInUrl: false, storageKey: 'la-traffic-auth' }
+    });
+    const { data: { session } } = await ob.auth.getSession();
+    if (!session) return;
+    const { data } = await ob.rpc('is_traffic_admin');
+    if (data === true) { isOwner = true; if ((location.hash.slice(1) || '/').split('/')[1] === 'videos') render(); }
+  } catch (e) { /* not the owner, or offline: no numbers */ }
+}
 const sessionId = (() => {
   try {
     let s = sessionStorage.getItem('la_sid');
@@ -1330,15 +1345,17 @@ function placeVideo(id) {
 }
 // Small tile: a still from the start of the video (the "#t=0.1" makes phones show that frame instead of black).
 // Tapping it opens the full-screen player.
-const videoCard = (file) => videoTile(file, 'aspect-[4/5]');
-const videoTile = (file, shape, solo) => `
+// n: the video's number (1, 2, 3...), shown in the corner only to the signed-in owner, so he can say "video 3"
+const videoCard = (file, n) => videoTile(file, 'aspect-[4/5]', false, n);
+const videoTile = (file, shape, solo, n) => `
   <button type="button" data-act="vv-open" data-f="${file}"${solo ? ' data-solo="1"' : ''} aria-label="Play video" class="lift press relative block ${shape} w-full min-w-0 overflow-hidden rounded-tile bg-black shadow-card">
     <video class="pointer-events-none absolute inset-0 h-full w-full object-cover" src="${VIDEO_BASE}${file}#t=0.1" muted playsinline preload="metadata" tabindex="-1" aria-hidden="true"></video>
     <span class="absolute inset-0 flex items-center justify-center">
       <span class="flex h-14 w-14 items-center justify-center rounded-full text-white" style="background: rgba(0,0,0,.55);">
         <svg viewBox="0 0 24 24" class="h-7 w-7" aria-hidden="true"><path d="M8 5.5v13l11-6.5z" fill="currentColor"/></svg>
       </span>
-    </span>
+    </span>${isOwner && n ? `
+    <span class="absolute left-2.5 top-2 text-lg font-bold text-white" style="text-shadow: 0 1px 3px rgba(0,0,0,.9);" aria-hidden="true">${n}</span>` : ''}
   </button>`;
 // Which video in the list is open, so a swipe (or the arrows on a computer) can move to the next or previous one.
 // Two video players take turns, so on phones the next video can slide in while the old one slides away (TikTok style).
@@ -1478,8 +1495,9 @@ function moreVideos(btn) {
   const grid = document.getElementById('videoGrid');
   if (!grid || !vid.list) return;
   const next = vid.list.slice(vid.shown, vid.shown + VIDEO_BATCH);
+  const start = vid.shown;
   vid.shown += next.length;
-  grid.insertAdjacentHTML('beforeend', next.map(videoCard).join(''));
+  grid.insertAdjacentHTML('beforeend', next.map((f, i) => videoCard(f, start + i + 1)).join(''));
   if (vid.shown >= vid.list.length && btn) btn.remove();
 }
 function viewVideos() {
@@ -1489,7 +1507,7 @@ function viewVideos() {
   else if (!vid.list) body = `<div class="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-4">${'<div class="skel aspect-[4/5] rounded-tile"></div>'.repeat(4)}</div>`;
   else if (!vid.list.length) body = `<p class="t-base text-secondary">Videos are coming soon.</p>`;
   else body = `
-    <div id="videoGrid" class="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-4">${vid.list.slice(0, vid.shown).map(videoCard).join('')}</div>
+    <div id="videoGrid" class="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-4">${vid.list.slice(0, vid.shown).map((f, i) => videoCard(f, i + 1)).join('')}</div>
     ${vid.list.length > vid.shown ? `<div class="mt-6 text-center"><button type="button" data-act="more-videos" class="${btnSecondary}">Show more videos</button></div>` : ''}`;
   return `
   <section class="space-y-6 text-primary">
@@ -1782,6 +1800,7 @@ render();
 loadData()
   .then(async () => {
     render();
+    checkOwner();
     logEvent('app_open', null, { standalone: isStandalone, inAppBrowser });
     await handleCheckoutReturn();
     await loadUnlocked();
