@@ -1319,11 +1319,12 @@ function viewPrivacy() {
   </article>`;
 }
 
-// ================= VIDEOS (TikTok videos from @local_america, stored in the public "tiktok-videos" bucket) =================
+// ================= VIDEOS (TikTok videos from @local_america, stored in Cloudflare R2, bucket "localamerica-videos") =================
 // The list lives in videos.json: [{ "file": "<filename in the bucket>", "place": <place id, optional> }, ...], newest first.
 // A video with a "place" shows on that place's page, and its full-screen player gets a place tag (pin, name, arrow, optional "area" line).
 const VIDEO_BATCH = 6;
-const VIDEO_BASE = 'https://ycdlxdijrlfsxvxksyrq.supabase.co/storage/v1/object/public/tiktok-videos/';
+// Videos are served from Cloudflare R2 (bucket localamerica-videos, public r2.dev address) since Nov 26, 2026; new videos go there too.
+const VIDEO_BASE = 'https://pub-f39873f66a624c2eb2db5902308387b0.r2.dev/';
 const vid = { list: null, place: {}, area: {}, failed: false, shown: VIDEO_BATCH, loading: false };
 const safeFile = (f) => typeof f === 'string' && /^[A-Za-z0-9_-]{5,80}\.mp4$/.test(f);
 function loadVideos() {
