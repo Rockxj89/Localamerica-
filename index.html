@@ -140,7 +140,7 @@
   a:focus-visible, button:focus-visible, select:focus-visible { outline: 2px solid #15803D; outline-offset: 2px; }
   .navlink[aria-current="page"] { background: rgb(21 128 61 / .12); color: #166534; }
   /* Pages whose title would land on the flag start just below it */
-  #view[data-page="list"], #view[data-page="p"], #view[data-page="safety"], #view[data-page="privacy"], #view[data-page="videos"] { padding-top: calc(var(--flag-clear) - 1.5rem); }
+  #view[data-page="home"], #view[data-page="list"], #view[data-page="p"], #view[data-page="safety"], #view[data-page="privacy"], #view[data-page="videos"] { padding-top: calc(var(--flag-clear) - 1.5rem); }
   /* Small logo on the flag (every page except Home and About, which show the big one). Tapping it goes Home. */
   .mini-logo { position: absolute; z-index: 20; top: .75rem; left: 48%; transform: translateX(-50%); width: 150px; height: 150px; border-radius: 9999px; }
   .mini-logo[hidden] { display: none; }
@@ -148,6 +148,8 @@
   @media (min-width: 768px) { .mini-logo.press:active { transform: translateX(-50%) scale(.96); } }
   .mini-logo svg { width: 100%; height: 100%; }
   @media (min-width: 768px) { .mini-logo { top: 4.5rem; left: calc(50% - 12px); width: 160px; height: 160px; } }
+  .rail { scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .rail::-webkit-scrollbar { display: none; }
   .view-enter { animation: view-in var(--dur-slow) var(--ease-out); }
   @keyframes view-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
   .skel { background: linear-gradient(90deg, rgb(27 35 30 / .06) 25%, rgb(27 35 30 / .11) 37%, rgb(27 35 30 / .06) 63%); background-size: 400% 100%; animation: shimmer 1.6s ease infinite; }
@@ -963,19 +965,44 @@ function viewTowns() {
 }
 
 // ================= SCREENS =================
+// "Start here" row at the top of Home: real places, one tap from the first screen (owner can change the list).
+// Places not in the public list or without a photo are skipped; the row fills up from other places with photos.
+const HOME_START_HERE = [60, 10, 199, 151, 119, 75, 210, 97];
+function startHerePlaces(n = 8) {
+  const withPhoto = (l) => l && state.photos[l.id]?.length;
+  const byId = new Map(state.locs.map((l) => [Number(l.id), l]));
+  const picks = HOME_START_HERE.map((id) => byId.get(id)).filter(withPhoto);
+  const seen = new Set(picks.map((l) => l.id));
+  for (const l of state.locs) { if (picks.length >= n) break; if (!seen.has(l.id) && withPhoto(l)) { picks.push(l); seen.add(l.id); } }
+  return picks.slice(0, n);
+}
+function startHereCard(l) {
+  const ph = state.photos[l.id][0];
+  return `
+        <a href="#/p/${l.id}" aria-label="Open ${esc(l.name)}" class="lift press flex w-[44%] shrink-0 snap-start flex-col overflow-hidden rounded-tile bg-white shadow-card sm:w-[30%] md:w-[23%]">
+          <div class="relative aspect-square overflow-hidden bg-inset">
+            <img loading="lazy" src="${esc(sizedUrl(ph.object_key, 640))}" alt="${esc(l.name)} field photo" class="img-zoom absolute inset-0 h-full w-full object-cover">
+          </div>
+          <div class="flex min-w-0 flex-1 flex-col gap-1 p-3">
+            <h3 class="line-clamp-2 font-display text-lg font-semibold leading-tight tracking-[-0.01em] text-primary">${esc(l.name)}</h3>
+            <p class="truncate t-xs text-tertiary">${esc(catLabel(l.category))}</p>
+            <div class="mt-auto pt-1">${accessBadge(l, true)}</div>
+          </div>
+        </a>`;
+}
+
 function viewHome() {
   const total = state.locs.length;
   // Popular locations leads; every place-type tile is the same size (only the Towns tile is big)
   const cats = state.cats.slice().sort((a, b) => (b.name === 'Popular locations') - (a.name === 'Popular locations'));
   const tile = (c) => {
-    const wide = false;
     const desc = CATEGORY_DESCRIPTIONS[c.name] || 'Field-collected locations in this group';
     const own = CATEGORY_HOME_PHOTOS[c.name];
-    const src = own ? own.src : c.photo ? sizedUrl(c.photo, wide ? 1080 : 640) : '';
+    const src = own ? own.src : c.photo ? sizedUrl(c.photo, 640) : '';
     const full = own ? own.src : c.photo ? photoUrl(c.photo) : '';
     const alt = own ? own.alt : c.photoOf ? `${c.photoOf} in ${catLabel(c.name)} field photo` : '';
     return `
-      <a href="#/c/${catSlug(c.name)}" aria-label="Browse ${esc(catLabel(c.name))}" class="lift press relative block overflow-hidden rounded-tile bg-inset shadow-card ${wide ? 'col-span-2 aspect-[16/10] md:col-span-1 md:aspect-[3/2]' : 'aspect-[4/5] md:aspect-[3/2]'}">
+      <a href="#/c/${catSlug(c.name)}" aria-label="Browse ${esc(catLabel(c.name))}" class="lift press relative block aspect-[4/5] overflow-hidden rounded-tile bg-inset shadow-card md:aspect-[3/2]">
         ${src
           ? `<img loading="lazy" src="${esc(src)}" data-full="${esc(full)}" alt="${esc(alt)}" class="img-zoom absolute inset-0 h-full w-full object-cover">`
           : `<div class="absolute inset-0 flex items-center justify-center text-tertiary">${icon(categoryIcon(c.name))}</div>`}
@@ -983,20 +1010,31 @@ function viewHome() {
         <div class="absolute inset-x-0 bottom-0 p-3.5 text-white md:p-4">
           <p class="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[.12em] text-white/80 tabular-nums">${icon(categoryIcon(c.name), 'ico-xs')}${c.count} ${c.count === 1 ? 'place' : 'places'}</p>
           <h3 class="mt-1 font-display text-xl font-semibold leading-tight tracking-[-0.01em]">${esc(catLabel(c.name))}</h3>
-          <p class="mt-1 line-clamp-2 text-[15px] leading-snug text-white/85 ${wide ? '' : 'hidden md:block'}">${esc(desc)}</p>
+          <p class="mt-1 line-clamp-2 hidden text-[15px] leading-snug text-white/85 md:block">${esc(desc)}</p>
         </div>
       </a>`;
   };
+  const start = startHerePlaces();
   return `
   <div class="space-y-10">
-    <div class="space-y-6">
-      ${logoSvg('0 0 0 0 0.106 0 0 0 0 0.137 0 0 0 0 0.118 6 6 6 0 -4.2')}
+    <div class="space-y-3">
       <h1 class="text-center font-display text-[length:var(--fs-display)] font-bold leading-[1.05] tracking-[-0.025em] text-primary">The Ozarks</h1>
       <p class="mx-auto max-w-md text-center t-sm text-secondary">All locations are situated on public land and are fully accessible to the general public.</p>
     </div>
 
+    ${start.length ? `
+    <section aria-label="Start here">
+      <div class="mb-3 flex items-end justify-between gap-4">
+        <h2 class="font-display text-[length:var(--fs-h2)] font-semibold leading-tight tracking-[-0.015em] text-primary">Start here</h2>
+        <a href="#/places" class="inline-flex shrink-0 items-center gap-1 t-sm font-medium text-primary underline decoration-black/20 underline-offset-4 hover:decoration-current">All ${total} places ${icon('arrow', 'ico-sm')}</a>
+      </div>
+      <div class="rail -mx-4 flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4 pb-2 sm:mx-0 sm:px-0 sm:scroll-px-0">
+        ${start.map(startHereCard).join('')}
+      </div>
+    </section>` : ''}
+
     <section>
-      ${eyebrow(`${total} ${total === 1 ? 'field record' : 'field records'}`)}
+      <h2 class="mb-3 font-display text-[length:var(--fs-h2)] font-semibold leading-tight tracking-[-0.015em] text-primary">Place types</h2>
       ${state.cats.length ? `
       <div class="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-4">
         ${townsTile()}
@@ -1560,10 +1598,10 @@ function renderInstall() {
 }
 
 // ================= ROUTER =================
-// Show the small flag logo on every page except Home and About (those already show the big logo)
+// Show the small flag logo on every page except About (it shows the big logo)
 function syncMiniLogo(page) {
   const el = document.getElementById('mini-logo');
-  if (el) el.hidden = !['list', 'p', 'safety', 'privacy', 'videos'].includes(page);
+  if (el) el.hidden = !['home', 'list', 'p', 'safety', 'privacy', 'videos'].includes(page);
 }
 // Footer notes show only on place pages; the home-screen card shows on the home page after a few visits
 let onHomePage = false;
