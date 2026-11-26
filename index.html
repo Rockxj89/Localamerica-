@@ -966,7 +966,7 @@ function viewTowns() {
 
 // ================= SCREENS =================
 // "Start here" row at the top of Home: real places, one tap from the first screen (owner can change the list).
-// Places that are archived, missing or have no photo are skipped; the row fills up from other places with photos.
+// Places not in the public list or without a photo are skipped; the row fills up from other places with photos.
 const HOME_START_HERE = [60, 10, 199, 151, 119, 75, 210, 97];
 function startHerePlaces(n = 8) {
   const withPhoto = (l) => l && state.photos[l.id]?.length;
@@ -1598,7 +1598,7 @@ function renderInstall() {
 }
 
 // ================= ROUTER =================
-// Show the small flag logo on every page except Home and About (those already show the big logo)
+// Show the small flag logo on every page except About (it shows the big logo)
 function syncMiniLogo(page) {
   const el = document.getElementById('mini-logo');
   if (el) el.hidden = !['home', 'list', 'p', 'safety', 'privacy', 'videos'].includes(page);
