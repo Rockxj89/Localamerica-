@@ -6,7 +6,8 @@ const fs = require('fs');
 const path = require('path');
 
 // Videos that belong to a place (videos.json, "place": <place id>). Read once per server start.
-const VIDEO_BASE = 'https://ycdlxdijrlfsxvxksyrq.supabase.co/storage/v1/object/public/tiktok-videos/';
+// Videos are served from Cloudflare R2 (bucket localamerica-videos, public r2.dev address) since Nov 26, 2026; new videos go there too.
+const VIDEO_BASE = 'https://pub-f39873f66a624c2eb2db5902308387b0.r2.dev/';
 let videoByPlace = null;
 function placeVideo(id) {
   if (!videoByPlace) {
