@@ -17,6 +17,9 @@ await batch('NAIPPlus tile z15 (9)', t15.map(([z,x,y])=>`https://imagery.nationa
 await batch('Esri photo z15 (9) compare', t15.map(([z,x,y])=>`https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`));
 let t=performance.now(); try{const r=await fetch('https://carto.nationalmap.gov/arcgis/rest/services/transportation/MapServer/32/query?f=json&where=1%3D1&geometry=-92.3,37.1,-92.2,37.2&geometryType=esriGeometryEnvelope&inSR=4326&outSR=4326&returnGeometry=true&resultRecordCount=2000&outFields=name&maxAllowableOffset=0.00002&_r='+Math.random());const j=await r.json();out.push(`USGS town streets query: ${Math.round(performance.now()-t)} ms, ${(j.features||[]).length} roads`);}catch(e){out.push('USGS query failed '+e)}
 t=performance.now(); try{const r=await fetch('/trails-data/places-mo.bin?_r='+Math.random(),{headers:{Range:'bytes=0-60000'}});await r.arrayBuffer();out.push(`Our own site file piece: ${Math.round(performance.now()-t)} ms`);}catch(e){out.push('site failed')}
+for (const fn of ['roads-mo-all.bin?v=1','roads-mo-main.bin?v=1']) { t=performance.now(); try{const r=await fetch('/trails-data/'+fn,{headers:{Range:'bytes=0-65535'}});const b=await r.arrayBuffer();out.push(`${fn}: status ${r.status}, ${b.byteLength} bytes, ${Math.round(performance.now()-t)} ms`);}catch(e){out.push(fn+' failed')} }
+t=performance.now(); try{const r=await fetch('/trails-data/names-mo.bin?v=1');const b=await r.arrayBuffer();out.push(`names: ${r.status} ${b.byteLength} bytes ${r.headers.get('content-type')} ${Math.round(performance.now()-t)} ms`);}catch(e){out.push('names failed')}
+out.push('dpr '+devicePixelRatio);
 out.push('DONE');o.innerHTML=out.join('<br>');
 })();
 </script>
