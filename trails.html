@@ -29,6 +29,10 @@
   .fab svg { width: 24px; height: 24px; }
   #me-btn { bottom: calc(90px + env(safe-area-inset-bottom)); color: var(--me); }
   #sat-btn { bottom: calc(152px + env(safe-area-inset-bottom)); font-size: 12px; }
+  #topo-btn { bottom: calc(214px + env(safe-area-inset-bottom)); font-size: 12px; line-height: 1.1; }
+  #topo-btn[aria-pressed="false"] { color: var(--muted); }
+  /* Brighten the brown topo lines so they show on the dark satellite photo */
+  .contours { filter: brightness(1.9) saturate(1.2); }
   .me-dot { width: 20px; height: 20px; border-radius: 50%; background: var(--me); border: 3px solid #fff; box-shadow: 0 0 0 2px rgba(37,99,235,.35), 0 1px 4px rgba(0,0,0,.4); box-sizing: border-box; position: relative; }
   .me-dot::after { content: ""; position: absolute; inset: -12px; border-radius: 50%; background: rgba(37,99,235,.25); animation: pulse 2s ease-out infinite; z-index: -1; }
   @keyframes pulse { from { transform: scale(.4); opacity: 1; } to { transform: scale(1.4); opacity: 0; } }
@@ -58,6 +62,7 @@
 <div id="gate"><h2 id="gate-title">Checking your sign-in…</h2><p id="gate-text"></p><div id="gate-extra"></div></div>
 <div id="note"></div>
 <div id="map"></div>
+<button class="fab" id="topo-btn" type="button" aria-label="Hide topo lines" aria-pressed="true">Topo<br>on</button>
 <button class="fab" id="sat-btn" type="button" aria-label="Switch to the plain map">Map</button>
 <button class="fab" id="me-btn" type="button" aria-label="Show where I am">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="12" cy="12" r="4" fill="currentColor"/><circle cx="12" cy="12" r="8"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3"/></svg>
@@ -106,15 +111,34 @@ const SUPABASE_KEY = 'sb_publishable_2ExdXbNtW9HpuOGAq1Oa7g_gPdONH_s';
 const WILLOW_SPRINGS = [36.9923, -91.9690];
 const MISSOURI = L.latLngBounds([35.99, -95.77], [40.62, -89.10]);
 
-const map = L.map('map', { zoomControl: true, preferCanvas: true, tap: true }).setView(WILLOW_SPRINGS, 12);
+const map = L.map('map', { zoomControl: true, preferCanvas: true, tap: true, maxZoom: 19 }).setView(WILLOW_SPRINGS, 12);
 const renderer = L.canvas({ tolerance: 12 });
 
 const topo = L.tileLayer('https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{z}/{y}/{x}', {
-  maxZoom: 16, className: 'base-topo', attribution: 'Base map: USGS The National Map'
+  maxNativeZoom: 16, maxZoom: 19, className: 'base-topo', attribution: 'Base map: USGS The National Map'
 });
 const imagery = L.tileLayer('https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/{z}/{y}/{x}', {
-  maxNativeZoom: 16, maxZoom: 17, attribution: 'Base map: USGS The National Map'
+  maxNativeZoom: 16, maxZoom: 19, zIndex: 1, attribution: 'Base map: USGS The National Map'
 }).addTo(map);
+
+// Close up, the cached satellite above gets blurry (it stops at about 2.4 m per pixel).
+// From zoom 14 the full-detail aerial photos (USDA NAIP, about 0.6 m per pixel) are drawn on top, straight from USGS.
+// Topo lines: USGS elevation contours (brown lines with heights), drawn over the satellite from zoom 11.
+const MERC = 20037508.342789244;
+const ArcExport = L.TileLayer.extend({
+  getTileUrl(c) {
+    const size = (2 * MERC) / Math.pow(2, c.z);
+    const bbox = [-MERC + c.x * size, MERC - (c.y + 1) * size, -MERC + (c.x + 1) * size, MERC - c.y * size].join(',');
+    return this._base + '&bbox=' + bbox;
+  }
+});
+const sharp = new ArcExport('', { minZoom: 14, maxNativeZoom: 18, maxZoom: 19, zIndex: 2, tileSize: 256 });
+sharp._base = 'https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer/exportImage?f=image&format=jpg&bboxSR=3857&imageSR=3857&size=512,512&renderingRule=' + encodeURIComponent('{"rasterFunction":"NaturalColor"}');
+sharp.addTo(map);
+const contours = new ArcExport('', { minZoom: 11, maxZoom: 19, zIndex: 5, className: 'contours' });
+contours._base = 'https://carto.nationalmap.gov/arcgis/rest/services/contours/MapServer/export?f=image&format=png32&transparent=true&bboxSR=3857&imageSR=3857&size=512,512&dpi=192';
+contours.addTo(map);
+map.attributionControl.addAttribution('Aerial photos: USDA NAIP; Topo lines: USGS 3DEP');
 map.attributionControl.setPrefix('');
 map.attributionControl.addAttribution('Roads: Forest Service; Public land: USGS PAD-US; © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors');
 
@@ -155,10 +179,19 @@ document.getElementById('me-btn').onclick = () => {
   followed = false; startLocation(true);
 };
 let sat = true;
+let topoOn = true;
+document.getElementById('topo-btn').onclick = (e) => {
+  topoOn = !topoOn;
+  if (topoOn) contours.addTo(map); else map.removeLayer(contours);
+  e.currentTarget.innerHTML = topoOn ? 'Topo<br>on' : 'Topo<br>off';
+  e.currentTarget.setAttribute('aria-pressed', String(topoOn));
+  e.currentTarget.ariaLabel = topoOn ? 'Hide topo lines' : 'Show topo lines';
+};
 document.getElementById('sat-btn').onclick = (e) => {
   sat = !sat;
-  if (sat) { map.removeLayer(topo); imagery.addTo(map); e.currentTarget.textContent = 'Map'; e.currentTarget.ariaLabel = 'Switch to the plain map'; }
-  else { map.removeLayer(imagery); topo.addTo(map); e.currentTarget.textContent = 'Satellite'; e.currentTarget.ariaLabel = 'Switch to satellite'; }
+  if (sat) { map.removeLayer(topo); imagery.addTo(map); sharp.addTo(map); if (topoOn) contours.addTo(map); e.currentTarget.textContent = 'Map'; e.currentTarget.ariaLabel = 'Switch to the plain map'; }
+  else { map.removeLayer(imagery); map.removeLayer(sharp); map.removeLayer(contours); topo.addTo(map); e.currentTarget.textContent = 'Satellite'; e.currentTarget.ariaLabel = 'Switch to satellite'; }
+  document.getElementById('topo-btn').style.display = sat ? '' : 'none';
 };
 
 // ---------- Places (pins) ----------
