@@ -4,9 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
-<title>Trails test map · Local America</title>
+<title>Trails · Local America</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <style>
   :root { --ink: #1c1917; --muted: #57534e; --drive: #f5ecd7; --edge: #3b2f22; --dirt: #d9c7a3; --land: #22c55e; --me: #2563eb; --pin: #111827; }
   html, body { height: 100%; margin: 0; }
@@ -28,6 +29,10 @@
   .fab svg { width: 24px; height: 24px; }
   #me-btn { bottom: calc(90px + env(safe-area-inset-bottom)); color: var(--me); }
   #sat-btn { bottom: calc(152px + env(safe-area-inset-bottom)); font-size: 12px; }
+  #topo-btn { bottom: calc(214px + env(safe-area-inset-bottom)); font-size: 12px; line-height: 1.1; }
+  #topo-btn[aria-pressed="false"] { color: var(--muted); }
+  /* Brighten the brown topo lines so they show on the dark satellite photo */
+  .contours { filter: brightness(1.9) saturate(1.2); }
   .me-dot { width: 20px; height: 20px; border-radius: 50%; background: var(--me); border: 3px solid #fff; box-shadow: 0 0 0 2px rgba(37,99,235,.35), 0 1px 4px rgba(0,0,0,.4); box-sizing: border-box; position: relative; }
   .me-dot::after { content: ""; position: absolute; inset: -12px; border-radius: 50%; background: rgba(37,99,235,.25); animation: pulse 2s ease-out infinite; z-index: -1; }
   @keyframes pulse { from { transform: scale(.4); opacity: 1; } to { transform: scale(1.4); opacity: 0; } }
@@ -38,24 +43,48 @@
   .pop .closed { color: #b91c1c; font-weight: 600; }
   .pop .small { color: var(--muted); font-size: 13px; margin-top: 6px; }
   .pop a.btn { display: inline-block; margin-top: 8px; background: #15803d; color: #fff; padding: 6px 12px; border-radius: 8px; text-decoration: none; font-weight: 600; }
+  body.locked #map, body.locked .fab, body.locked .key { display: none; }
+  #gate { display: none; max-width: 420px; margin: 32px auto; padding: 0 16px; text-align: center; }
+  body.locked #gate { display: block; }
+  #gate h2 { font-size: 20px; margin: 0 0 8px; }
+  #gate p { color: var(--muted); margin: 0 0 16px; }
+  #gate .err { background: #fee2e2; color: #991b1b; padding: 10px; border-radius: 8px; font-size: 14px; }
+  #gate a.go { display: block; background: #15803d; color: #fff; padding: 12px 16px; border-radius: 10px; text-decoration: none; font-weight: 600; }
   .leaflet-control-zoom { display: none; }
   @media (min-width: 700px) { .leaflet-control-zoom { display: block; } }
 </style>
 </head>
-<body>
+<body class="locked">
 <header>
   <h1>Trails near you</h1>
   <a href="/">Back to Local America</a>
 </header>
+<div id="gate"><h2 id="gate-title">Checking your sign-in…</h2><p id="gate-text"></p><div id="gate-extra"></div></div>
 <div id="note"></div>
 <div id="map"></div>
+<button class="fab" id="topo-btn" type="button" aria-label="Hide topo lines" aria-pressed="true">Topo<br>on</button>
 <button class="fab" id="sat-btn" type="button" aria-label="Switch to the plain map">Map</button>
 <button class="fab" id="me-btn" type="button" aria-label="Show where I am">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="12" cy="12" r="4" fill="currentColor"/><circle cx="12" cy="12" r="8"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3"/></svg>
 </button>
 <div class="key"><span><i></i>Open to drive</span><span><i class="dirt"></i>Dirt road, not checked</span><span><i class="land"></i>Public land</span><span><i class="pin"></i>Local America place</span></div>
 <script>
-// Test page only. Not linked from the app. Simple version:
+// ---------- Owner only ----------
+// Same sign-in as the Traffic page. The map starts only after Supabase confirms this is the owner account.
+const sb = supabase.createClient('https://ycdlxdijrlfsxvxksyrq.supabase.co', 'sb_publishable_2ExdXbNtW9HpuOGAq1Oa7g_gPdONH_s', {
+  auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: 'pkce', storageKey: 'la-traffic-auth' }
+});
+function gate(title, text, extra) {
+  document.getElementById('gate-title').textContent = title;
+  document.getElementById('gate-text').textContent = text || '';
+  document.getElementById('gate-extra').innerHTML = extra || '';
+}
+const SIGN_IN = '<a class="go" href="/traffic.html">Go to the Traffic page to sign in</a>';
+document.body.classList.remove('locked');
+startMap();
+
+function startMap() {
+// Owner-only trails map (only the Local America owner account can open it; not linked from the app).
 // - starts where you are (blue dot), or Willow Springs if location is off
 // - satellite photo underneath (USGS, public domain); the Map button switches to the plain topo map
 // - green = public land (Forest Service land from PAD-US)
@@ -67,15 +96,34 @@ const SUPABASE_KEY = 'sb_publishable_2ExdXbNtW9HpuOGAq1Oa7g_gPdONH_s';
 const WILLOW_SPRINGS = [36.9923, -91.9690];
 const MISSOURI = L.latLngBounds([35.99, -95.77], [40.62, -89.10]);
 
-const map = L.map('map', { zoomControl: true, preferCanvas: true, tap: true }).setView(WILLOW_SPRINGS, 12);
+const map = L.map('map', { zoomControl: true, preferCanvas: true, tap: true, maxZoom: 19 }).setView(WILLOW_SPRINGS, 12);
 const renderer = L.canvas({ tolerance: 12 });
 
 const topo = L.tileLayer('https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{z}/{y}/{x}', {
-  maxZoom: 16, className: 'base-topo', attribution: 'Base map: USGS The National Map'
+  maxNativeZoom: 16, maxZoom: 19, className: 'base-topo', attribution: 'Base map: USGS The National Map'
 });
 const imagery = L.tileLayer('https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/{z}/{y}/{x}', {
-  maxNativeZoom: 16, maxZoom: 17, attribution: 'Base map: USGS The National Map'
+  maxNativeZoom: 16, maxZoom: 19, zIndex: 1, attribution: 'Base map: USGS The National Map'
 }).addTo(map);
+
+// Close up, the cached satellite above gets blurry (it stops at about 2.4 m per pixel).
+// From zoom 14 the full-detail aerial photos (USDA NAIP, about 0.6 m per pixel) are drawn on top, straight from USGS.
+// Topo lines: USGS elevation contours (brown lines with heights), drawn over the satellite from zoom 11.
+const MERC = 20037508.342789244;
+const ArcExport = L.TileLayer.extend({
+  getTileUrl(c) {
+    const size = (2 * MERC) / Math.pow(2, c.z);
+    const bbox = [-MERC + c.x * size, MERC - (c.y + 1) * size, -MERC + (c.x + 1) * size, MERC - c.y * size].join(',');
+    return this._base + '&bbox=' + bbox;
+  }
+});
+const sharp = new ArcExport('', { minZoom: 14, maxNativeZoom: 18, maxZoom: 19, zIndex: 2, tileSize: 256 });
+sharp._base = 'https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer/exportImage?f=image&format=jpg&bboxSR=3857&imageSR=3857&size=512,512&renderingRule=' + encodeURIComponent('{"rasterFunction":"NaturalColor"}');
+sharp.addTo(map);
+const contours = new ArcExport('', { minZoom: 11, maxZoom: 19, zIndex: 5, className: 'contours' });
+contours._base = 'https://carto.nationalmap.gov/arcgis/rest/services/contours/MapServer/export?f=image&format=png32&transparent=true&bboxSR=3857&imageSR=3857&size=512,512&dpi=192';
+contours.addTo(map);
+map.attributionControl.addAttribution('Aerial photos: USDA NAIP; Topo lines: USGS 3DEP');
 map.attributionControl.setPrefix('');
 map.attributionControl.addAttribution('Roads: Forest Service; Public land: USGS PAD-US; © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors');
 
@@ -105,7 +153,7 @@ function startLocation(centerOnIt) {
     if (!followed || centerOnIt) {
       followed = true; centerOnIt = false;
       if (MISSOURI.contains(me)) { map.setView(me, 14); note(''); }
-      else fallback("You're outside Missouri, where this test map has trails. Here's Willow Springs.");
+      else fallback("You're outside Missouri, where this map has trails. Here's Willow Springs.");
     }
   }, () => { if (!followed) { followed = true; fallback('Location is off, so here is Willow Springs. Tap the blue button to try again.'); } },
   { enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 });
@@ -116,10 +164,19 @@ document.getElementById('me-btn').onclick = () => {
   followed = false; startLocation(true);
 };
 let sat = true;
+let topoOn = true;
+document.getElementById('topo-btn').onclick = (e) => {
+  topoOn = !topoOn;
+  if (topoOn) contours.addTo(map); else map.removeLayer(contours);
+  e.currentTarget.innerHTML = topoOn ? 'Topo<br>on' : 'Topo<br>off';
+  e.currentTarget.setAttribute('aria-pressed', String(topoOn));
+  e.currentTarget.ariaLabel = topoOn ? 'Hide topo lines' : 'Show topo lines';
+};
 document.getElementById('sat-btn').onclick = (e) => {
   sat = !sat;
-  if (sat) { map.removeLayer(topo); imagery.addTo(map); e.currentTarget.textContent = 'Map'; e.currentTarget.ariaLabel = 'Switch to the plain map'; }
-  else { map.removeLayer(imagery); topo.addTo(map); e.currentTarget.textContent = 'Satellite'; e.currentTarget.ariaLabel = 'Switch to satellite'; }
+  if (sat) { map.removeLayer(topo); imagery.addTo(map); sharp.addTo(map); if (topoOn) contours.addTo(map); e.currentTarget.textContent = 'Map'; e.currentTarget.ariaLabel = 'Switch to the plain map'; }
+  else { map.removeLayer(imagery); map.removeLayer(sharp); map.removeLayer(contours); topo.addTo(map); e.currentTarget.textContent = 'Satellite'; e.currentTarget.ariaLabel = 'Switch to satellite'; }
+  document.getElementById('topo-btn').style.display = sat ? '' : 'none';
 };
 
 // ---------- Places (pins) ----------
@@ -236,8 +293,7 @@ const DATA = 'https://pub-2db698c77b2e4668a900baa59fbc0af0.r2.dev/';
 // ---------- Dirt and gravel roads (OpenStreetMap), all of Missouri ----------
 // One file holds the whole state cut into small pieces by area (0.25 degree squares). The map
 // reads only the pieces on screen, a few KB each, so the phone never downloads the whole state.
-// It tries the copy on R2 first and falls back to the copy on this site.
-const DIRT_FILES = [DATA + 'dirt-roads-mo.bin', '/trails-test/dirt-roads-mo.bin'];
+const DIRT_FILES = [DATA + 'dirt-roads-mo.bin'];
 const DIRT_MIN_ZOOM = 10;
 let dirtSrc = null, dirtWhole = null, dirtIdx = null, dirtStart = 0, dirtIdxP = null, dirtFailed = false;
 const dirtAsked = new Set(), dirtShown = new Set();
@@ -332,7 +388,8 @@ Promise.allSettled([getJson(DATA + 'fs-roads.json'), getJson(DATA + 'public-land
 // For checking the page: ?at=lat,lng skips location; ?open=fs or ?open=dirt opens one line's info box
 const qs = new URLSearchParams(location.search);
 const at = qs.get('at');
-if (at) { const [la, lo] = at.split(',').map(Number); showMe([la, lo]); followed = true; map.setView(me, 14); }
+const atLL = at ? at.split(',').map(Number) : [];
+if (atLL.length === 2 && atLL.every(Number.isFinite)) { showMe(atLL); followed = true; map.setView(me, 14); }
 else startLocation(false);
 const openParam = qs.get('open');
 let tries = 0;
@@ -344,6 +401,7 @@ function demoOpen() {
   const ll = first.getLatLngs().flat(3); first.openPopup(ll[Math.floor(ll.length / 2)]);
 }
 if (openParam) setTimeout(demoOpen, 1500);
+}
 </script>
 </body>
 </html>
