@@ -50,7 +50,7 @@
   .key { position: absolute; left: 10px; right: 76px; bottom: calc(56px + env(safe-area-inset-bottom)); z-index: 1000; max-width: 420px; background: rgba(17,17,17,.86); color: var(--tan); border-radius: 14px; box-shadow: 0 2px 10px rgba(0,0,0,.35); padding: 8px 12px; font-size: 13px; display: flex; gap: 6px 14px; flex-wrap: wrap; pointer-events: none; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
   .key span { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
   .key i { display: inline-block; width: 22px; height: 6px; background: var(--gold); border: 2px solid #111; border-radius: 4px; box-shadow: 0 0 0 1px rgba(255,255,255,.45); }
-  .key i.dirt { height: 3px; background: var(--tan); border-width: 2px; box-shadow: none; }
+  .key i.dirt { height: 2px; background: #e7e5e4; opacity: .7; border: 0; border-radius: 0; box-shadow: none; }
   .key i.topo { height: 0; background: none; border: 0; border-top: 2px solid #c98a4e; border-radius: 0; box-shadow: none; }
   .key i.land { width: 16px; height: 12px; background: rgba(74,222,128,.35); border: 2px solid #bbf7d0; border-radius: 3px; box-shadow: none; }
   .key i.hwy { height: 7px; background: #fff; border: 2px solid #111; box-shadow: none; }
@@ -189,7 +189,7 @@
 <div id="map"></div>
 <button class="fab" id="trip-btn" type="button" aria-label="Open trips" aria-expanded="false" aria-controls="trip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="18" r="2.4" fill="currentColor"/><circle cx="18" cy="6" r="2.4" fill="currentColor"/><path d="M8 17c4-1 2-6 6-6s3-3 2.5-3.5"/></svg><span>Trips</span></button>
 <button class="fab" id="lay-btn" type="button" aria-label="Open layers" aria-expanded="false" aria-controls="panel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="9" cy="6" r="2" fill="currentColor"/><circle cx="15" cy="12" r="2" fill="currentColor"/><circle cx="7" cy="18" r="2" fill="currentColor"/></svg><span>Layers</span></button>
-<button class="fab" id="topo-btn" type="button" aria-label="Hide topo lines" aria-pressed="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 17c3-4 6-4 9-1s6 2 9-2"/><path d="M3 12c3-4 6-4 9-1s6 2 9-2"/><path d="M3 7c3-4 6-4 9-1s6 2 9-2"/></svg><span>Topo on</span></button>
+<button class="fab" id="topo-btn" type="button" aria-label="Show topo lines" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 17c3-4 6-4 9-1s6 2 9-2"/><path d="M3 12c3-4 6-4 9-1s6 2 9-2"/><path d="M3 7c3-4 6-4 9-1s6 2 9-2"/></svg><span>Topo off</span></button>
 <button class="fab" id="sat-btn" type="button" aria-label="Switch to the plain map"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 3 2 8l10 5 10-5-10-5Z"/><path d="m2 13 10 5 10-5"/></svg><span>Map</span></button>
 <button class="fab" id="me-btn" type="button" aria-label="Show where I am">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="12" cy="12" r="4" fill="currentColor"/><circle cx="12" cy="12" r="8"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3"/></svg>
@@ -222,7 +222,7 @@ function startMap() {
 // - satellite photo underneath (USGS, public domain); the Map button switches to the plain topo map
 // - green = public land (Forest Service land from PAD-US)
 // - cream lines with dark edges = Forest Service roads and trails open to vehicles today
-// - thin tan lines = OpenStreetMap dirt and gravel roads (nobody has checked who may drive them)
+// - thin pale gray lines = OpenStreetMap dirt and gravel roads (nobody has checked who may drive them)
 // - pins = free Local America places (paid places have no public GPS)
 const SUPABASE_URL = 'https://ycdlxdijrlfsxvxksyrq.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_2ExdXbNtW9HpuOGAq1Oa7g_gPdONH_s';
@@ -342,7 +342,7 @@ contours.getTileUrl = function (c) {
   const show = c.z >= 16 ? '2,10,11,15,16,21,22,25,26' : c.z >= 15 ? '2,10,11,15,16,21,25' : '2,11,16,25';
   return ArcExport.prototype.getTileUrl.call(this, c) + '&dpi=' + (c.z >= 15 ? 192 : 120) + '&layers=show:' + show;
 };
-contours.addTo(map);
+// Topo lines start off every time; the Topo button turns them on.
 map.attributionControl.addAttribution('Aerial photos: USDA NAIP; Topo lines: USGS 3DEP');
 map.attributionControl.setPrefix('');
 map.attributionControl.setPosition('bottomleft');
@@ -393,7 +393,7 @@ document.getElementById('me-btn').onclick = () => {
   followed = false; startLocation(true);
 };
 let sat = true;
-let topoOn = true;
+let topoOn = false;
 document.getElementById('topo-btn').onclick = (e) => {
   topoOn = !topoOn;
   if (topoOn) contours.addTo(map); else map.removeLayer(contours);
@@ -572,10 +572,9 @@ async function gunzipJson(bytes) {
   return JSON.parse(await new Response(s).text());
 }
 function drawDirt(fc) {
-  // dark edge first so the thin tan line shows on the satellite photo
-  L.geoJSON(fc, { interactive: false, style: () => ({ renderer, color: '#111', weight: 6, opacity: 0.85, lineCap: 'round', lineJoin: 'round' }) }).addTo(map);
+  // plain thin road line (no dark edge or glow), so only trails look like trails
   L.geoJSON(fc, {
-    style: () => ({ renderer, color: '#f5e6c8', weight: 2.75, opacity: 1, lineCap: 'round', lineJoin: 'round' }),
+    style: () => ({ renderer, color: '#e7e5e4', weight: 2, opacity: 0.7, lineCap: 'round', lineJoin: 'round' }),
     onEachFeature: (f, layer) => {
       const p = f.properties;
       layer.bindPopup(() => `<div class="pop"><h3>${esc(p.n || DIRT_KINDS[p.k])}</h3><div class="big">${esc(DIRT_KINDS[p.k])} · ${miles(Number(p.mi)).replace(' mi', ' miles')}</div>${placeAndYou(layer.getLatLngs())}
@@ -646,7 +645,7 @@ function drawFs() {
 // ---------- Highways and main paved roads ----------
 // Interstates, US highways and Missouri state routes (numbered and lettered, like Hwy 76 or Rte CC) from the
 // USGS road map, fetched for the area on screen. Drawn white with a dark edge so they stand apart from the
-// gold Forest Service roads and the thin tan dirt roads.
+// gold Forest Service roads and the thin gray dirt roads.
 const ROADS = 'https://carto.nationalmap.gov/arcgis/rest/services/transportation/MapServer/';
 const roadCache = new Map();
 const mainLayer = L.layerGroup().addTo(map);
@@ -1089,9 +1088,12 @@ toggle(layerSec, 'shade', 'Hill shading', 'Shadows that make ridges and hollows 
 const oldTopo = new ArcExport('', { minZoom: 9, maxZoom: 19, maxNativeZoom: 17, zIndex: 4, attribution: 'Old topo maps: USGS Historical Topographic Map Collection, Esri' });
 oldTopo._base = 'https://historical1.arcgis.com/arcgis/rest/services/USA_Historical_Topo_Maps/ImageServer/exportImage?f=image&format=jpg&bboxSR=3857&imageSR=3857&size=512,512&mosaicRule='
   + encodeURIComponent('{"mosaicMethod":"esriMosaicAttribute","sortField":"DateCurrent","sortValue":"1800","ascending":true,"where":"Map_Scale<=62500"}');
-toggle(layerSec, 'oldtopo', 'Old topo maps', 'The oldest USGS map of each area. Shows old roads, mills, schools and homesteads. Zoom in to see it.', (v) => {
-  if (v) { oldTopo.addTo(map); if (map.getZoom() < 9) note('Zoom in to see the old topo maps.', 4000); } else oldTopo.remove();
-});
+// Switch hidden Nov 27, 2026 at the owner's ask; the layer stays here. To bring it back, call addOldTopoSwitch().
+function addOldTopoSwitch() {
+  toggle(layerSec, 'oldtopo', 'Old topo maps', 'The oldest USGS map of each area. Shows old roads, mills, schools and homesteads. Zoom in to see it.', (v) => {
+    if (v) { oldTopo.addTo(map); if (map.getZoom() < 9) note('Zoom in to see the old topo maps.', 4000); } else oldTopo.remove();
+  });
+}
 
 // Dark skies: NASA night lights (Black Marble, 2016). Bright spots are towns; dark areas are best for stars.
 const nightLights = L.tileLayer('https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_Black_Marble/default/2016-01-01/GoogleMapsCompatible_Level8/{z}/{y}/{x}.png', {
@@ -1696,9 +1698,11 @@ loadTrips();
 function parseGPS(raw) {
   let s = String(raw || '').trim();
   if (!s) return null;
-  const at = s.match(/@(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/) || s.match(/[?&](?:q|query|ll)=(-?\d+(?:\.\d+)?)(?:,|%2C)\s*(-?\d+(?:\.\d+)?)/i);
+  const at = s.match(/!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/) || s.match(/@(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/) || s.match(/[?&](?:q|query|ll)=(-?\d+(?:\.\d+)?)(?:,|%2C)\s*(-?\d+(?:\.\d+)?)/i);
   if (at) s = at[1] + ', ' + at[2];
-  const toks = s.replace(/[−–—]/g, '-').match(/(?<![A-Za-z])[NSEWnsew](?![A-Za-z])|-?\d+(?:\.\d+)?/g) || [];
+  // Split letters from numbers (N36 -> N 36), then keep lone N/S/E/W letters and numbers
+  const toks = s.replace(/[−–—]/g, '-').replace(/(\d)([NSEWnsew])/g, '$1 $2').replace(/([NSEWnsew])(-?\d)/g, '$1 $2')
+    .split(/[^A-Za-z0-9.\-]+/).filter((t) => /^[NSEW]$/i.test(t) || /^-?\d+(?:\.\d+)?$/.test(t));
   const nums = [], hems = [];
   for (const t of toks) {
     if (/^[NSEW]$/i.test(t)) hems.push({ h: t.toUpperCase() }); else nums.push(t);
@@ -1751,7 +1755,10 @@ const findIn = document.getElementById('find-in');
 document.getElementById('find').addEventListener('submit', (e) => {
   e.preventDefault();
   const r = parseGPS(findIn.value);
-  if (!r) { note("Couldn't read that. Paste it like 36.98123, -91.97456", 6000); return; }
+  if (!r) {
+    note(/goo\.gl|maps\.app/i.test(findIn.value) ? "Short map links can't be read here. Open the link and copy the numbers." : "Couldn't read that. Paste it like 36.98123, -91.97456", 6000);
+    return;
+  }
   const ll = L.latLng(r.lat, r.lng);
   findIn.blur();
   setPanel(false);
