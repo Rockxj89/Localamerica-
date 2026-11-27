@@ -52,6 +52,7 @@ async function fsTrails([w, s, e, n]) {
 const MODOT = 'https://mapping.modot.org/arcgis/rest/services/TravelerInformation/TravelerInformationData/MapServer';
 const MODOT_EVENT = ['TRAVELWAY_NAME', 'DESIGNATION', 'DIRECTION', 'COUNTY_NAME', 'TYPE_CODE', 'LEVEL_OF_IMPACT_CODE', 'EXT_COMMENT', 'BEGIN_DESCRIPTION', 'END_DESCRIPTION', 'START_DATE', 'END_DATE', 'RIVER_NAME'];
 const MODOT_WORK = ['TRAVELWAY_NAME', 'DESIGNATION', 'DIRECTION', 'COUNTY_NAME', 'WORK_TYPE', 'LEVEL_OF_IMPACT', 'BEG_REF_PT', 'END_REF_PT', 'START_DATE', 'END_DATE', 'START_TIME', 'END_TIME'];
+// Layers 21, 22 and 23 are MoDOT's "Closed Point" layers (only full closures); the flood layer holds every flood note, so it is filtered to CLOSED.
 const CLOSURE_LAYERS = [
   { id: 21, kind: 'crash', fields: MODOT_EVENT },
   { id: 23, kind: 'winter', fields: MODOT_EVENT },
@@ -60,7 +61,8 @@ const CLOSURE_LAYERS = [
 ];
 async function closures() {
   const out = [];
-  await Promise.all(CLOSURE_LAYERS.map(async (L) => {
+  // one MoDOT layer failing shouldn't blank the others; only fail if none answered
+  const got = await Promise.allSettled(CLOSURE_LAYERS.map(async (L) => {
     const q = new URLSearchParams({ where: L.where || '1=1', outFields: L.fields.join(','), returnGeometry: 'true', outSR: '4326', resultRecordCount: '2000', f: 'json' });
     const j = await getJson(`${MODOT}/${L.id}/query?${q}`, { timeout: 15000 });
     for (const f of j.features || []) {
@@ -70,7 +72,9 @@ async function closures() {
       for (const k of Object.keys(a)) { if (typeof a[k] === 'string') a[k] = a[k].trim().slice(0, 400); if (a[k] === '') delete a[k]; }
       out.push({ k: L.kind, a, p: [r5(g.y), r5(g.x)] });
     }
+    if (j.exceededTransferLimit) console.error('closures: more than 2000 in layer', L.id);
   }));
+  if (got.every((r) => r.status === 'rejected')) throw got[0].reason;
   return { at: Date.now(), closures: out };
 }
 
@@ -104,11 +108,11 @@ async function rivers() {
   for (const t of (j.value && j.value.timeSeries) || []) {
     const si = t.sourceInfo || {}, code = si.siteCode && si.siteCode[0] && si.siteCode[0].value;
     const geo = si.geoLocation && si.geoLocation.geogLocation;
-    if (!code || !/^\d{8,15}$/.test(code) || !geo) continue;
+    if (!code || !/^\d{8,15}$/.test(code) || !geo || !Number.isFinite(Number(geo.latitude)) || !Number.isFinite(Number(geo.longitude))) continue;
     const v = t.values && t.values[0] && t.values[0].value && t.values[0].value[0];
     const param = t.variable && t.variable.variableCode && t.variable.variableCode[0] && t.variable.variableCode[0].value;
     const nd = t.variable && t.variable.noDataValue;
-    if (!by.has(code)) by.set(code, { id: code, n: String(si.siteName || '').slice(0, 100), p: [r5(geo.latitude), r5(geo.longitude)] });
+    if (!by.has(code)) by.set(code, { id: code, n: String(si.siteName || '').slice(0, 100), p: [r5(Number(geo.latitude)), r5(Number(geo.longitude))] });
     if (!v || Number(v.value) === nd || !Number.isFinite(Number(v.value))) continue;
     const g = by.get(code);
     if (param === '00065') { g.ft = Number(v.value); g.t = Date.parse(v.dateTime) || null; }
