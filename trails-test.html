@@ -1003,7 +1003,7 @@ map.attributionControl.addAttribution('Camping: USDA Forest Service');
 // ---------- Places: river accesses, campgrounds, gas, food, springs, waterfalls, caves, cemeteries, old towns, old mines ----------
 // Most places live in one file on our own site (trails-data/places-mo.bin), cut into 0.25 degree squares like the paths file.
 // Each row: [kind, name, lng, lat, extra]. MDC areas come from the MDC list (whole state) and old mines from USGS (by square).
-const PLACES_FILE = '/trails-data/places-mo.bin';
+const PLACES_FILE = '/trails-data/places-mo.bin?v=1'; // change v when the file is rebuilt
 const PK = {
   mdc: { ic: '🛶', title: 'River accesses & conservation areas', sub: 'Boat ramps, river accesses and conservation areas from MDC.', z: 9 },
   camp: { ic: '⛺', title: 'Campgrounds', sub: 'Campgrounds and RV parks, public and private. OpenStreetMap and Overture.', z: 10, name: 'Campground' },
@@ -1069,7 +1069,7 @@ function mdcPop(a) {
     + '<div class="big">' + (a.k === 'access' ? 'River or lake access' : 'Conservation area') + (a.ac ? ' · ' + a.ac.toLocaleString() + ' acres' : '') + '</div>'
     + (a.c ? '<div class="small">' + esc(a.c) + ' County</div>' : '')
     + '<div class="small">Missouri Department of Conservation. Check the area rules, hours and hunting seasons before you go.</div>'
-    + (a.u ? '<a class="btn" target="_blank" rel="noopener" href="' + esc(a.u) + '">MDC area page</a>' : '') + '</div>';
+    + (a.u && /^https:\/\/mdc\.mo\.gov\/conservation-area\/a\d{1,6}$/.test(a.u) ? '<a class="btn" target="_blank" rel="noopener" href="' + esc(a.u) + '">MDC area page</a>' : '') + '</div>';
 }
 function minePop(m) {
   return '<div class="pop"><h3>' + esc(m.n || 'Old mine') + '</h3>'
@@ -1078,23 +1078,31 @@ function minePop(m) {
     + '<div class="small">History marker from the USGS Mineral Resources Data System. The spot can be off by a long way.</div>'
     + (m.id ? '<a class="btn" target="_blank" rel="noopener" href="https://mrdata.usgs.gov/mrds/show-mrds.php?dep_id=' + encodeURIComponent(m.id) + '">USGS record</a>' : '') + '</div>';
 }
-// Only draws what's on screen (plus a margin), so busy towns stay quick
+// Only draws what's on screen (plus a margin), closest to the middle first, so busy towns stay quick.
+// Markers that stay on screen are kept (an open info box stays open when the map moves).
 const PLACE_MAX = 300;
+const placeMarks = {}; for (const k of Object.keys(PK)) placeMarks[k] = new Map();
+let placeBusy = '';
 function drawPlaces() {
-  const z = map.getZoom(), b = map.getBounds().pad(0.3);
+  const z = map.getZoom(), b = map.getBounds().pad(0.3), c = map.getCenter();
   const busy = [];
   for (const k of Object.keys(PK)) {
-    const lay = placeLayers[k];
-    lay.clearLayers();
-    if (!placeOn[k] || z < PK[k].z) continue;
-    let n = 0;
-    const add = (ll, icon, html) => { if (n >= PLACE_MAX) return; if (!b.contains(ll)) return; n++; L.marker(ll, { icon, keyboard: false }).bindPopup(html).addTo(lay); };
-    if (k === 'mdc') { (mdcAreas || []).forEach((a) => add(a.p, placeIcons[a.k], mdcPop(a))); }
-    else if (k === 'mines') { for (const rows of mineRows.values()) rows.forEach((m) => add(m.p, placeIcons.mines, minePop(m))); }
-    else { for (const rows of placeRows.values()) for (const r of rows) if (r[0] === k) add([r[3], r[2]], placeIcons[k], placePop(k, r[1], r[4])); }
-    if (n >= PLACE_MAX) busy.push(PK[k].title.toLowerCase());
+    const lay = placeLayers[k], marks = placeMarks[k];
+    if (!placeOn[k] || z < PK[k].z) { lay.clearLayers(); marks.clear(); continue; }
+    const cand = [];
+    const add = (key, ll, icon, pop) => { if (b.contains(ll)) cand.push({ key, ll: L.latLng(ll), icon, pop }); };
+    if (k === 'mdc') (mdcAreas || []).forEach((a) => add('m' + a.p, a.p, placeIcons[a.k], () => mdcPop(a)));
+    else if (k === 'mines') { for (const rows of mineRows.values()) rows.forEach((m) => add(m.id || 'p' + m.p, m.p, placeIcons.mines, () => minePop(m))); }
+    else { for (const rows of placeRows.values()) for (const r of rows) if (r[0] === k) add(r[2] + ',' + r[3], [r[3], r[2]], placeIcons[k], () => placePop(k, r[1], r[4])); }
+    if (cand.length > PLACE_MAX) { cand.forEach((o) => { o.d = c.distanceTo(o.ll); }); cand.sort((x, y) => x.d - y.d); busy.push(PK[k].title.toLowerCase()); }
+    const want = new Map();
+    for (const o of cand) { if (want.size >= PLACE_MAX) break; if (!want.has(o.key)) want.set(o.key, o); }
+    for (const [key, m] of marks) if (!want.has(key) && !m.isPopupOpen()) { lay.removeLayer(m); marks.delete(key); }
+    for (const [key, o] of want) if (!marks.has(key)) marks.set(key, L.marker(o.ll, { icon: o.icon, keyboard: false }).bindPopup(o.pop).addTo(lay));
   }
-  if (busy.length) note('Zoom in to see all the ' + busy.join(' and '), 3000);
+  const nowBusy = busy.join(' and ');
+  if (nowBusy && nowBusy !== placeBusy) note('Zoom in to see all the ' + nowBusy, 3000);
+  placeBusy = nowBusy;
 }
 function loadPlaces() {
   const on = Object.keys(PK).filter((k) => placeOn[k]);
@@ -1111,14 +1119,16 @@ function loadPlaces() {
   const i0 = Math.max(TRAIL_SQ.x0, Math.floor(b.getWest() / CELL)), i1 = Math.min(TRAIL_SQ.x1, Math.floor(b.getEast() / CELL));
   const j0 = Math.max(TRAIL_SQ.y0, Math.floor(b.getSouth() / CELL)), j1 = Math.min(TRAIL_SQ.y1, Math.floor(b.getNorth() / CELL));
   const wantPack = on.some((k) => k !== 'mdc' && k !== 'mines' && z >= PK[k].z), wantMines = placeOn.mines && z >= PK.mines.z;
-  if ((wantPack || wantMines) && (i1 - i0 + 1) * (j1 - j0 + 1) <= 16) {
+  const squares = (i1 - i0 + 1) * (j1 - j0 + 1), packOk = wantPack && squares <= 49, minesOk = wantMines && squares <= 16;
+  if ((wantPack && !packOk) || (wantMines && !minesOk)) note('Zoom in a little more to see the places', 3000);
+  if (packOk || minesOk) {
     for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) {
       const cell = i + '_' + j;
-      if (wantPack && !placeAsked.has(cell)) {
+      if (packOk && !placeAsked.has(cell)) {
         placeAsked.add(cell);
         placeCell(i, j).then((rows) => { placeRows.set(cell, rows); drawPlaces(); }).catch(() => { placeAsked.delete(cell); placeFail(); });
       }
-      if (wantMines && !mineAsked.has(cell)) {
+      if (minesOk && !mineAsked.has(cell)) {
         mineAsked.add(cell);
         getCell('mines', i, j).then((d) => { mineRows.set(cell, d.mines || []); drawPlaces(); }).catch(() => { mineAsked.delete(cell); placeFail(); });
       }
@@ -1132,7 +1142,7 @@ const placeSec = section('places', 'Places', 'Zoom in to see them. Nobody checks
 for (const k of Object.keys(PK)) {
   toggle(placeSec, 'place-' + k, PK[k].ic + ' ' + PK[k].title, PK[k].sub, (v) => {
     placeOn[k] = v;
-    if (v) { placeLayers[k].addTo(map); loadPlaces(); } else { placeLayers[k].remove(); placeLayers[k].clearLayers(); }
+    if (v) { placeLayers[k].addTo(map); loadPlaces(); } else { placeLayers[k].remove(); placeLayers[k].clearLayers(); placeMarks[k].clear(); }
   });
 }
 map.attributionControl.addAttribution('Places: MDC; USGS GNIS and MRDS; Overture Maps; © OpenStreetMap contributors');
