@@ -233,7 +233,17 @@ const Locate = L.Control.extend({
 });
 map.addControl(new Locate());
 
-loadFs();
+// For checking the page: ?open=fs or ?open=osm opens one line's info box after loading
+const openParam = new URLSearchParams(location.search).get('open');
+async function demoOpen() {
+  await loadFs();
+  setTimeout(() => {
+    const group = openParam === 'osm' ? osm : fsRoads;
+    let first; group.eachLayer((l) => { if (first) return; if (l.eachLayer) l.eachLayer((x) => { if (!first) first = x; }); else first = l; });
+    if (first && first.getLatLngs) { const ll = first.getLatLngs().flat(2); first.openPopup(ll[Math.floor(ll.length / 2)]); }
+  }, 1500);
+}
+if (openParam) demoOpen(); else loadFs();
 </script>
 </body>
 </html>
