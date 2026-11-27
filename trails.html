@@ -370,7 +370,8 @@ Promise.allSettled([getJson(DATA + 'fs-roads.json'), getJson(DATA + 'public-land
 // For checking the page: ?at=lat,lng skips location; ?open=fs or ?open=dirt opens one line's info box
 const qs = new URLSearchParams(location.search);
 const at = qs.get('at');
-if (at) { const [la, lo] = at.split(',').map(Number); showMe([la, lo]); followed = true; map.setView(me, 14); }
+const atLL = at ? at.split(',').map(Number) : [];
+if (atLL.length === 2 && atLL.every(Number.isFinite)) { showMe(atLL); followed = true; map.setView(me, 14); }
 else startLocation(false);
 const openParam = qs.get('open');
 let tries = 0;

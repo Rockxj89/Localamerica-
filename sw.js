@@ -31,11 +31,15 @@ self.addEventListener('fetch', (event) => {
   // Never cache Meta pixel traffic: every tracking hit must reach Facebook
   if (url.hostname.endsWith('facebook.com') || url.hostname.endsWith('facebook.net')) return;
 
-  // The private traffic, card maker, towns and pins pages are never cached (and never saved in place of the guide)
+  // The private traffic, card maker, towns, pins and trails pages are never cached (and never saved in place of the guide)
   if (url.pathname.endsWith('/traffic.html') || url.pathname.endsWith('/traffic')) return;
   if (url.pathname.endsWith('/cards.html') || url.pathname.endsWith('/cards')) return;
   if (url.pathname.endsWith('/towns.html') || url.pathname.endsWith('/towns')) return;
   if (url.pathname.endsWith('/pins.html') || url.pathname.endsWith('/pins')) return;
+  if (url.pathname.endsWith('/trails.html') || url.pathname.endsWith('/trails')) return;
+
+  // Trails map tiles (USGS): the browser's own cache handles these, so they don't pile up on the phone
+  if (url.hostname === 'basemap.nationalmap.gov') return;
 
   // The video list: always fresh, so new videos show up right away
   if (url.pathname === '/videos.json') return;
