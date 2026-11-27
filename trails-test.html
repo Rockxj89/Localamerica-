@@ -97,6 +97,8 @@
   .leaflet-control-attribution a { color: var(--tan); }
   .leaflet-control-zoom { display: none; }
   @media (min-width: 700px) { .leaflet-control-zoom { display: block; } }
+  .shade { mix-blend-mode: multiply; }
+  .camp-ic { width:24px;height:24px;border-radius:6px;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:700; }
 </style>
 </head>
 <body class="locked">
@@ -951,6 +953,51 @@ const closures = liveLayer('closures', (g, d, first) => {
 }, 10);
 toggle(liveSec, 'closures', 'Road closures', 'Closed roads from MoDOT: crashes, winter weather, flooding, work zones.', closures.on);
 map.attributionControl.addAttribution('Live: NIFC, USGS Water Data, MoDOT');
+
+// ---------- Map layers: hill shading, old topo maps, night lights, forest camping ----------
+const layerSec = section('maplayers', 'Map layers');
+// Hill shading: USGS shaded relief, blended into the map below so ridges and hollows stand out
+const shade = L.tileLayer('https://basemap.nationalmap.gov/arcgis/rest/services/USGSShadedReliefOnly/MapServer/tile/{z}/{y}/{x}', {
+  maxNativeZoom: 16, maxZoom: 19, zIndex: 3, opacity: 0.55, className: 'shade', attribution: 'Hill shading: USGS 3DEP'
+});
+toggle(layerSec, 'shade', 'Hill shading', 'Shadows that make ridges and hollows easy to see. USGS.', (v) => { if (v) shade.addTo(map); else shade.remove(); });
+
+// Old topo maps: the oldest USGS topo map for each spot (about 1880s to 1990s), from the USGS map collection hosted by Esri
+const oldTopo = new ArcExport('', { minZoom: 9, maxZoom: 19, maxNativeZoom: 17, zIndex: 4, attribution: 'Old topo maps: USGS Historical Topographic Map Collection, Esri' });
+oldTopo._base = 'https://historical1.arcgis.com/arcgis/rest/services/USA_Historical_Topo_Maps/ImageServer/exportImage?f=image&format=jpg&bboxSR=3857&imageSR=3857&size=512,512&mosaicRule='
+  + encodeURIComponent('{"mosaicMethod":"esriMosaicAttribute","sortField":"DateCurrent","sortValue":"1800","ascending":true}');
+toggle(layerSec, 'oldtopo', 'Old topo maps', 'The oldest USGS map of each area. Shows old roads, mills, schools and homesteads. Zoom in to see it.', (v) => {
+  if (v) { oldTopo.addTo(map); if (map.getZoom() < 9) note('Zoom in to see the old topo maps.', 4000); } else oldTopo.remove();
+});
+
+// Dark skies: NASA night lights (Black Marble, 2016). Bright spots are towns; dark areas are best for stars.
+const nightLights = L.tileLayer('https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_Black_Marble/default/2016-01-01/GoogleMapsCompatible_Level8/{z}/{y}/{x}.png', {
+  maxNativeZoom: 8, maxZoom: 19, zIndex: 6, opacity: 0.75, attribution: 'Night lights: NASA Black Marble 2016 (GIBS)'
+});
+toggle(layerSec, 'night', 'Dark skies', 'Night lights from NASA. The darker the area, the better for stars.', (v) => { if (v) nightLights.addTo(map); else nightLights.remove(); });
+
+// Forest camping: dispersed camping spots and campgrounds in the Mark Twain National Forest (Forest Service list)
+const campLayer = L.layerGroup();
+const campIcon = (k, closed) => L.divIcon({ className: '', html: '<div class="camp-ic" style="background:' + (closed ? '#78716c' : k === 'dispersed' ? '#15803d' : '#0f766e') + '">' + (k === 'dispersed' ? 'DC' : 'CG') + '</div>', iconSize: [24, 24], iconAnchor: [12, 12] });
+let campLoaded = false;
+function loadCamping() {
+  if (campLoaded) return; campLoaded = true;
+  fetch('/api/trails-data?src=camping').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); }).then((d) => {
+    (d.spots || []).forEach((c) => {
+      const html = '<div class="pop"><h3>' + esc(c.n || 'Camping') + '</h3>'
+        + '<div class="big">' + (c.k === 'dispersed' ? 'Dispersed camping' : 'Campground') + '</div>'
+        + (c.closed ? '<div class="closed">Listed as closed</div>' : '')
+        + '<div class="small">Mark Twain National Forest: camping is limited to 14 days in any 30 (Forest Order 09-05-20-01). Follow posted signs.</div>'
+        + (c.u ? '<a class="btn" target="_blank" rel="noopener" href="' + esc(c.u) + '">Forest Service page</a>' : '') + '</div>';
+      L.marker(c.p, { icon: campIcon(c.k, c.closed) }).bindPopup(html).addTo(campLayer);
+    });
+    if (!(d.spots || []).length) note('No forest camping spots came back. Try again later.', 4000);
+  }).catch(() => { campLoaded = false; note("Couldn't load the forest camping spots. Try again later.", 5000); });
+}
+toggle(layerSec, 'camping', 'Forest camping', 'Dispersed camping spots (DC) and campgrounds (CG) in the Mark Twain National Forest.', (v) => {
+  if (v) { campLayer.addTo(map); loadCamping(); } else campLayer.remove();
+});
+map.attributionControl.addAttribution('Camping: USDA Forest Service');
 
 // ---------- Start ----------
 // For checking the page: ?at=lat,lng skips location; ?open=fs or ?open=dirt opens one line's info box
