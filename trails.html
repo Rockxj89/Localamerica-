@@ -477,10 +477,7 @@ async function drawMain() {
     L.polyline(x.ll, { renderer, color: '#ffffff', weight: x.w, opacity: 1, ...round })
       .bindPopup(() => `<div class="pop"><h3>${esc(name)}</h3><div class="big">Paved highway${x.sh ? ' · ' + esc(x.sh.text) : ''}</div><div class="small">Road map: USGS The National Map.</div></div>`)
       .addTo(mainLayer);
-    if (x.sh) {
-      const longest = x.ll.reduce((m, p) => (p.length > m.length ? p : m), x.ll[0]);
-      labels.push({ text: x.sh.text, cls: x.sh.cls, rank: x.sh.rank, ll: L.latLng(longest[Math.floor(longest.length / 2)]), n: longest.length });
-    }
+    if (x.sh) labels.push({ text: x.sh.text, cls: x.sh.cls, rank: x.sh.rank, ll: x.ll });
   });
   mainLabels = labels;
   if (map.hasLayer(fsLayer)) { fsLayer.remove(); fsLayer.addTo(map); }
@@ -527,9 +524,16 @@ async function drawLabels() {
   ]);
   if (run !== labelRun) return;
   const items = [];
-  // highway shields: one per route in view, on its longest stretch
-  mainLabels.filter((m) => b.contains(m.ll)).sort((x, y) => y.n - x.n)
-    .forEach((m) => items.push({ kind: 'shield' + (m.cls ? ' ' + m.cls : ''), name: m.text, ll: m.ll, pri: 2.7 + m.rank / 10 }));
+  // highway shields: one per route, halfway along the part that is on screen (kept off the edges)
+  const inner = b.pad(-0.1);
+  mainLabels.forEach((m) => {
+    const on = [];
+    m.ll.forEach((path) => path.forEach((pt, i) => {
+      if (i) { const half = [(pt[0] + path[i - 1][0]) / 2, (pt[1] + path[i - 1][1]) / 2]; if (inner.contains(half)) on.push(half); }
+      if (inner.contains(pt)) on.push(pt);
+    }));
+    if (on.length) items.push({ kind: 'shield' + (m.cls ? ' ' + m.cls : ''), name: m.text, ll: L.latLng(on[Math.floor(on.length / 2)]), pri: 2.7 + m.rank / 10 + on.length / 1e6 });
+  });
   const ptsOf = (f) => (f.geometry && (f.geometry.points || (f.geometry.x != null ? [[f.geometry.x, f.geometry.y]] : null))) || [];
   towns.forEach((f) => { if (!f.attributes.gaz_name || !ptsOf(f).length) return; const pt = ptsOf(f)[0]; items.push({ kind: 'town', name: f.attributes.gaz_name, ll: L.latLng(pt[1], pt[0]), pri: 3 }); });
   if (z >= 13) roadLabels.forEach((r) => { if (b.contains(r.ll) && r.text) items.push({ kind: 'road', name: r.text, ll: r.ll, pri: 2 }); });
