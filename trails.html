@@ -417,7 +417,8 @@ Promise.allSettled([getJson(DATA + 'fs-roads.json'), getJson(DATA + 'public-land
     L.polyline(ll, { renderer, color: '#111', weight: info.open ? 9 : 5, opacity: info.open ? 0.95 : 0.6, interactive: false, ...round }).addTo(fsLayer);
     L.polyline(ll, { renderer, color: info.open ? '#f2b134' : '#a8a29e', weight: info.open ? 4.5 : 2.5, opacity: 1, dashArray: info.open ? null : '6 6', ...round })
       .bindPopup(() => fsPopup(a, info, ll, f.t === 2)).addTo(fsLayer);
-    if (info.open) roadLabels.push({ ll: ll[0][Math.floor(ll[0].length / 2)], text: fsLabel(a, f.t === 2) });
+    const p0 = ll[0] || [];
+    if (info.open && p0.length) roadLabels.push({ ll: p0[Math.floor(p0.length / 2)], text: fsLabel(a, f.t === 2) });
   });
   drawLabels();
 });
@@ -439,8 +440,9 @@ async function gnis(layer, where, b) {
   const key = layer + '|' + g;
   if (nameCache.has(key)) return nameCache.get(key);
   const url = `${GNIS}${layer}/query?f=json&where=${encodeURIComponent(where)}&geometry=${g}&geometryType=esriGeometryEnvelope&inSR=4326&outSR=4326&outFields=gaz_name,gaz_featureclass&returnGeometry=true&resultRecordCount=300`;
-  const p = fetch(url).then((r) => r.json()).then((j) => j.features || []).catch(() => { nameCache.delete(key); return []; });
+  const p = fetch(url).then((r) => r.json()).then((j) => { if (j.error) throw new Error('gnis'); return j.features || []; }).catch(() => { nameCache.delete(key); return []; });
   nameCache.set(key, p);
+  if (nameCache.size > 60) nameCache.delete(nameCache.keys().next().value);
   return p;
 }
 function peakHeight(ll) {
@@ -462,12 +464,14 @@ async function drawLabels() {
   ]);
   if (run !== labelRun) return;
   const items = [];
-  towns.forEach((f) => { const pt = f.geometry.points[0]; items.push({ kind: 'town', name: f.attributes.gaz_name, ll: L.latLng(pt[1], pt[0]), pri: 3 }); });
+  const ptsOf = (f) => (f.geometry && (f.geometry.points || (f.geometry.x != null ? [[f.geometry.x, f.geometry.y]] : null))) || [];
+  towns.forEach((f) => { if (!f.attributes.gaz_name || !ptsOf(f).length) return; const pt = ptsOf(f)[0]; items.push({ kind: 'town', name: f.attributes.gaz_name, ll: L.latLng(pt[1], pt[0]), pri: 3 }); });
   if (z >= 13) roadLabels.forEach((r) => { if (b.contains(r.ll) && r.text) items.push({ kind: 'road', name: r.text, ll: r.ll, pri: 2 }); });
   lands.forEach((f) => {
-    const pts = f.geometry.points, c = f.attributes.gaz_featureclass;
+    const pts = ptsOf(f), c = f.attributes.gaz_featureclass;
+    if (!f.attributes.gaz_name || !pts.length) return;
     const pt = pts.length > 1 ? [(pts[0][0] + pts[1][0]) / 2, (pts[0][1] + pts[1][1]) / 2] : pts[0];
-    if (c === 'Valley' && z < 13) return;
+    if (c !== 'Summit' && z < 13) return;
     items.push({ kind: c === 'Summit' ? 'peak' : 'valley', name: f.attributes.gaz_name, ll: L.latLng(pt[1], pt[0]), pri: c === 'Summit' ? 2.5 : 0 });
   });
   items.sort((x, y) => y.pri - x.pri);
