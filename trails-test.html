@@ -753,19 +753,49 @@ function drawFsTrails(j) {
     });
   });
 }
-function drawPaths(j) {
-  (j.features || []).forEach((f) => {
-    const a = f.a || {};
-    if (trailAsked.has('osm' + f.id)) return; trailAsked.add('osm' + f.id);
-    if (a.name && fsTrailNames.has(nameKey(a.name))) return; // already shown from the Forest Service
+// OpenStreetMap paths for all of Missouri live in one file on our own site (trails-data/paths-mo.bin),
+// cut into 0.25 degree squares like the dirt road file, so the phone reads only the squares on screen.
+// Each row: [kind, miles, name, coordinates, id, surface]
+const PATHS_FILE = '/trails-data/paths-mo.bin';
+let pathsIdxP = null, pathsWhole = null;
+async function pathRange(from, to) {
+  if (pathsWhole) return pathsWhole.slice(from, to + 1);
+  const r = await fetch(PATHS_FILE, { headers: { Range: `bytes=${from}-${to}` } });
+  if (!r.ok) throw new Error(r.status);
+  const b = new Uint8Array(await r.arrayBuffer());
+  if (r.status === 206) return b;
+  pathsWhole = b; // the site sent the whole file; keep it and cut pieces from it
+  return b.slice(from, to + 1);
+}
+function pathsIndex() {
+  return pathsIdxP || (pathsIdxP = (async () => {
+    let head = await pathRange(0, 65535);
+    const len = +new TextDecoder().decode(head.slice(0, 10));
+    if (!len) throw new Error('bad file');
+    if (10 + len > head.length) head = await pathRange(0, 9 + len);
+    return { idx: JSON.parse(new TextDecoder().decode(head.slice(10, 10 + len))), start: 10 + len };
+  })().catch((e) => { pathsIdxP = null; throw e; }));
+}
+async function pathCell(i, j) {
+  const { idx, start } = await pathsIndex();
+  const t = idx.tiles[i + '_' + j];
+  if (!t) return [];
+  return gunzipJson(await pathRange(start + t[0], start + t[0] + t[1] - 1));
+}
+function drawPaths(rows) {
+  for (const [kind, mi, name, coords, id, surface] of rows) {
+    if (trailAsked.has('osm' + id)) continue; trailAsked.add('osm' + id);
+    if (name && fsTrailNames.has(nameKey(name))) continue; // already shown from the Forest Service
+    const a = { highway: kind };
     const uses = osmUses(a);
-    if (!uses.foot && !uses.horse && !uses.bike) return;
-    addTrail(f.c.map(([x, y]) => L.latLng(y, x)), uses, {
-      name: a.name || OSM_KIND[a.highway] || 'Trail', lvl: osmLevel(a), mi: null, uses: usesText(uses),
-      extra: a.surface ? titleCase(a.surface.replace(/_/g, ' ')) : '',
+    if (!uses.foot && !uses.horse && !uses.bike) continue;
+    const ll = typeof coords[0][0] === 'number' ? [coords.map(([x, y]) => L.latLng(y, x))] : coords.map((c) => c.map(([x, y]) => L.latLng(y, x)));
+    addTrail(ll, uses, {
+      name: name || OSM_KIND[kind] || 'Trail', lvl: osmLevel(a), mi, uses: usesText(uses),
+      extra: surface ? titleCase(String(surface).replace(/_/g, ' ')) : '',
       src: 'Map data © OpenStreetMap contributors. Nobody has checked this one, and some cross private land.',
     });
-  });
+  }
 }
 function getCell(src, i, j) {
   return fetch(`/api/trails-data?src=${src}&x=${i}&y=${j}`).then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
@@ -781,7 +811,7 @@ function loadTrails() {
       const fsDone = trailAsked.has(fsKey) ? Promise.resolve() : (trailAsked.add(fsKey), getCell('fstrails', i, j).then(drawFsTrails).catch(() => { trailAsked.delete(fsKey); failNote(); }));
       if (z >= PATH_MIN_ZOOM && !trailAsked.has(osmKey)) {
         trailAsked.add(osmKey);
-        fsDone.then(() => getCell('paths', i, j)).then(drawPaths).catch(() => { trailAsked.delete(osmKey); failNote(); });
+        fsDone.then(() => pathCell(i, j)).then(drawPaths).catch(() => { trailAsked.delete(osmKey); failNote(); });
       }
     }
   }

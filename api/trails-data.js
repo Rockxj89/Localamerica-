@@ -47,34 +47,8 @@ async function fsTrails([w, s, e, n]) {
   return { features: out };
 }
 
-// ---------- Foot, bike and horse paths (OpenStreetMap) ----------
-const OVERPASS = ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter', 'https://overpass.private.coffee/api/interpreter'];
-async function overpass(query) {
-  let last;
-  for (const url of OVERPASS) {
-    try {
-      return await getJson(url, { timeout: 30000, fetch: { method: 'POST', body: 'data=' + encodeURIComponent(query), headers: { ...UA, 'Content-Type': 'application/x-www-form-urlencoded' } } }, 1);
-    } catch (e) { last = e; }
-  }
-  throw last;
-}
-const PATH_TAGS = ['name', 'highway', 'sac_scale', 'mtb:scale', 'trail_visibility', 'foot', 'bicycle', 'horse', 'access', 'surface', 'motor_vehicle', 'atv'];
-async function osmPaths([w, s, e, n]) {
-  const bb = `${s},${w},${n},${e}`;
-  const j = await overpass(`[out:json][timeout:25];(way["highway"~"^(path|bridleway|cycleway)$"](${bb});way["highway"="footway"]["footway"!~"^(sidewalk|crossing)$"](${bb}););out tags geom qt;`);
-  const out = [];
-  for (const el of j.elements || []) {
-    if (el.type !== 'way' || !el.geometry || el.geometry.length < 2) continue;
-    const t = el.tags || {};
-    if (/^(private|no)$/.test(t.access || '') && !t.foot && !t.horse && !t.bicycle) continue;
-    out.push({ id: el.id, a: keep(t, PATH_TAGS), c: el.geometry.map((g) => [r5(g.lon), r5(g.lat)]) });
-  }
-  return { features: out };
-}
-
 const SOURCES = {
   fstrails: { run: fsTrails, days: 7 },
-  paths: { run: osmPaths, days: 7 },
 };
 
 module.exports = async (req, res) => {
