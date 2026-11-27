@@ -237,7 +237,7 @@ async function loadFs() {
         fsSeen[id].add(key);
         const info = fsInfo(a);
         if (!info) return;
-        const ll = (f.geometry && f.geometry.paths ? f.geometry.paths : []).map((p) => p.map(([x, y]) => [y, x]));
+        const ll = (f.geometry && f.geometry.paths ? f.geometry.paths : []).map((p) => p.map(([x, y]) => L.latLng(y, x)));
         const pop = () => fsPopup(a, info, ll, id === 2);
         if (info.open) L.polyline(ll, { renderer: fsRenderer, pane: 'fsPane', color: '#fff', weight: 9, opacity: 0.9, interactive: false }).addTo(fsLayer);
         L.polyline(ll, { renderer: fsRenderer, pane: 'fsPane', color: info.open ? '#f97316' : '#9ca3af', weight: info.open ? 5 : 3, opacity: info.open ? 1 : 0.8, dashArray: info.open ? null : '6 6', interactive: false }).addTo(fsLayer);
