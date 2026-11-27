@@ -233,6 +233,11 @@ const SIGN_IN = '<a class="go" href="/traffic.html">Go to the Traffic page to si
 })();
 
 function startMap() {
+// Phone memory: keeps map squares already seen on this phone (see trails-sw.js). Its scope is this page's own
+// address, so it never touches the rest of the site.
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/trails-sw.js', { scope: location.pathname.replace(/\.html$/, '') }).catch(() => {});
+}
 // Owner-only trails map (only the Local America owner account can open it; not linked from the app).
 // - starts where you are (blue dot), or Willow Springs if location is off
 // - satellite photo underneath (USGS, public domain); the Map button switches to the plain topo map
@@ -325,24 +330,27 @@ function chips(sec, items, isOn, onTap) {
 const renderer = L.canvas({ tolerance: 12, padding: 0.5 }); // draws half a screen past the edges so lines are there as you pan
 
 const topo = L.tileLayer('https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{z}/{y}/{x}', {
-  maxNativeZoom: 16, maxZoom: 19, className: 'base-topo', keepBuffer: 4, attribution: 'Base map: USGS The National Map'
+  maxNativeZoom: 16, maxZoom: 19, className: 'base-topo', keepBuffer: 4, crossOrigin: true, attribution: 'Base map: USGS The National Map'
 });
 // On sharp phone screens (2 or 3 screen dots per pixel) each photo square is drawn half size, one zoom step closer,
 // so the picture has twice the detail. These saved squares come back fast (about a tenth of a second each).
 const HI_DPI = (window.devicePixelRatio || 1) >= 1.5;
 const imagery = L.tileLayer('https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/{z}/{y}/{x}', HI_DPI
-  ? { tileSize: 128, zoomOffset: 1, maxNativeZoom: 15, maxZoom: 19, zIndex: 1, keepBuffer: 3, className: 'sat', attribution: 'Base map: USGS The National Map' }
-  : { maxNativeZoom: 16, maxZoom: 19, zIndex: 1, keepBuffer: 4, className: 'sat', attribution: 'Base map: USGS The National Map' }
+  ? { tileSize: 128, zoomOffset: 1, maxNativeZoom: 15, maxZoom: 19, zIndex: 1, keepBuffer: 3, crossOrigin: true, className: 'sat', attribution: 'Base map: USGS The National Map' }
+  : { maxNativeZoom: 16, maxZoom: 19, zIndex: 1, keepBuffer: 4, crossOrigin: true, className: 'sat', attribution: 'Base map: USGS The National Map' }
 ).addTo(map);
 // A rough copy of the same photos underneath, from a few big squares, so zooming never shows empty gray squares
 // while the sharp ones load.
 const backstop = L.tileLayer('https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/{z}/{y}/{x}', {
-  maxNativeZoom: 10, maxZoom: 16, zIndex: 0, keepBuffer: 1, className: 'sat'
+  maxNativeZoom: 10, maxZoom: 16, zIndex: 0, keepBuffer: 1, crossOrigin: true, className: 'sat'
 }).addTo(map);
 
 // Close up, the saved satellite squares above run out of detail (they stop at about 2.4 m per pixel).
-// From zoom 16 the full-detail aerial photos (USDA NAIP, about 0.6 m per pixel) are drawn on top, straight from USGS.
-// These are made to order and take 1 to 2 seconds a square, so they only start where the saved ones run out.
+// From zoom 16 Missouri's own statewide aerial photo (6 inch, about 0.15 m per pixel, flown with the leaves off
+// in 2023 and 2024 by the state, served free by MSDIS) is drawn on top, so trails show under the trees.
+// Zoomed out the green summer photo stays. Squares are made to order (1 to 2 seconds each) and kept on the
+// phone by trails-sw.js, so a spot you've seen opens at once next time. Outside Missouri the photo is see-through
+// and the regular satellite shows instead.
 // Topo lines: USGS elevation contours (brown lines with heights), drawn over the satellite from zoom 11.
 const MERC = 20037508.342789244;
 const ArcExport = L.TileLayer.extend({
@@ -352,10 +360,10 @@ const ArcExport = L.TileLayer.extend({
     return this._base + '&bbox=' + bbox;
   }
 });
-const sharp = new ArcExport('', { minZoom: 16, maxNativeZoom: 18, maxZoom: 19, zIndex: 2, tileSize: 256, keepBuffer: 4, updateWhenZooming: false, className: 'sat' });
-sharp._base = 'https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer/exportImage?f=image&format=jpg&bboxSR=3857&imageSR=3857&size=512,512&renderingRule=' + encodeURIComponent('{"rasterFunction":"NaturalColor"}');
+const sharp = new ArcExport('', { minZoom: 16, maxNativeZoom: 19, maxZoom: 19, zIndex: 2, tileSize: 256, keepBuffer: 4, updateWhenZooming: false, crossOrigin: true, className: 'sat' });
+sharp._base = 'https://stateimagery.msdis.missouri.edu/arcgis/rest/services/Missouri_6inch_Statewide_2023_2024_Cached/ImageServer/exportImage?f=image&format=jpgpng&bandIds=0,1,2&bboxSR=3857&imageSR=3857&size=512,512';
 sharp.addTo(map);
-const contours = new ArcExport('', { minZoom: 11, maxZoom: 19, zIndex: 5, className: 'contours', keepBuffer: 4, updateWhenZooming: false });
+const contours = new ArcExport('', { minZoom: 11, maxZoom: 19, zIndex: 5, className: 'contours', keepBuffer: 4, updateWhenZooming: false, crossOrigin: true });
 contours._base = 'https://carto.nationalmap.gov/arcgis/rest/services/contours/MapServer/export?f=image&format=png32&transparent=true&bboxSR=3857&imageSR=3857&size=512,512';
 // Zoomed out: only the bold every-5th lines, no numbers. From zoom 15: heights you can read. Close up (16+): every line.
 // Each 512 px picture is shown at 256 px: dpi 120 keeps the lines hairline thin; close up, dpi 192 makes the numbers big enough to read.
@@ -364,7 +372,7 @@ contours.getTileUrl = function (c) {
   return ArcExport.prototype.getTileUrl.call(this, c) + '&dpi=' + (c.z >= 15 ? 192 : 120) + '&layers=show:' + show;
 };
 // Topo lines start off every time; the Topo button turns them on.
-map.attributionControl.addAttribution('Aerial photos: USDA NAIP; Topo lines: USGS 3DEP');
+map.attributionControl.addAttribution('Close-up aerial photo: State of Missouri 6-inch 2023-2024 (MSDIS); Topo lines: USGS 3DEP');
 map.attributionControl.setPrefix('');
 map.attributionControl.setPosition('bottomleft');
 // Key and credits open from the two small buttons in the bottom left; tapping the map closes them.
