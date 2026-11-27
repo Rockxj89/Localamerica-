@@ -61,15 +61,11 @@
 // - pins = free Local America places (paid places have no public GPS)
 const SUPABASE_URL = 'https://ycdlxdijrlfsxvxksyrq.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_2ExdXbNtW9HpuOGAq1Oa7g_gPdONH_s';
-const MVUM = 'https://apps.fs.usda.gov/arcx/rest/services/EDW/EDW_MVUM_02/MapServer/';
-const FS_MIN_ZOOM = 11;
 const WILLOW_SPRINGS = [36.9923, -91.9690];
 const MISSOURI = L.latLngBounds([35.99, -95.77], [40.62, -89.10]);
 
 const map = L.map('map', { zoomControl: true, preferCanvas: true, tap: true }).setView(WILLOW_SPRINGS, 12);
 const renderer = L.canvas({ tolerance: 12 });
-map.createPane('fsPane').style.zIndex = 420;
-const fsRenderer = L.svg({ pane: 'fsPane' });
 
 const topo = L.tileLayer('https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{z}/{y}/{x}', {
   maxZoom: 16, className: 'base-topo', attribution: 'Base map: USGS The National Map'
@@ -171,7 +167,6 @@ function placeAndYou(latlngs) {
 
 // ---------- Forest Service roads and trails open to vehicles ----------
 const fsLayer = L.layerGroup().addTo(map);
-const fsSeen = { 1: new Set(), 2: new Set() };
 const isOpen = (v) => v != null && String(v).trim() !== '' && !/^(n|no|null)$/i.test(String(v).trim());
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 // Dates look like "04/01-12/15" (sometimes several, split by commas)
@@ -205,65 +200,35 @@ function fsPopup(a, info, latlngs, isTrail) {
   return `<div class="pop"><h3>${esc(name)}</h3><div class="big">${esc(info.label)} · ${miles(len).replace(' mi', ' miles')}</div>${season}${info.rough && info.label === 'Any car' ? '<div>Rough in spots</div>' : ''}${placeAndYou(latlngs)}
     <div class="small">${esc(num && name !== num ? num + ' · ' : '')}From the Forest Service. Open means allowed, not that it's in good shape today.</div></div>`;
 }
-let jsonpN = 0;
-function jsonp(url, timeoutMs = 20000) {
-  return new Promise((resolve, reject) => {
-    const cb = '__fs' + (++jsonpN);
-    const s = document.createElement('script');
-    const t = setTimeout(() => { cleanup(); reject(new Error('timeout')); }, timeoutMs);
-    function cleanup() { clearTimeout(t); delete window[cb]; s.remove(); }
-    window[cb] = (data) => { cleanup(); resolve(data); };
-    s.onerror = () => { cleanup(); reject(new Error('load')); };
-    s.src = url + '&callback=' + cb;
-    document.head.appendChild(s);
-  });
-}
-async function loadFs() {
-  if (map.getZoom() < FS_MIN_ZOOM) { note('Zoom in to see trails'); return; }
-  const n = document.getElementById('note');
-  if (n.textContent === 'Zoom in to see trails') note('');
-  const b = map.getBounds().pad(0.2);
-  const env = [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()].map((x) => x.toFixed(5)).join(',');
-  let failed = false;
-  await Promise.all([1, 2].map(async (id) => {
-    const url = `${MVUM}${id}/query?where=1%3D1&geometry=${env}&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=true&outSR=4326&maxAllowableOffset=0.00004&f=json`;
-    try {
-      const data = await jsonp(url);
-      if (data.error) throw new Error('error');
-      (data.features || []).forEach((f) => {
-        const a = f.attributes || {};
-        const key = a.objectid ?? a.OBJECTID ?? JSON.stringify(f.geometry && f.geometry.paths && f.geometry.paths[0] && f.geometry.paths[0][0]);
-        if (fsSeen[id].has(key)) return;
-        fsSeen[id].add(key);
-        const info = fsInfo(a);
-        if (!info) return;
-        const ll = (f.geometry && f.geometry.paths ? f.geometry.paths : []).map((p) => p.map(([x, y]) => L.latLng(y, x)));
-        const pop = () => fsPopup(a, info, ll, id === 2);
-        if (info.open) L.polyline(ll, { renderer: fsRenderer, pane: 'fsPane', color: '#fff', weight: 9, opacity: 0.9, interactive: false }).addTo(fsLayer);
-        L.polyline(ll, { renderer: fsRenderer, pane: 'fsPane', color: info.open ? '#f97316' : '#9ca3af', weight: info.open ? 5 : 3, opacity: info.open ? 1 : 0.8, dashArray: info.open ? null : '6 6', interactive: false }).addTo(fsLayer);
-        // Wide invisible copy so the line is easy to tap with a finger
-        L.polyline(ll, { renderer: fsRenderer, pane: 'fsPane', weight: 24, opacity: 0, color: '#000' }).bindPopup(pop).addTo(fsLayer);
-      });
-    } catch (e) { failed = true; }
-  }));
-  if (failed) note("Couldn't load the Forest Service trails. Move the map to try again.", 5000);
-}
-let fsTimer;
-map.on('moveend', () => { clearTimeout(fsTimer); fsTimer = setTimeout(loadFs, 300); });
-
-// ---------- OpenStreetMap dirt and gravel roads (faint) ----------
+// Forest Service roads come from our own site (a saved copy), not live from the Forest Service.
+// Dirt roads draw first and Forest Service roads on top, all on one canvas so taps work everywhere.
 const DIRT_KINDS = { 'Dirt track': 'Dirt track', 'Dirt road': 'Dirt road', 'Unpaved road': 'Gravel or dirt road', 'Gravel road': 'Gravel road' };
-fetch('/trails-test/osm-tracks.json').then((r) => r.json()).then((fc) => {
-  fc.features = fc.features.filter((f) => DIRT_KINDS[f.properties.k]);
-  L.geoJSON(fc, {
-    style: () => ({ renderer, color: '#c4a27c', weight: 3, opacity: 0.9 }),
-    onEachFeature: (f, layer) => {
-      const p = f.properties;
-      layer.bindPopup(() => `<div class="pop"><h3>${esc(p.n || DIRT_KINDS[p.k])}</h3><div class="big">${esc(DIRT_KINDS[p.k])} · ${miles(Number(p.mi)).replace(' mi', ' miles')}</div>${placeAndYou(layer.getLatLngs())}
-        <div class="small">Nobody has checked who may drive this one. Some are private land. Map data © OpenStreetMap contributors.</div></div>`);
-    }
-  }).addTo(map);
-}).catch(() => {});
+const getJson = (url, tries = 3) => fetch(url).then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
+  .catch((e) => (tries > 1 ? new Promise((ok) => setTimeout(ok, 1500)).then(() => getJson(url, tries - 1)) : Promise.reject(e)));
+Promise.allSettled([getJson('/trails-test/osm-tracks.json'), getJson('/api/trails-mvum')]).then(([dirt, fs]) => {
+  if (dirt.status === 'fulfilled') {
+    const fc = dirt.value;
+    fc.features = fc.features.filter((f) => DIRT_KINDS[f.properties.k]);
+    L.geoJSON(fc, {
+      style: () => ({ renderer, color: '#c4a27c', weight: 3, opacity: 0.9 }),
+      onEachFeature: (f, layer) => {
+        const p = f.properties;
+        layer.bindPopup(() => `<div class="pop"><h3>${esc(p.n || DIRT_KINDS[p.k])}</h3><div class="big">${esc(DIRT_KINDS[p.k])} · ${miles(Number(p.mi)).replace(' mi', ' miles')}</div>${placeAndYou(layer.getLatLngs())}
+          <div class="small">Nobody has checked who may drive this one. Some are private land. Map data © OpenStreetMap contributors.</div></div>`);
+      }
+    }).addTo(map);
+  }
+  if (fs.status !== 'fulfilled') { note("Couldn't load the Forest Service roads. Pull down to reload the page.", 8000); return; }
+  (fs.value.features || []).forEach((f) => {
+    const a = f.a || {};
+    const info = fsInfo(a);
+    if (!info) return;
+    const ll = f.p.map((path) => path.map(([x, y]) => L.latLng(y, x)));
+    if (info.open) L.polyline(ll, { renderer, color: '#fff', weight: 9, opacity: 0.9, interactive: false }).addTo(fsLayer);
+    L.polyline(ll, { renderer, color: info.open ? '#f97316' : '#9ca3af', weight: info.open ? 5 : 3, opacity: info.open ? 1 : 0.85, dashArray: info.open ? null : '6 6' })
+      .bindPopup(() => fsPopup(a, info, ll, f.t === 2)).addTo(fsLayer);
+  });
+});
 
 // ---------- Start ----------
 // For checking the page: ?at=lat,lng skips location; ?open=fs or ?open=dirt opens one line's info box
@@ -271,7 +236,6 @@ const qs = new URLSearchParams(location.search);
 const at = qs.get('at');
 if (at) { const [la, lo] = at.split(',').map(Number); showMe([la, lo]); followed = true; map.setView(me, 14); }
 else startLocation(false);
-loadFs();
 const openParam = qs.get('open');
 let tries = 0;
 function demoOpen() {
