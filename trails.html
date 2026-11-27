@@ -870,6 +870,96 @@ chips(vehSec, VEH_OK.map((k) => [k, VEHICLES[k].name]), (k) => prefs.veh === k, 
   if (k !== 'any') note('Showing Forest Service roads open to ' + VEHICLES[k].short, 4000);
 });
 
+// ---------- Live: weather radar, wildfires, river levels, road closures ----------
+// All off by default. Each one is fetched fresh while it is on (radar every 5 minutes, the rest every 10).
+const liveSec = section('live', 'Live', 'Updated while switched on. Check the source before you rely on it.');
+const when = (t) => { if (!t) return ''; const d = new Date(t); return isNaN(d) ? '' : d.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }); };
+const ago = (t) => { if (!t) return ''; const m = Math.round((Date.now() - t) / 60000); return m < 2 ? 'just now' : m < 90 ? m + ' min ago' : Math.round(m / 60) + ' hr ago'; };
+const nf = (n) => Number(n).toLocaleString();
+function liveLayer(src, draw, everyMin) {
+  const group = L.layerGroup();
+  let timer = null, busy = false, first = true;
+  const load = () => {
+    if (busy) return; busy = true;
+    fetch('/api/trails-data?src=' + src).then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then((d) => { if (!map.hasLayer(group)) return; group.clearLayers(); draw(group, d, first); first = false; })
+      .catch(() => note("Couldn't load the live " + src + ' right now. It will try again.', 5000))
+      .finally(() => { busy = false; });
+  };
+  return {
+    group,
+    on(v) {
+      clearInterval(timer); timer = null;
+      if (v) { first = true; group.addTo(map); load(); timer = setInterval(load, everyMin * 60000); } else { group.remove(); group.clearLayers(); }
+    }
+  };
+}
+
+// Weather radar: NOAA NEXRAD picture, about 5 minutes old at most
+map.createPane('radar'); map.getPane('radar').style.zIndex = 350; map.getPane('radar').style.pointerEvents = 'none';
+const RADAR = 'https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q-900913/{z}/{x}/{y}.png';
+const radar = L.tileLayer(RADAR + '?t={t}', { pane: 'radar', opacity: 0.6, maxNativeZoom: 12, maxZoom: 19, t: () => Math.floor(Date.now() / 300000), attribution: 'Radar: NOAA NEXRAD via Iowa Environmental Mesonet' });
+let radarTimer = null;
+toggle(liveSec, 'radar', 'Weather radar', 'Rain and storms from NOAA. Refreshes every 5 minutes.', (v) => {
+  clearInterval(radarTimer); radarTimer = null;
+  if (v) { radar.addTo(map); radarTimer = setInterval(() => radar.redraw(), 300000); } else radar.remove();
+});
+
+// Wildfires: current fires and their outlines from the national fire center (NIFC)
+const fireIcon = L.divIcon({ className: '', html: '<div style="width:22px;height:22px;border-radius:50%;background:#ea580c;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;font-weight:700">F</div>', iconSize: [22, 22], iconAnchor: [11, 11] });
+const firePop = (n, ac, pc, d) => '<div class="pop"><h3>' + esc(n || 'Wildfire') + '</h3>'
+  + (ac != null ? '<div class="big">' + nf(Math.round(ac)) + ' acres</div>' : '')
+  + (pc != null ? '<div>' + esc(pc) + '% contained</div>' : '')
+  + (d ? '<div class="small">Found ' + esc(when(d)) + '</div>' : '')
+  + '<div class="small">Source: NIFC. Stay clear and follow local orders.</div></div>';
+const fires = liveLayer('fires', (g, d, first) => {
+  (d.areas || []).forEach((a) => {
+    const rings = (a.r || []).map((ring) => ring.map(([x, y]) => [y, x]));
+    if (rings.length) L.polygon(rings, { renderer, color: '#ea580c', weight: 2, fillColor: '#ea580c', fillOpacity: 0.25 }).bindPopup(firePop(a.n, a.ac, a.pc)).addTo(g);
+  });
+  (d.fires || []).forEach((f) => L.marker(f.p, { icon: fireIcon }).bindPopup(firePop(f.n, f.ac, f.pc, f.d)).addTo(g));
+  if (first && !(d.fires || []).length && !(d.areas || []).length) note('No current wildfires in or near Missouri.', 4000);
+}, 10);
+toggle(liveSec, 'fires', 'Wildfires', 'Current fires and fire outlines from NIFC.', fires.on);
+
+// River levels: USGS stream gauges (height in feet and flow)
+const rivers = liveLayer('rivers', (g, d) => {
+  (d.gauges || []).forEach((s) => {
+    const html = '<div class="pop"><h3>' + esc(titleCase(s.n)) + '</h3>'
+      + (s.ft != null ? '<div class="big">' + esc(s.ft) + ' ft</div>' : '')
+      + (s.cfs != null ? '<div>' + nf(s.cfs) + ' cubic feet per second</div>' : '')
+      + (s.t ? '<div class="small">Read ' + esc(ago(s.t)) + '</div>' : '')
+      + '<a class="btn" target="_blank" rel="noopener" href="https://waterdata.usgs.gov/monitoring-location/' + encodeURIComponent(s.id) + '/">USGS page</a></div>';
+    L.circleMarker(s.p, { renderer, radius: 6, color: '#fff', weight: 1.5, fillColor: '#0284c7', fillOpacity: 0.95 }).bindPopup(html).addTo(g);
+  });
+}, 10);
+toggle(liveSec, 'rivers', 'River levels', 'USGS stream gauges: water height and flow.', rivers.on);
+
+// Road closures: MoDOT (crashes, winter weather, flooding and work zones that close the road)
+const CLOSE_KIND = { crash: 'Crash or incident', winter: 'Winter weather', flood: 'Flooding', work: 'Work zone' };
+const CLOSE_COLOR = { crash: '#dc2626', winter: '#7c3aed', flood: '#2563eb', work: '#ea580c' };
+const closures = liveLayer('closures', (g, d, first) => {
+  (d.closures || []).forEach((c) => {
+    const a = c.a || {};
+    const road = [a.DESIGNATION, a.TRAVELWAY_NAME].filter(Boolean).join(' ').trim() || 'Road';
+    const fromTo = [a.BEGIN_DESCRIPTION || a.BEG_REF_PT, a.END_DESCRIPTION || a.END_REF_PT].filter((v) => v != null && v !== '');
+    const dt = (v) => (typeof v === 'number' ? when(v) : String(v));
+    const html = '<div class="pop"><h3>' + esc(road) + (a.DIRECTION ? ' ' + esc(a.DIRECTION) : '') + '</h3>'
+      + '<div class="closed">Closed: ' + esc(CLOSE_KIND[c.k] || 'Closure') + '</div>'
+      + (a.COUNTY_NAME ? '<div>' + esc(titleCase(a.COUNTY_NAME)) + ' County</div>' : '')
+      + (a.RIVER_NAME ? '<div>' + esc(a.RIVER_NAME) + '</div>' : '')
+      + (a.WORK_TYPE ? '<div>' + esc(a.WORK_TYPE) + '</div>' : '')
+      + (fromTo.length ? '<div class="small">' + esc(fromTo.join(' to ')) + '</div>' : '')
+      + (a.EXT_COMMENT ? '<div class="small">' + esc(a.EXT_COMMENT) + '</div>' : '')
+      + ((a.START_DATE || a.END_DATE) ? '<div class="small">' + esc([a.START_DATE && 'From ' + dt(a.START_DATE), a.END_DATE && 'until ' + dt(a.END_DATE)].filter(Boolean).join(' ')) + '</div>' : '')
+      + '<div class="small">Source: MoDOT Traveler Information.</div></div>';
+    L.circleMarker(c.p, { renderer, radius: 7, color: '#fff', weight: 2, fillColor: CLOSE_COLOR[c.k] || '#dc2626', fillOpacity: 1 }).bindPopup(html).addTo(g);
+  });
+  if (first && !(d.closures || []).length) note('No road closures listed by MoDOT right now.', 4000);
+}, 10);
+toggle(liveSec, 'closures', 'Road closures', 'Closed roads from MoDOT: crashes, winter weather, flooding, work zones.', closures.on);
+map.attributionControl.addAttribution('Live: NIFC, USGS Water Data, MoDOT');
+
 // ---------- Start ----------
 // For checking the page: ?at=lat,lng skips location; ?open=fs or ?open=dirt opens one line's info box
 const qs = new URLSearchParams(location.search);
