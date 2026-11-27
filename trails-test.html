@@ -15,24 +15,41 @@
   header { padding: 10px 14px; background: #111; color: #f5e6c8; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
   header h1 { margin: 0; font-size: 17px; font-weight: 600; }
   header a { color: #f5e6c8; font-size: 14px; }
+  /* Once the map is showing, the top bar shrinks to one small floating button */
+  body:not(.locked) header { position: absolute; top: calc(8px + env(safe-area-inset-top)); left: 8px; z-index: 1000; padding: 0; background: none; }
+  body:not(.locked) header h1 { display: none; }
+  body:not(.locked) header a { display: inline-flex; align-items: center; gap: 4px; background: rgba(17,17,17,.86); border: 1px solid rgba(245,230,200,.18); border-radius: 999px; padding: 7px 12px 7px 9px; font-size: 13px; font-weight: 600; text-decoration: none; box-shadow: 0 2px 10px rgba(0,0,0,.4); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+  body:not(.locked) header a::before { content: "\2039"; font-size: 20px; line-height: 14px; margin-top: -2px; }
+  /* Small buttons in the bottom left: the key and the map credits */
+  .mini { position: absolute; z-index: 1000; bottom: calc(14px + env(safe-area-inset-bottom)); height: 34px; border-radius: 999px; border: 1px solid rgba(245,230,200,.18); background: rgba(17,17,17,.86); color: var(--tan); font: 600 13px system-ui, -apple-system, sans-serif; padding: 0 12px; box-shadow: 0 2px 10px rgba(0,0,0,.4); cursor: pointer; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+  .mini[aria-expanded="true"] { color: var(--gold); }
+  #key-btn { left: 10px; }
+  #cred-btn { left: 72px; width: 34px; padding: 0; font: 700 15px Georgia, serif; }
+  body.locked .mini { display: none; }
+  body:not(.key-open) .key { display: none; }
+  body.key-open .leaflet-bottom.leaflet-left { visibility: hidden; }
+  .leaflet-bottom.leaflet-left { bottom: calc(52px + env(safe-area-inset-bottom)); }
+  .leaflet-control-scale-line { background: rgba(17,17,17,.7); color: var(--tan); border-color: var(--tan); font-size: 11px; font-weight: 600; }
   #map { flex: 1; min-height: 0; }
+  #map.leaflet-container { background: #1c1917; } /* dark, not gray, while pictures load */
   /* Fade the base map so the trails stand out */
   .base-topo { filter: saturate(.35) brightness(1.06) contrast(.9); }
-  #note { position: absolute; left: 50%; transform: translateX(-50%); top: 60px; z-index: 1000; background: rgba(17,17,17,.88); color: #fff; padding: 8px 14px; border-radius: 999px; font-size: 15px; display: none; max-width: 88vw; text-align: center; }
+  #note { position: absolute; left: 50%; transform: translateX(-50%); top: calc(56px + env(safe-area-inset-top)); z-index: 1000; background: rgba(17,17,17,.88); color: #fff; padding: 8px 14px; border-radius: 999px; font-size: 15px; display: none; max-width: 88vw; text-align: center; }
   /* Local America look: black panels, tan text, gold trails */
-  .key { position: absolute; left: 10px; right: 76px; bottom: calc(26px + env(safe-area-inset-bottom)); z-index: 1000; max-width: 420px; background: rgba(17,17,17,.86); color: var(--tan); border-radius: 14px; box-shadow: 0 2px 10px rgba(0,0,0,.35); padding: 8px 12px; font-size: 13px; display: flex; gap: 6px 14px; flex-wrap: wrap; pointer-events: none; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+  .key { position: absolute; left: 10px; right: 76px; bottom: calc(56px + env(safe-area-inset-bottom)); z-index: 1000; max-width: 420px; background: rgba(17,17,17,.86); color: var(--tan); border-radius: 14px; box-shadow: 0 2px 10px rgba(0,0,0,.35); padding: 8px 12px; font-size: 13px; display: flex; gap: 6px 14px; flex-wrap: wrap; pointer-events: none; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
   .key span { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
   .key i { display: inline-block; width: 22px; height: 6px; background: var(--gold); border: 2px solid #111; border-radius: 4px; box-shadow: 0 0 0 1px rgba(255,255,255,.45); }
-  .key i.dirt { height: 3px; background: var(--tan); border-width: 1px; box-shadow: none; }
+  .key i.dirt { height: 3px; background: var(--tan); border-width: 2px; box-shadow: none; }
+  .key i.topo { height: 0; background: none; border: 0; border-top: 2px solid #c98a4e; border-radius: 0; box-shadow: none; }
   .key i.land { width: 16px; height: 12px; background: rgba(74,222,128,.35); border: 2px solid #bbf7d0; border-radius: 3px; box-shadow: none; }
   .key i.hwy { height: 7px; background: #fff; border: 2px solid #111; box-shadow: none; }
   .key i.pin { width: 12px; height: 12px; border: 2px solid var(--tan); border-radius: 50% 50% 50% 0; transform: rotate(-45deg); background: #111; box-shadow: none; }
   .fab { position: absolute; right: 12px; z-index: 1000; width: 54px; height: 54px; border-radius: 16px; border: 1px solid rgba(245,230,200,.18); background: rgba(17,17,17,.88); box-shadow: 0 2px 10px rgba(0,0,0,.4); font-size: 11px; font-weight: 600; color: var(--tan); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: pointer; padding: 0; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
   .fab svg { width: 24px; height: 24px; }
   .fab:active { transform: scale(.95); }
-  #me-btn { bottom: calc(26px + env(safe-area-inset-bottom)); color: #60a5fa; }
-  #sat-btn { bottom: calc(92px + env(safe-area-inset-bottom)); }
-  #topo-btn { bottom: calc(158px + env(safe-area-inset-bottom)); }
+  #me-btn { bottom: calc(14px + env(safe-area-inset-bottom)); color: #60a5fa; }
+  #sat-btn { bottom: calc(80px + env(safe-area-inset-bottom)); }
+  #topo-btn { bottom: calc(146px + env(safe-area-inset-bottom)); }
   #topo-btn[aria-pressed="false"] { color: #a8a29e; }
   /* Place names drawn by us over the satellite photo */
   .lbl { color: #fff; font-weight: 600; white-space: nowrap; text-shadow: 0 0 3px #000, 0 0 3px #000, 0 1px 2px #000; pointer-events: none; transform: translate(-50%, -50%); position: absolute; text-align: center; line-height: 1.15; }
@@ -45,7 +62,8 @@
   .lbl.shield { font-size: 12px; font-weight: 800; color: #111; background: #fff; border: 2px solid #111; border-radius: 6px; padding: 1px 6px; text-shadow: none; box-shadow: 0 1px 3px rgba(0,0,0,.6); letter-spacing: .01em; }
   .lbl.shield.us { border-radius: 6px 6px 12px 12px; }
   /* Brighten the brown topo lines so they show on the dark satellite photo */
-  .contours { filter: brightness(1.7) saturate(.8); opacity: .7; }
+  /* Topo lines: thin copper-brown, so they never look like the cream dirt roads */
+  .contours { filter: brightness(1.2) saturate(1.25); opacity: .85; }
   .me-dot { width: 20px; height: 20px; border-radius: 50%; background: var(--me); border: 3px solid #fff; box-shadow: 0 0 0 2px rgba(37,99,235,.35), 0 1px 4px rgba(0,0,0,.4); box-sizing: border-box; position: relative; }
   .me-dot::after { content: ""; position: absolute; inset: -12px; border-radius: 50%; background: rgba(37,99,235,.25); animation: pulse 2s ease-out infinite; z-index: -1; }
   @keyframes pulse { from { transform: scale(.4); opacity: 1; } to { transform: scale(1.4); opacity: 0; } }
@@ -58,7 +76,7 @@
   .pop .closed { color: #b91c1c; font-weight: 600; }
   .pop .small { color: var(--muted); font-size: 13px; margin-top: 6px; }
   .pop a.btn { display: inline-block; margin-top: 8px; background: #15803d; color: #fff; padding: 6px 12px; border-radius: 8px; text-decoration: none; font-weight: 600; }
-  #lay-btn { bottom: calc(224px + env(safe-area-inset-bottom)); }
+  #lay-btn { bottom: calc(212px + env(safe-area-inset-bottom)); }
   #lay-btn[aria-expanded="true"] { color: var(--gold); }
   /* Layers panel: slides up from the bottom */
   :is(#panel, #trip) { position: absolute; left: 0; right: 0; bottom: 0; z-index: 1100; max-height: 72vh; overflow-y: auto; background: #111; color: var(--tan); border-radius: 18px 18px 0 0; box-shadow: 0 -4px 18px rgba(0,0,0,.5); padding: 8px 16px calc(18px + env(safe-area-inset-bottom)); transform: translateY(105%); transition: transform .22s ease; -webkit-overflow-scrolling: touch; }
@@ -68,6 +86,16 @@
   :is(#panel, #trip) h2 { margin: 0; font-size: 18px; color: #fff; }
   :is(#panel, #trip) .close { background: none; border: 0; color: var(--tan); font-size: 15px; font-weight: 600; padding: 8px 4px; cursor: pointer; }
   :is(#panel, #trip) h3 { margin: 16px 0 4px; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: #a8a29e; font-weight: 600; }
+  #panel .sec-h { display: flex; align-items: center; gap: 10px; width: 100%; background: none; border: 0; border-bottom: 1px solid #292524; color: #fff; padding: 14px 0; font: 600 17px system-ui, -apple-system, sans-serif; cursor: pointer; text-align: left; }
+  #panel .sec-h .ic { width: 30px; height: 30px; border-radius: 9px; background: #1c1917; display: grid; place-items: center; font-size: 16px; flex: none; }
+  #panel .sec-h .nm { flex: 1; }
+  #panel .sec-h .cnt { font-size: 13px; font-weight: 600; color: #a8a29e; }
+  #panel .sec-h .cnt.on { color: #4ade80; }
+  #panel .sec-h::after { content: ""; width: 8px; height: 8px; border-right: 2px solid #a8a29e; border-bottom: 2px solid #a8a29e; transform: rotate(45deg); margin: -4px 4px 0 2px; transition: transform .15s; }
+  #panel .sec-h[aria-expanded="true"]::after { transform: rotate(-135deg); margin-top: 4px; }
+  #panel .sec-b { padding: 0 0 6px 40px; }
+  #panel .sec-b[hidden] { display: none; }
+  #panel .row .ri { flex: none; width: 24px; text-align: center; font-size: 17px; margin-left: -34px; }
   :is(#panel, #trip) .row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid #292524; cursor: pointer; }
   :is(#panel, #trip) .row:last-child { border-bottom: 0; }
   :is(#panel, #trip) .row .txt { flex: 1; min-width: 0; }
@@ -93,15 +121,17 @@
   #gate p { color: var(--muted); margin: 0 0 16px; }
   #gate .err { background: #fee2e2; color: #991b1b; padding: 10px; border-radius: 8px; font-size: 14px; }
   #gate a.go { display: block; background: #15803d; color: #fff; padding: 12px 16px; border-radius: 10px; text-decoration: none; font-weight: 600; }
-  .leaflet-control-attribution { white-space: nowrap; overflow-x: auto; max-width: 100vw; font-size: 10px; background: rgba(17,17,17,.6) !important; color: #d6d3d1; }
+  .leaflet-control-attribution { display: none; white-space: normal; max-width: min(420px, calc(100vw - 96px)); font-size: 11px; line-height: 1.4; background: rgba(17,17,17,.88) !important; color: #d6d3d1; border-radius: 10px; padding: 6px 9px !important; margin: 0 0 6px 10px !important; }
+  body.creds-open .leaflet-control-attribution { display: block; }
   .leaflet-control-attribution a { color: var(--tan); }
   .leaflet-control-zoom { display: none; }
+  .leaflet-top.leaflet-left { top: calc(44px + env(safe-area-inset-top)); }
   @media (min-width: 700px) { .leaflet-control-zoom { display: block; } }
   .shade { mix-blend-mode: multiply; }
   .place-ic { width:26px;height:26px;border-radius:50%;background:#fff;border:2px solid #1c1917;box-shadow:0 1px 4px rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;font-size:14px;line-height:1; }
   .camp-ic { width:24px;height:24px;border-radius:6px;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:700; }
   /* Trip tools: route builder and your own pins */
-  #trip-btn { bottom: calc(290px + env(safe-area-inset-bottom)); }
+  #trip-btn { bottom: calc(278px + env(safe-area-inset-bottom)); }
   #trip-btn[aria-expanded="true"] { color: var(--gold); }
   .tbtns { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px 0 4px; }
   .tbtn { border: 1px solid #57534e; background: #1c1917; color: var(--tan); border-radius: 10px; padding: 10px 14px; font-size: 15px; font-weight: 600; cursor: pointer; }
@@ -152,7 +182,9 @@
 <button class="fab" id="me-btn" type="button" aria-label="Show where I am">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="12" cy="12" r="4" fill="currentColor"/><circle cx="12" cy="12" r="8"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3"/></svg>
 </button>
-<div class="key"><span><i class="hwy"></i>Highway</span><span><i></i>Open to drive</span><span><i class="dirt"></i>Dirt road, not checked</span><span><i class="land"></i>Public land</span><span><i class="pin"></i>Local America place</span><span class="k-trail"><i class="easy"></i>Easy trail</span><span class="k-trail"><i class="mod"></i>Moderate</span><span class="k-trail"><i class="hard"></i>Hard</span><span class="k-trail"><i class="unk"></i>Not rated</span></div>
+<button class="mini" id="key-btn" type="button" aria-expanded="false" aria-label="Show the map key">Key</button>
+<button class="mini" id="cred-btn" type="button" aria-expanded="false" aria-label="Show map credits">i</button>
+<div class="key"><span><i class="hwy"></i>Highway</span><span><i></i>Open to drive</span><span><i class="dirt"></i>Dirt road, not checked</span><span><i class="topo"></i>Topo line</span><span><i class="land"></i>Public land</span><span><i class="pin"></i>Local America place</span><span class="k-trail"><i class="easy"></i>Easy trail</span><span class="k-trail"><i class="mod"></i>Moderate</span><span class="k-trail"><i class="hard"></i>Hard</span><span class="k-trail"><i class="unk"></i>Not rated</span></div>
 <div id="trip" role="dialog" aria-label="Trips" aria-hidden="true"><div class="grab"></div><div class="top"><h2 id="trip-title">Trips</h2><button class="close" type="button">Done</button></div><div id="trip-body"></div></div>
 <div id="planbar" hidden><div class="pb-top"><b id="pb-sum">Tap the map to add stops</b><button class="tbtn" id="pb-x" type="button">Close</button></div><div id="pb-modes"></div><div class="tbtns"><button class="tbtn" id="pb-undo" type="button">Undo</button><button class="tbtn" id="pb-clear" type="button">Clear</button><button class="tbtn" id="pb-share" type="button">Share</button><button class="tbtn pri" id="pb-save" type="button">Save</button></div><div class="pb-name" hidden><input id="pb-input" type="text" maxlength="80" placeholder="Name this route" aria-label="Route name"><button class="tbtn pri" id="pb-ok" type="button">Save</button></div><small>Tap a stop to take it out, or drag it to move it. Routes follow roads and trails in OpenStreetMap (routing by FOSSGIS Valhalla). <a href="https://www.openstreetmap.org/fixthemap" target="_blank" rel="noopener">Fix the map</a></small></div>
 <div id="panel" role="dialog" aria-label="Map layers" aria-hidden="true"><div class="grab"></div><div class="top"><h2>Layers</h2><button class="close" type="button">Done</button></div><div id="panel-body"></div></div>
@@ -187,6 +219,7 @@ const VEH_OK = ['any', 'jeep', 'wide', 'atv', 'moto'];
 const MISSOURI = L.latLngBounds([35.99, -95.77], [40.62, -89.10]);
 
 const map = L.map('map', { zoomControl: true, preferCanvas: true, tap: true, maxZoom: 19 }).setView(WILLOW_SPRINGS, 12);
+L.control.scale({ metric: false, position: 'bottomleft', maxWidth: 110 }).addTo(map);
 
 // ---------- Layers panel ----------
 // The Layers button opens a panel of switches. Choices are kept on this phone only (browser
@@ -200,25 +233,49 @@ function setPanel(open) { panel.classList.toggle('open', open); panel.setAttribu
 layBtn.addEventListener('click', () => setPanel(!panel.classList.contains('open')));
 panel.querySelector('.close').addEventListener('click', () => setPanel(false));
 map.on('click', () => setPanel(false));
+// Each group of switches folds up under a heading that says how many are on. Open or shut is kept like the switches.
 const sections = {};
+const SEC_ICONS = { trails: '\u{1F97E}', veh: '\u{1F699}', live: '\u{1F4E1}', maplayers: '\u{1F5FA}\uFE0F', places: '\u{1F4CD}', trips: '\u{1F9ED}' };
+function countOn(id) {
+  const sec = sections[id]; if (!sec) return;
+  const cnt = sec.head.querySelector('.cnt');
+  const chip = sec.box.querySelector('.chips .chip[aria-pressed="true"]');
+  if (id === 'veh') { cnt.textContent = chip ? chip.textContent : ''; cnt.classList.toggle('on', !!chip && chip.dataset.k !== 'any'); return; }
+  const n = sec.box.querySelectorAll('.row[role="switch"][aria-checked="true"]').length;
+  cnt.textContent = n ? n + ' on' : 'Off'; cnt.classList.toggle('on', n > 0);
+}
 function section(id, title, sub) {
   if (!sections[id]) {
-    const h = document.createElement('h3'); h.textContent = title;
-    const box = document.createElement('div');
-    panelBody.append(h, box);
+    const head = document.createElement('button'); head.type = 'button'; head.className = 'sec-h';
+    head.innerHTML = '<span class="ic" aria-hidden="true"></span><span class="nm"></span><span class="cnt"></span>';
+    head.querySelector('.ic').textContent = SEC_ICONS[id] || '';
+    head.querySelector('.nm').textContent = title;
+    const box = document.createElement('div'); box.className = 'sec-b'; box.id = 'sec-' + id;
+    head.setAttribute('aria-controls', box.id);
+    const setOpen = (v) => { head.setAttribute('aria-expanded', String(v)); box.hidden = !v; };
+    setOpen(!!prefs['open-' + id]);
+    head.addEventListener('click', () => { const v = box.hidden; setOpen(v); prefs['open-' + id] = v; savePrefs(); });
+    panelBody.append(head, box);
     if (sub) { const p = document.createElement('div'); p.className = 'row'; p.style.cursor = 'default'; p.innerHTML = '<div class="txt"><small></small></div>'; p.querySelector('small').textContent = sub; box.append(p); }
-    sections[id] = box;
+    sections[id] = { head, box };
   }
-  return sections[id];
+  return sections[id].box;
 }
+const secOf = (el) => { const b = el.closest('.sec-b'); return b ? b.id.slice(4) : null; };
+const ROW_ICONS = { trails: '\u{1F97E}', radar: '\u{1F327}\uFE0F', fires: '\u{1F525}', rivers: '\u{1F30A}', closures: '\u{1F6A7}', shade: '\u26F0\uFE0F', oldtopo: '\u{1F4DC}', night: '\u{1F30C}', cell: '\u{1F4F6}', camping: '\u{1F3D5}\uFE0F', 'trip-routes': '\u3030\uFE0F', 'trip-pins': '\u{1F4CC}' };
 // One on/off switch. key is the saved name; on(true/false) shows or hides the layer.
 function toggle(sec, key, title, sub, on, def = false) {
   const row = document.createElement('div');
   row.className = 'row'; row.setAttribute('role', 'switch'); row.tabIndex = 0;
   row.innerHTML = '<div class="txt"><b></b><small></small></div><span class="sw"></span>';
+  // a small picture in front of each switch; Places already start with one in the title
+  const m = /^(\p{Extended_Pictographic}\uFE0F?)\s+(.*)$/u.exec(title);
+  const ic = m ? m[1] : ROW_ICONS[key];
+  if (ic) { const i = document.createElement('span'); i.className = 'ri'; i.setAttribute('aria-hidden', 'true'); i.textContent = ic; row.prepend(i); }
+  if (m) title = m[2];
   row.querySelector('b').textContent = title;
   row.querySelector('small').textContent = sub || '';
-  const set = (v, save) => { row.setAttribute('aria-checked', String(v)); prefs[key] = v; if (save) savePrefs(); on(v); };
+  const set = (v, save) => { row.setAttribute('aria-checked', String(v)); prefs[key] = v; if (save) savePrefs(); on(v); countOn(secOf(row)); };
   row.addEventListener('click', () => set(row.getAttribute('aria-checked') !== 'true', true));
   row.addEventListener('keydown', (e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); row.click(); } });
   sec.append(row);
@@ -228,22 +285,27 @@ function toggle(sec, key, title, sub, on, def = false) {
 // A row of buttons to pick from
 function chips(sec, items, isOn, onTap) {
   const box = document.createElement('div'); box.className = 'chips';
-  const paint = () => box.querySelectorAll('.chip').forEach((b) => b.setAttribute('aria-pressed', String(isOn(b.dataset.k))));
+  const paint = () => { box.querySelectorAll('.chip').forEach((b) => b.setAttribute('aria-pressed', String(isOn(b.dataset.k)))); countOn(secOf(box)); };
   items.forEach(([k, label]) => {
     const b = document.createElement('button'); b.type = 'button'; b.className = 'chip'; b.textContent = label; b.dataset.k = k;
     b.addEventListener('click', () => { onTap(k); paint(); });
     box.append(b);
   });
-  paint(); sec.append(box);
+  sec.append(box); paint();
   return box;
 }
-const renderer = L.canvas({ tolerance: 12 });
+const renderer = L.canvas({ tolerance: 12, padding: 0.5 }); // draws half a screen past the edges so lines are there as you pan
 
 const topo = L.tileLayer('https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{z}/{y}/{x}', {
-  maxNativeZoom: 16, maxZoom: 19, className: 'base-topo', attribution: 'Base map: USGS The National Map'
+  maxNativeZoom: 16, maxZoom: 19, className: 'base-topo', keepBuffer: 4, attribution: 'Base map: USGS The National Map'
 });
 const imagery = L.tileLayer('https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/{z}/{y}/{x}', {
-  maxNativeZoom: 16, maxZoom: 19, zIndex: 1, attribution: 'Base map: USGS The National Map'
+  maxNativeZoom: 16, maxZoom: 19, zIndex: 1, keepBuffer: 4, attribution: 'Base map: USGS The National Map'
+}).addTo(map);
+// A rough copy of the same photos underneath, from a few big squares, so zooming never shows empty gray squares
+// while the sharp ones load.
+const backstop = L.tileLayer('https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/{z}/{y}/{x}', {
+  maxNativeZoom: 10, maxZoom: 16, zIndex: 0, keepBuffer: 1
 }).addTo(map);
 
 // Close up, the cached satellite above gets blurry (it stops at about 2.4 m per pixel).
@@ -257,19 +319,29 @@ const ArcExport = L.TileLayer.extend({
     return this._base + '&bbox=' + bbox;
   }
 });
-const sharp = new ArcExport('', { minZoom: 14, maxNativeZoom: 18, maxZoom: 19, zIndex: 2, tileSize: 256 });
+const sharp = new ArcExport('', { minZoom: 14, maxNativeZoom: 18, maxZoom: 19, zIndex: 2, tileSize: 256, keepBuffer: 4, updateWhenZooming: false });
 sharp._base = 'https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer/exportImage?f=image&format=jpg&bboxSR=3857&imageSR=3857&size=512,512&renderingRule=' + encodeURIComponent('{"rasterFunction":"NaturalColor"}');
 sharp.addTo(map);
-const contours = new ArcExport('', { minZoom: 11, maxZoom: 19, zIndex: 5, className: 'contours' });
-contours._base = 'https://carto.nationalmap.gov/arcgis/rest/services/contours/MapServer/export?f=image&format=png32&transparent=true&bboxSR=3857&imageSR=3857&size=512,512&dpi=144';
-// Zoomed out: only the bold every-5th lines with heights. Close up (16+): every line.
+const contours = new ArcExport('', { minZoom: 11, maxZoom: 19, zIndex: 5, className: 'contours', keepBuffer: 4, updateWhenZooming: false });
+contours._base = 'https://carto.nationalmap.gov/arcgis/rest/services/contours/MapServer/export?f=image&format=png32&transparent=true&bboxSR=3857&imageSR=3857&size=512,512&dpi=192';
+// Zoomed out: only the bold every-5th lines, no numbers. From zoom 15: heights you can read. Close up (16+): every line.
+// dpi 192 on a 512 px picture shown at 256 px keeps the lines thin and the numbers sharp.
 contours.getTileUrl = function (c) {
-  const show = c.z >= 16 ? '2,10,11,15,16,21,22,25,26' : '2,10,11,15,16,21,25';
+  const show = c.z >= 16 ? '2,10,11,15,16,21,22,25,26' : c.z >= 15 ? '2,10,11,15,16,21,25' : '2,11,16,25';
   return ArcExport.prototype.getTileUrl.call(this, c) + '&layers=show:' + show;
 };
 contours.addTo(map);
 map.attributionControl.addAttribution('Aerial photos: USDA NAIP; Topo lines: USGS 3DEP');
 map.attributionControl.setPrefix('');
+map.attributionControl.setPosition('bottomleft');
+// Key and credits open from the two small buttons in the bottom left; tapping the map closes them.
+function miniToggle(id, cls) {
+  const b = document.getElementById(id);
+  b.addEventListener('click', (e) => { e.stopPropagation(); const v = !document.body.classList.contains(cls); document.body.classList.toggle(cls, v); b.setAttribute('aria-expanded', String(v)); });
+  map.on('click', () => { document.body.classList.remove(cls); b.setAttribute('aria-expanded', 'false'); });
+}
+miniToggle('key-btn', 'key-open');
+miniToggle('cred-btn', 'creds-open');
 map.attributionControl.addAttribution('Roads: Forest Service; Public land: USGS PAD-US; © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors');
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -319,8 +391,8 @@ document.getElementById('topo-btn').onclick = (e) => {
 };
 document.getElementById('sat-btn').onclick = (e) => {
   sat = !sat;
-  if (sat) { map.removeLayer(topo); imagery.addTo(map); sharp.addTo(map); if (topoOn) contours.addTo(map); e.currentTarget.querySelector('span').textContent = 'Map'; e.currentTarget.ariaLabel = 'Switch to the plain map'; }
-  else { map.removeLayer(imagery); map.removeLayer(sharp); map.removeLayer(contours); topo.addTo(map); e.currentTarget.querySelector('span').textContent = 'Satellite'; e.currentTarget.ariaLabel = 'Switch to satellite'; }
+  if (sat) { map.removeLayer(topo); backstop.addTo(map); imagery.addTo(map); sharp.addTo(map); if (topoOn) contours.addTo(map); e.currentTarget.querySelector('span').textContent = 'Map'; e.currentTarget.ariaLabel = 'Switch to the plain map'; }
+  else { map.removeLayer(backstop); map.removeLayer(imagery); map.removeLayer(sharp); map.removeLayer(contours); topo.addTo(map); e.currentTarget.querySelector('span').textContent = 'Satellite'; e.currentTarget.ariaLabel = 'Switch to satellite'; }
   document.getElementById('topo-btn').style.display = sat ? '' : 'none';
 };
 
@@ -489,9 +561,9 @@ async function gunzipJson(bytes) {
 }
 function drawDirt(fc) {
   // dark edge first so the thin tan line shows on the satellite photo
-  L.geoJSON(fc, { interactive: false, style: () => ({ renderer, color: '#111', weight: 5, opacity: 0.5, lineCap: 'round', lineJoin: 'round' }) }).addTo(map);
+  L.geoJSON(fc, { interactive: false, style: () => ({ renderer, color: '#111', weight: 6, opacity: 0.85, lineCap: 'round', lineJoin: 'round' }) }).addTo(map);
   L.geoJSON(fc, {
-    style: () => ({ renderer, color: '#f5e6c8', weight: 2.5, opacity: 0.95, lineCap: 'round', lineJoin: 'round' }),
+    style: () => ({ renderer, color: '#f5e6c8', weight: 2.75, opacity: 1, lineCap: 'round', lineJoin: 'round' }),
     onEachFeature: (f, layer) => {
       const p = f.properties;
       layer.bindPopup(() => `<div class="pop"><h3>${esc(p.n || DIRT_KINDS[p.k])}</h3><div class="big">${esc(DIRT_KINDS[p.k])} · ${miles(Number(p.mi)).replace(' mi', ' miles')}</div>${placeAndYou(layer.getLatLngs())}
