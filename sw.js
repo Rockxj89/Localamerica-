@@ -38,8 +38,8 @@ self.addEventListener('fetch', (event) => {
   if (url.pathname.endsWith('/pins.html') || url.pathname.endsWith('/pins')) return;
   if (url.pathname.endsWith('/trails.html') || url.pathname.endsWith('/trails')) return;
 
-  // Trails map tiles (USGS): the browser's own cache handles these, so they don't pile up on the phone
-  if (url.hostname === 'basemap.nationalmap.gov') return;
+  // Trails map tiles, aerial photos and topo lines (USGS): the browser's own cache handles these, so they don't pile up on the phone
+  if (url.hostname === 'nationalmap.gov' || url.hostname.endsWith('.nationalmap.gov')) return;
 
   // The video list: always fresh, so new videos show up right away
   if (url.pathname === '/videos.json') return;
