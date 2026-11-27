@@ -52,10 +52,10 @@
   .key { position: absolute; left: 10px; right: 76px; bottom: calc(56px + env(safe-area-inset-bottom)); z-index: 1000; max-width: 420px; background: rgba(17,17,17,.86); color: var(--tan); border-radius: 14px; box-shadow: 0 2px 10px rgba(0,0,0,.35); padding: 8px 12px; font-size: 13px; display: flex; gap: 6px 14px; flex-wrap: wrap; pointer-events: none; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
   .key span { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
   .key i { display: inline-block; width: 22px; height: 6px; background: var(--gold); border: 2px solid #111; border-radius: 4px; box-shadow: 0 0 0 1px rgba(255,255,255,.45); }
-  .key i.dirt { height: 3px; background: #c4c4c8; border: 1px solid #27272a; box-shadow: none; }
+  .key i.dirt { height: 3px; background: #b9bdc4; border: 1px solid #27272a; box-shadow: none; }
   .key i.topo { height: 0; background: none; border: 0; border-top: 2px solid #c98a4e; border-radius: 0; box-shadow: none; }
   .key i.land { width: 16px; height: 12px; background: rgba(74,222,128,.35); border: 2px solid #bbf7d0; border-radius: 3px; box-shadow: none; }
-  .key i.hwy { height: 5px; background: #d4d4d8; border: 1px solid #27272a; box-shadow: none; }
+  .key i.hwy { height: 5px; background: #cfd3d9; border: 1px solid #27272a; box-shadow: none; }
   .key i.pin { width: 12px; height: 12px; border: 2px solid var(--tan); border-radius: 50% 50% 50% 0; transform: rotate(-45deg); background: #111; box-shadow: none; }
   .fab { position: absolute; right: 12px; z-index: 1000; width: 54px; height: 54px; border-radius: 16px; border: 1px solid rgba(245,230,200,.18); background: rgba(17,17,17,.88); box-shadow: 0 2px 10px rgba(0,0,0,.4); font-size: 11px; font-weight: 600; color: var(--tan); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: pointer; padding: 0; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
   .fab svg { width: 24px; height: 24px; }
@@ -575,9 +575,9 @@ async function gunzipJson(bytes) {
 }
 function drawDirt(fc) {
   // same plain gray road style as every other road, so only trails look like trails
-  L.geoJSON(fc, { interactive: false, style: () => ({ renderer, color: '#27272a', weight: 4, opacity: 0.6, lineCap: 'round', lineJoin: 'round' }) }).addTo(map);
+  L.geoJSON(fc, { interactive: false, style: () => ({ renderer, color: '#27272a', weight: 4.5, opacity: 0.7, lineCap: 'round', lineJoin: 'round' }) }).addTo(map);
   L.geoJSON(fc, {
-    style: () => ({ renderer, color: '#c4c4c8', weight: 2, opacity: 1, lineCap: 'round', lineJoin: 'round' }),
+    style: () => ({ renderer, color: '#b9bdc4', weight: 2.5, opacity: 1, lineCap: 'round', lineJoin: 'round' }),
     onEachFeature: (f, layer) => {
       const p = f.properties;
       layer.bindPopup(() => `<div class="pop"><h3>${esc(p.n || DIRT_KINDS[p.k])}</h3><div class="big">${esc(DIRT_KINDS[p.k])} · ${miles(Number(p.mi)).replace(' mi', ' miles')}</div>${placeAndYou(layer.getLatLngs())}
@@ -695,7 +695,7 @@ async function drawMain() {
   })));
 }
 function renderMain(feats, z) {
-  const round = { lineCap: 'round', lineJoin: 'round' }, close = z >= 14 ? 1 : z >= 12 ? 0.8 : 0.6;
+  const round = { lineCap: 'round', lineJoin: 'round' }, close = z >= 13 ? 1 : z >= 12 ? 0.8 : 0.6;
   mainLayer.clearLayers();
   const labels = [];
   // Every road in one gray style with a thin dark edge; highways only a little wider.
@@ -712,7 +712,7 @@ function renderMain(feats, z) {
   lines.forEach((x) => {
     const hwy = !!x.sh || x.lyr === 29 || x.lyr === 30;
     const name = (x.f.attributes && x.f.attributes.name) || (x.sh && x.sh.text) || (hwy ? 'Highway' : 'Road');
-    L.polyline(x.ll, { renderer, color: hwy ? '#d4d4d8' : '#c4c4c8', weight: x.w, opacity: 1, ...round })
+    L.polyline(x.ll, { renderer, color: hwy ? '#cfd3d9' : '#b9bdc4', weight: x.w, opacity: 1, ...round })
       .bindPopup(() => `<div class="pop"><h3>${esc(name)}</h3><div class="big">${hwy ? 'Paved highway' : 'Road'}${x.sh ? ' · ' + esc(x.sh.text) : ''}</div><div class="small">Road map: USGS The National Map.</div></div>`)
       .addTo(mainLayer);
     if (x.sh) labels.push({ text: x.sh.short, cls: x.sh.cls, rank: x.sh.rank, ll: x.ll });
