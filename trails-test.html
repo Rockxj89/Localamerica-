@@ -169,17 +169,27 @@ function placeAndYou(latlngs) {
 }
 
 // ---------- Public land (green) ----------
-// Drawn on its own layer under the roads; taps go through it to the roads and pins.
-map.createPane('land'); map.getPane('land').style.zIndex = 350; map.getPane('land').style.pointerEvents = 'none';
-const landRenderer = L.canvas({ pane: 'land' });
-fetch('/api/trails-publand').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); }).then((j) => {
-  (j.areas || []).forEach((rings) => {
-    L.polygon(rings.map((ring) => ring.map(([x, y]) => [y, x])), {
-      renderer: landRenderer, pane: 'land', interactive: false,
-      color: '#16a34a', weight: 2, opacity: 0.9, fillColor: '#22c55e', fillOpacity: 0.22
-    }).addTo(map);
+// Drawn first on the same canvas as the roads, so roads sit on top and win a tap when you're close
+// to one; a tap anywhere else inside the green says what land it is.
+function landPopup(a) {
+  const name = a.n ? `${a.k}: ${a.n}` : a.k;
+  const access = a.o ? 'Open to the public.' : 'Open to the public with some limits. Check the rules before you go.';
+  return `<div class="pop"><h3>${esc(name)}</h3><div>${access}</div>${me ? `<div>${miles(nearestOnLand(a.ll) / 1609.34)} from you</div>` : ''}
+    <div class="small">Public land from USGS PAD-US and the Forest Service. Driving is only allowed on roads marked open.</div></div>`;
+}
+function nearestOnLand(rings) {
+  let best = Infinity;
+  for (const ring of rings) for (const p of ring) best = Math.min(best, me.distanceTo(p));
+  return best;
+}
+function drawLand(j) {
+  (j.areas || []).forEach((a) => {
+    a.ll = a.r.map((ring) => ring.map(([x, y]) => L.latLng(y, x)));
+    L.polygon(a.ll, { renderer, color: '#16a34a', weight: 1.5, opacity: 0.9, fillColor: '#22c55e', fillOpacity: 0.22 })
+      .bindPopup(() => landPopup(a)).addTo(landLayer);
   });
-}).catch(() => note("Couldn't load the public land shading. Pull down to reload the page.", 6000));
+}
+const landLayer = L.layerGroup().addTo(map);
 
 // ---------- Forest Service roads and trails open to vehicles ----------
 const fsLayer = L.layerGroup().addTo(map);
@@ -221,7 +231,9 @@ function fsPopup(a, info, latlngs, isTrail) {
 const DIRT_KINDS = { 'Dirt track': 'Dirt track', 'Dirt road': 'Dirt road', 'Unpaved road': 'Gravel or dirt road', 'Gravel road': 'Gravel road' };
 const getJson = (url, tries = 3) => fetch(url).then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
   .catch((e) => (tries > 1 ? new Promise((ok) => setTimeout(ok, 1500)).then(() => getJson(url, tries - 1)) : Promise.reject(e)));
-Promise.allSettled([getJson('/trails-test/osm-tracks.json'), getJson('/api/trails-mvum')]).then(([dirt, fs]) => {
+Promise.allSettled([getJson('/trails-test/osm-tracks.json'), getJson('/api/trails-mvum'), getJson('/api/trails-publand')]).then(([dirt, fs, land]) => {
+  if (land.status === 'fulfilled') drawLand(land.value);
+  else note("Couldn't load the public land. Pull down to reload the page.", 6000);
   if (dirt.status === 'fulfilled') {
     const fc = dirt.value;
     fc.features = fc.features.filter((f) => DIRT_KINDS[f.properties.k]);
@@ -259,7 +271,7 @@ let tries = 0;
 function demoOpen() {
   let first;
   const take = (l) => { if (!first && l.getPopup && l.getPopup()) first = l; };
-  if (openParam === 'fs') fsLayer.eachLayer(take); else map.eachLayer((l) => { if (l.feature) take(l); });
+  if (openParam === 'fs') fsLayer.eachLayer(take); else if (openParam === 'land') landLayer.eachLayer((l) => { if (!first && /Conservation area: Peck/.test(l.getPopup()._content() || '')) first = l; }); else map.eachLayer((l) => { if (l.feature) take(l); });
   if (!first) { if (++tries < 30) setTimeout(demoOpen, 1000); return; }
   const ll = first.getLatLngs().flat(3); first.openPopup(ll[Math.floor(ll.length / 2)]);
 }
