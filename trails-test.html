@@ -660,8 +660,9 @@ function drawFs() {
 // Dirt and gravel roads stay in their own file (dirt-roads-mo.bin).
 const ROAD_FILES = { main: '/trails-data/roads-mo-main.bin?v=1', all: '/trails-data/roads-mo-all.bin?v=1' };
 const roadFile = { main: null, all: null };
-const roadCells = new Map(); // "set|i_j" -> { set, cas: [], low: [], high: [], shields: [] } or a promise while loading
-const roadRows = new Map(); // downloaded squares, kept so panning back needs no new download
+const roadCells = new Map(); // "set|i_j|width" -> { set, cas: [], low: [], high: [], shields: [] } or a promise while loading
+const roadBytes = new Map(); // downloaded squares (still packed, so they stay small), kept so panning back needs no new download
+let roadBytesSize = 0;
 const roadCase = L.layerGroup().addTo(map), roadLow = L.layerGroup().addTo(map), roadHigh = L.layerGroup().addTo(map);
 const mainLayer = roadHigh; // kept so other code can find the highways
 let mainLabels = [], mainRun = 0;
@@ -689,12 +690,22 @@ function openRoadFile(set) {
   }
   return roadFile[set];
 }
-// "I-44", "US 60", "Hwy 76", "Rte CC" -> the number or letters for the small round badge
+// one packed square, from the cache or the file (the cache holds about 12 MB at most)
+function squareBytes(f, key, tile) {
+  if (roadBytes.has(key)) { const p = roadBytes.get(key); roadBytes.delete(key); roadBytes.set(key, p); return p; }
+  const [off, len] = f.idx.tiles[tile];
+  const p = rangeOf(f, f.start + off, f.start + off + len - 1);
+  roadBytes.set(key, p); roadBytesSize += len; p.len = len;
+  p.catch(() => { if (roadBytes.get(key) === p) { roadBytes.delete(key); roadBytesSize -= len; } });
+  while (roadBytesSize > 12e6 && roadBytes.size > 1) { const [k0, p0] = roadBytes.entries().next().value; roadBytes.delete(k0); roadBytesSize -= p0.len || 0; }
+  return p;
+}
+// "I-44", "US 60", "Hwy 76", "Rte CC" (or "Rte MO CC") -> the number or letters for the small round badge
 function shieldOf(text) {
   if (!text) return null;
-  const m = /^(I-|US |Hwy |Rte )(.+)$/.exec(text);
+  const m = /^(I-|US |Hwy |Rte )(?:MO )?(.+)$/.exec(text);
   if (!m) return null;
-  return { text, short: m[2], cls: m[1] === 'I-' || m[1] === 'US ' ? 'us' : '', rank: { 'I-': 3, 'US ': 2, 'Hwy ': 1, 'Rte ': 1 }[m[1]] };
+  return { text: m[1] + m[2], short: m[2], cls: m[1] === 'I-' || m[1] === 'US ' ? 'us' : '', rank: { 'I-': 3, 'US ': 2, 'Hwy ': 1, 'Rte ': 1 }[m[1]] };
 }
 // one line from the file: [x0, y0, dx, dy, ...] in 1/100000 degrees -> Leaflet points
 function unpack(a) {
@@ -707,34 +718,52 @@ function roadWidth(kind, z) {
   const close = z >= 13 ? 1 : z >= 12 ? 0.8 : 0.6;
   return (kind === 1 ? 4.5 : kind === 2 ? 3.5 : kind === 3 ? 3 : 2.5) * close;
 }
+// which drawing a square needs at this zoom; a square drawn for another one is rebuilt
+function widthKey(set, z) { return set === 'main' ? (z < 10 ? 'a' : 'b') + roadWidth(2, z) : 'c' + roadWidth(2, z); }
+// The file keeps each road in many short pieces. Pieces of the same road are joined into one map line,
+// so a square is about a hundred lines instead of thousands (fast on a phone, even in a city).
 function buildCell(set, rows, z) {
   const cell = { set, cas: [], low: [], high: [], shields: [] };
   const round = { lineCap: 'round', lineJoin: 'round' };
+  const roads = new Map(), edges = new Map();
   for (const [kind, name, sh, parts] of rows) {
     if (set === 'main' && kind === 3 && z < 10) continue;
-    const ll = parts.map(unpack), w = roadWidth(kind, z), hwy = kind <= 2 || !!sh;
-    cell.cas.push(L.polyline(ll, { renderer, color: '#27272a', weight: w + 2, opacity: 0.85, interactive: false, ...round }));
-    const s = shieldOf(sh);
+    const ll = parts.map(unpack), key = kind + '|' + name + '|' + sh;
+    let r = roads.get(key);
+    if (!r) roads.set(key, r = { kind, name, sh, ll: [] });
+    r.ll.push(...ll);
+    if (!edges.has(kind)) edges.set(kind, []);
+    edges.get(kind).push(...ll);
+  }
+  for (const [kind, ll] of edges) cell.cas.push(L.polyline(ll, { renderer, color: '#27272a', weight: roadWidth(kind, z) + 2, opacity: 0.85, interactive: false, ...round }));
+  for (const { kind, name, sh, ll } of roads.values()) {
+    const s = shieldOf(sh), hwy = kind <= 2 || !!sh;
     const title = name || (s && s.text) || (hwy ? 'Highway' : 'Road');
-    const line = L.polyline(ll, { renderer, color: hwy ? '#cfd3d9' : '#b9bdc4', weight: w, opacity: 1, ...round })
+    const line = L.polyline(ll, { renderer, color: hwy ? '#cfd3d9' : '#b9bdc4', weight: roadWidth(kind, z), opacity: 1, ...round })
       .bindPopup(() => `<div class="pop"><h3>${esc(title)}</h3><div class="big">${ROAD_KIND[kind]}${s && s.text !== title ? ' · ' + esc(s.text) : ''}</div><div class="small">Map data © OpenStreetMap contributors.</div></div>`);
     (hwy ? cell.high : cell.low).push(line);
     if (s) cell.shields.push({ text: s.short, cls: s.cls, rank: s.rank, ll });
   }
-  cell.z = z;
   return cell;
 }
-// Keeps crossings clean: every dark edge under every gray line, highways over small roads, Forest Service roads on top
-function restackRoads(newCas) {
-  newCas.forEach((l) => l.bringToBack());
-  roadHigh.eachLayer((l) => l.bringToFront());
-  if (map.hasLayer(fsLayer)) { fsLayer.remove(); fsLayer.addTo(map); }
+// Keeps crossings clean: every dark edge under every gray line, highways over small roads,
+// Forest Service roads on top. Runs once per screen refresh, however many squares came in.
+let restackQueued = false;
+function restackRoads() {
+  if (restackQueued) return;
+  restackQueued = true;
+  requestAnimationFrame(() => {
+    restackQueued = false;
+    roadHigh.eachLayer((l) => l.bringToFront());
+    if (map.hasLayer(fsLayer)) { fsLayer.remove(); fsLayer.addTo(map); }
+  });
 }
 function showCell(c) {
-  c.cas.forEach((l) => roadCase.addLayer(l));
+  c.cas.forEach((l) => { roadCase.addLayer(l); l.bringToBack(); });
   c.low.forEach((l) => roadLow.addLayer(l));
   c.high.forEach((l) => roadHigh.addLayer(l));
   c.shown = true;
+  restackRoads();
 }
 function hideCell(c) {
   c.cas.forEach((l) => roadCase.removeLayer(l));
@@ -750,35 +779,31 @@ async function drawMain() {
   if (run !== mainRun) return;
   const want = new Set();
   if (f) {
-    const C = f.idx.cell, b = map.getBounds().pad(0.25);
+    const C = f.idx.cell, b = map.getBounds().pad(0.25), wk = widthKey(set, z);
     for (let i = Math.floor(b.getWest() / C); i <= Math.floor(b.getEast() / C); i++)
       for (let j = Math.floor(b.getSouth() / C); j <= Math.floor(b.getNorth() / C); j++)
-        if (f.idx.tiles[i + '_' + j]) want.add(set + '|' + i + '_' + j);
+        if (f.idx.tiles[i + '_' + j]) want.add(set + '|' + i + '_' + j + '|' + wk);
   }
-  // take away squares that are now far off screen, or from the other file, or drawn for another zoom width
-  for (const [k, c] of roadCells) {
-    if (c instanceof Promise) continue;
-    const widthChanged = c.set === 'main' ? (c.z < 10) !== (z < 10) || roadWidth(2, c.z) !== roadWidth(2, z) : roadWidth(2, c.z) !== roadWidth(2, z);
-    if (!want.has(k) || widthChanged) { if (c.shown) hideCell(c); roadCells.delete(k); }
-  }
-  const newCas = [];
+  // squares no longer wanted (off screen, the other file, or drawn for another zoom) stay up
+  // until the new ones are drawn, so the roads never blink off
+  const old = [];
+  for (const [k, c] of roadCells) if (!want.has(k)) { roadCells.delete(k); if (!(c instanceof Promise)) old.push(c); }
   await Promise.all([...want].map(async (k) => {
     let c = roadCells.get(k);
     if (!c) {
-      const [off, len] = f.idx.tiles[k.split('|')[1]];
-      const rowsP = roadRows.get(k) || rangeOf(f, f.start + off, f.start + off + len - 1).then(gunzipJson);
-      roadRows.delete(k); roadRows.set(k, rowsP);
-      if (roadRows.size > 200) roadRows.delete(roadRows.keys().next().value);
-      rowsP.catch(() => roadRows.delete(k));
-      const p = rowsP.then((rows) => buildCell(set, rows, z));
+      const [, tile] = k.split('|');
+      const p = squareBytes(f, set + '|' + tile, tile).then(gunzipJson).then((rows) => buildCell(set, rows, z));
       roadCells.set(k, p);
-      try { c = await p; roadCells.set(k, c); } catch (e) { roadCells.delete(k); return; }
-    } else if (c instanceof Promise) { try { c = await c; } catch (e) { return; } }
+      try { c = await p; } catch (e) { if (roadCells.get(k) === p) roadCells.delete(k); return; }
+      if (roadCells.get(k) !== p) return;
+      roadCells.set(k, c);
+    } else if (c instanceof Promise) { const p = c; try { c = await p; } catch (e) { return; } if (roadCells.get(k) !== p && roadCells.get(k) !== c) return; roadCells.set(k, c); }
     if (run !== mainRun || roadCells.get(k) !== c) return;
-    if (!c.shown) { showCell(c); newCas.push(...c.cas); }
+    if (!c.shown) showCell(c);
   }));
+  old.forEach((c) => { if (c.shown) hideCell(c); });
+  // a run that was overtaken still clears its old squares; the newer run draws the labels
   if (run !== mainRun) return;
-  if (newCas.length) restackRoads(newCas);
   mainLabels = [];
   for (const k of want) { const c = roadCells.get(k); if (c && !(c instanceof Promise)) mainLabels.push(...c.shields); }
 }
