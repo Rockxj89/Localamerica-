@@ -1710,9 +1710,11 @@ loadTrips();
 function parseGPS(raw) {
   let s = String(raw || '').trim();
   if (!s) return null;
-  const at = s.match(/@(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/) || s.match(/[?&](?:q|query|ll)=(-?\d+(?:\.\d+)?)(?:,|%2C)\s*(-?\d+(?:\.\d+)?)/i);
+  const at = s.match(/!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/) || s.match(/@(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/) || s.match(/[?&](?:q|query|ll)=(-?\d+(?:\.\d+)?)(?:,|%2C)\s*(-?\d+(?:\.\d+)?)/i);
   if (at) s = at[1] + ', ' + at[2];
-  const toks = s.replace(/[−–—]/g, '-').match(/(?<![A-Za-z])[NSEWnsew](?![A-Za-z])|-?\d+(?:\.\d+)?/g) || [];
+  // Split letters from numbers (N36 -> N 36), then keep lone N/S/E/W letters and numbers
+  const toks = s.replace(/[−–—]/g, '-').replace(/(\d)([NSEWnsew])/g, '$1 $2').replace(/([NSEWnsew])(-?\d)/g, '$1 $2')
+    .split(/[^A-Za-z0-9.\-]+/).filter((t) => /^[NSEW]$/i.test(t) || /^-?\d+(?:\.\d+)?$/.test(t));
   const nums = [], hems = [];
   for (const t of toks) {
     if (/^[NSEW]$/i.test(t)) hems.push({ h: t.toUpperCase() }); else nums.push(t);
@@ -1765,7 +1767,10 @@ const findIn = document.getElementById('find-in');
 document.getElementById('find').addEventListener('submit', (e) => {
   e.preventDefault();
   const r = parseGPS(findIn.value);
-  if (!r) { note("Couldn't read that. Paste it like 36.98123, -91.97456", 6000); return; }
+  if (!r) {
+    note(/goo\.gl|maps\.app/i.test(findIn.value) ? "Short map links can't be read here. Open the link and copy the numbers." : "Couldn't read that. Paste it like 36.98123, -91.97456", 6000);
+    return;
+  }
   const ll = L.latLng(r.lat, r.lng);
   findIn.blur();
   setPanel(false);
