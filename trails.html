@@ -9,7 +9,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <style>
-  :root { --ink: #1c1917; --muted: #57534e; --drive: #f5ecd7; --edge: #3b2f22; --dirt: #d9c7a3; --land: #22c55e; --me: #2563eb; --pin: #111827; }
+  :root { --tan: #f5e6c8; --gold: #f2b134; --ink: #1c1917; --muted: #57534e; --drive: #f5ecd7; --edge: #3b2f22; --dirt: #d9c7a3; --land: #22c55e; --me: #2563eb; --pin: #111827; }
   html, body { height: 100%; margin: 0; }
   body { font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--ink); background: #faf7f2; display: flex; flex-direction: column; }
   header { padding: 10px 14px; background: #111; color: #f5e6c8; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
@@ -19,24 +19,36 @@
   /* Fade the base map so the trails stand out */
   .base-topo { filter: saturate(.35) brightness(1.06) contrast(.9); }
   #note { position: absolute; left: 50%; transform: translateX(-50%); top: 60px; z-index: 1000; background: rgba(17,17,17,.88); color: #fff; padding: 8px 14px; border-radius: 999px; font-size: 15px; display: none; max-width: 88vw; text-align: center; }
-  .key { position: absolute; left: 10px; right: 10px; bottom: calc(24px + env(safe-area-inset-bottom)); z-index: 1000; margin: 0 auto; max-width: 420px; background: rgba(255,255,255,.95); border-radius: 12px; box-shadow: 0 1px 6px rgba(0,0,0,.25); padding: 8px 12px; font-size: 14px; display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; pointer-events: none; }
+  /* Local America look: black panels, tan text, gold trails */
+  .key { position: absolute; left: 10px; right: 76px; bottom: calc(26px + env(safe-area-inset-bottom)); z-index: 1000; max-width: 420px; background: rgba(17,17,17,.86); color: var(--tan); border-radius: 14px; box-shadow: 0 2px 10px rgba(0,0,0,.35); padding: 8px 12px; font-size: 13px; display: flex; gap: 6px 14px; flex-wrap: wrap; pointer-events: none; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
   .key span { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
-  .key i { display: inline-block; width: 22px; height: 5px; background: var(--drive); border: 2px solid var(--edge); border-radius: 3px; }
-  .key i.dirt { height: 2px; background: var(--dirt); border-width: 1.5px; }
-  .key i.land { width: 16px; height: 12px; background: rgba(34,197,94,.35); border: 2px solid #16a34a; border-radius: 2px; }
-  .key i.pin { width: 12px; height: 12px; border: 0; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); background: var(--pin); }
-  .fab { position: absolute; right: 12px; z-index: 1000; width: 52px; height: 52px; border-radius: 50%; border: 0; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.3); font-size: 13px; font-weight: 600; color: var(--ink); display: grid; place-items: center; cursor: pointer; padding: 0; }
+  .key i { display: inline-block; width: 22px; height: 6px; background: var(--gold); border: 2px solid #111; border-radius: 4px; box-shadow: 0 0 0 1px rgba(255,255,255,.45); }
+  .key i.dirt { height: 3px; background: var(--tan); border-width: 1px; box-shadow: none; }
+  .key i.land { width: 16px; height: 12px; background: rgba(74,222,128,.35); border: 2px solid #bbf7d0; border-radius: 3px; box-shadow: none; }
+  .key i.pin { width: 12px; height: 12px; border: 2px solid var(--tan); border-radius: 50% 50% 50% 0; transform: rotate(-45deg); background: #111; box-shadow: none; }
+  .fab { position: absolute; right: 12px; z-index: 1000; width: 54px; height: 54px; border-radius: 16px; border: 1px solid rgba(245,230,200,.18); background: rgba(17,17,17,.88); box-shadow: 0 2px 10px rgba(0,0,0,.4); font-size: 11px; font-weight: 600; color: var(--tan); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: pointer; padding: 0; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
   .fab svg { width: 24px; height: 24px; }
-  #me-btn { bottom: calc(90px + env(safe-area-inset-bottom)); color: var(--me); }
-  #sat-btn { bottom: calc(152px + env(safe-area-inset-bottom)); font-size: 12px; }
-  #topo-btn { bottom: calc(214px + env(safe-area-inset-bottom)); font-size: 12px; line-height: 1.1; }
-  #topo-btn[aria-pressed="false"] { color: var(--muted); }
+  .fab:active { transform: scale(.95); }
+  #me-btn { bottom: calc(26px + env(safe-area-inset-bottom)); color: #60a5fa; }
+  #sat-btn { bottom: calc(92px + env(safe-area-inset-bottom)); }
+  #topo-btn { bottom: calc(158px + env(safe-area-inset-bottom)); }
+  #topo-btn[aria-pressed="false"] { color: #a8a29e; }
+  /* Place names drawn by us over the satellite photo */
+  .lbl { color: #fff; font-weight: 600; white-space: nowrap; text-shadow: 0 0 3px #000, 0 0 3px #000, 0 1px 2px #000; pointer-events: none; transform: translate(-50%, -50%); position: absolute; text-align: center; line-height: 1.15; }
+  .lbl.peak { font-size: 12px; }
+  .lbl.peak b { display: block; width: 0; height: 0; margin: 0 auto 2px; border-left: 6px solid transparent; border-right: 6px solid transparent; border-bottom: 9px solid #fff; filter: drop-shadow(0 0 1px #000) drop-shadow(0 0 1px #000); }
+  .lbl.peak small { display: block; font-size: 11px; font-weight: 500; }
+  .lbl.valley { font-size: 12px; font-style: italic; font-weight: 500; color: #f5f5f4; }
+  .lbl.town { font-size: 14px; font-weight: 700; letter-spacing: .02em; }
+  .lbl.road { font-size: 11px; font-weight: 700; color: var(--tan); background: rgba(17,17,17,.85); border: 1px solid rgba(245,230,200,.35); border-radius: 6px; padding: 1px 6px; text-shadow: none; }
   /* Brighten the brown topo lines so they show on the dark satellite photo */
   .contours { filter: brightness(1.7) saturate(.8); opacity: .7; }
   .me-dot { width: 20px; height: 20px; border-radius: 50%; background: var(--me); border: 3px solid #fff; box-shadow: 0 0 0 2px rgba(37,99,235,.35), 0 1px 4px rgba(0,0,0,.4); box-sizing: border-box; position: relative; }
   .me-dot::after { content: ""; position: absolute; inset: -12px; border-radius: 50%; background: rgba(37,99,235,.25); animation: pulse 2s ease-out infinite; z-index: -1; }
   @keyframes pulse { from { transform: scale(.4); opacity: 1; } to { transform: scale(1.4); opacity: 0; } }
-  .pin { width: 26px; height: 26px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); background: var(--pin); border: 3px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.45); box-sizing: border-box; }
+  .pin { width: 30px; height: 30px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); background: #111; border: 3px solid var(--tan); box-shadow: 0 2px 6px rgba(0,0,0,.55); box-sizing: border-box; display: grid; place-items: center; }
+  .pin::after { content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--tan); }
+  .leaflet-popup-content-wrapper { border-radius: 14px; }
   .pop { font-size: 15px; }
   .pop h3 { margin: 0 0 4px; font-size: 17px; }
   .pop .big { font-weight: 600; }
@@ -50,6 +62,8 @@
   #gate p { color: var(--muted); margin: 0 0 16px; }
   #gate .err { background: #fee2e2; color: #991b1b; padding: 10px; border-radius: 8px; font-size: 14px; }
   #gate a.go { display: block; background: #15803d; color: #fff; padding: 12px 16px; border-radius: 10px; text-decoration: none; font-weight: 600; }
+  .leaflet-control-attribution { white-space: nowrap; overflow-x: auto; max-width: 100vw; font-size: 10px; background: rgba(17,17,17,.6) !important; color: #d6d3d1; }
+  .leaflet-control-attribution a { color: var(--tan); }
   .leaflet-control-zoom { display: none; }
   @media (min-width: 700px) { .leaflet-control-zoom { display: block; } }
 </style>
@@ -62,8 +76,8 @@
 <div id="gate"><h2 id="gate-title">Checking your sign-in…</h2><p id="gate-text"></p><div id="gate-extra"></div></div>
 <div id="note"></div>
 <div id="map"></div>
-<button class="fab" id="topo-btn" type="button" aria-label="Hide topo lines" aria-pressed="true">Topo<br>on</button>
-<button class="fab" id="sat-btn" type="button" aria-label="Switch to the plain map">Map</button>
+<button class="fab" id="topo-btn" type="button" aria-label="Hide topo lines" aria-pressed="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 17c3-4 6-4 9-1s6 2 9-2"/><path d="M3 12c3-4 6-4 9-1s6 2 9-2"/><path d="M3 7c3-4 6-4 9-1s6 2 9-2"/></svg><span>Topo on</span></button>
+<button class="fab" id="sat-btn" type="button" aria-label="Switch to the plain map"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 3 2 8l10 5 10-5-10-5Z"/><path d="m2 13 10 5 10-5"/></svg><span>Map</span></button>
 <button class="fab" id="me-btn" type="button" aria-label="Show where I am">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="12" cy="12" r="4" fill="currentColor"/><circle cx="12" cy="12" r="8"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3"/></svg>
 </button>
@@ -188,20 +202,20 @@ let topoOn = true;
 document.getElementById('topo-btn').onclick = (e) => {
   topoOn = !topoOn;
   if (topoOn) contours.addTo(map); else map.removeLayer(contours);
-  e.currentTarget.innerHTML = topoOn ? 'Topo<br>on' : 'Topo<br>off';
+  e.currentTarget.querySelector('span').textContent = topoOn ? 'Topo on' : 'Topo off';
   e.currentTarget.setAttribute('aria-pressed', String(topoOn));
   e.currentTarget.ariaLabel = topoOn ? 'Hide topo lines' : 'Show topo lines';
 };
 document.getElementById('sat-btn').onclick = (e) => {
   sat = !sat;
-  if (sat) { map.removeLayer(topo); imagery.addTo(map); sharp.addTo(map); if (topoOn) contours.addTo(map); e.currentTarget.textContent = 'Map'; e.currentTarget.ariaLabel = 'Switch to the plain map'; }
-  else { map.removeLayer(imagery); map.removeLayer(sharp); map.removeLayer(contours); topo.addTo(map); e.currentTarget.textContent = 'Satellite'; e.currentTarget.ariaLabel = 'Switch to satellite'; }
+  if (sat) { map.removeLayer(topo); imagery.addTo(map); sharp.addTo(map); if (topoOn) contours.addTo(map); e.currentTarget.querySelector('span').textContent = 'Map'; e.currentTarget.ariaLabel = 'Switch to the plain map'; }
+  else { map.removeLayer(imagery); map.removeLayer(sharp); map.removeLayer(contours); topo.addTo(map); e.currentTarget.querySelector('span').textContent = 'Satellite'; e.currentTarget.ariaLabel = 'Switch to satellite'; }
   document.getElementById('topo-btn').style.display = sat ? '' : 'none';
 };
 
 // ---------- Places (pins) ----------
 const placeList = [];
-const pinIcon = L.divIcon({ className: '', html: '<div class="pin"></div>', iconSize: [26, 26], iconAnchor: [3, 26], popupAnchor: [10, -24] });
+const pinIcon = L.divIcon({ className: '', html: '<div class="pin"></div>', iconSize: [30, 30], iconAnchor: [4, 30], popupAnchor: [11, -28] });
 fetch(`${SUPABASE_URL}/rest/v1/poi_public_locations?select=id,name,category,latitude,longitude`, {
   headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
 }).then((r) => r.json()).then((rows) => {
@@ -262,7 +276,7 @@ function nearestOnLand(rings) {
 function drawLand(j) {
   (j.areas || []).forEach((a) => {
     a.ll = a.r.map((ring) => ring.map(([x, y]) => L.latLng(y, x)));
-    L.polygon(a.ll, { renderer, color: '#16a34a', weight: 1.5, opacity: 0.9, fillColor: '#22c55e', fillOpacity: 0.22 })
+    L.polygon(a.ll, { renderer, color: '#bbf7d0', weight: 2, opacity: 0.85, fillColor: '#4ade80', fillOpacity: 0.16 })
       .bindPopup(() => landPopup(a)).addTo(landLayer);
   });
 }
@@ -348,9 +362,9 @@ async function gunzipJson(bytes) {
 }
 function drawDirt(fc) {
   // dark edge first so the thin tan line shows on the satellite photo
-  L.geoJSON(fc, { interactive: false, style: () => ({ renderer, color: '#3b2f22', weight: 5, opacity: 0.55 }) }).addTo(map);
+  L.geoJSON(fc, { interactive: false, style: () => ({ renderer, color: '#111', weight: 5, opacity: 0.5, lineCap: 'round', lineJoin: 'round' }) }).addTo(map);
   L.geoJSON(fc, {
-    style: () => ({ renderer, color: '#d9c7a3', weight: 2.5, opacity: 0.95 }),
+    style: () => ({ renderer, color: '#f5e6c8', weight: 2.5, opacity: 0.95, lineCap: 'round', lineJoin: 'round' }),
     onEachFeature: (f, layer) => {
       const p = f.properties;
       layer.bindPopup(() => `<div class="pop"><h3>${esc(p.n || DIRT_KINDS[p.k])}</h3><div class="big">${esc(DIRT_KINDS[p.k])} · ${miles(Number(p.mi)).replace(' mi', ' miles')}</div>${placeAndYou(layer.getLatLngs())}
@@ -398,11 +412,92 @@ Promise.allSettled([getJson(DATA + 'fs-roads.json'), getJson(DATA + 'public-land
     const info = fsInfo(a);
     if (!info) return;
     const ll = f.p.map((path) => path.map(([x, y]) => L.latLng(y, x)));
-    L.polyline(ll, { renderer, color: '#3b2f22', weight: info.open ? 8 : 5, opacity: info.open ? 0.95 : 0.6, interactive: false }).addTo(fsLayer);
-    L.polyline(ll, { renderer, color: info.open ? '#f5ecd7' : '#a8a29e', weight: info.open ? 4 : 2.5, opacity: 1, dashArray: info.open ? null : '6 6' })
+    const round = { lineCap: 'round', lineJoin: 'round' };
+    if (info.open) L.polyline(ll, { renderer, color: '#fff', weight: 13, opacity: 0.22, interactive: false, ...round }).addTo(fsLayer);
+    L.polyline(ll, { renderer, color: '#111', weight: info.open ? 9 : 5, opacity: info.open ? 0.95 : 0.6, interactive: false, ...round }).addTo(fsLayer);
+    L.polyline(ll, { renderer, color: info.open ? '#f2b134' : '#a8a29e', weight: info.open ? 4.5 : 2.5, opacity: 1, dashArray: info.open ? null : '6 6', ...round })
       .bindPopup(() => fsPopup(a, info, ll, f.t === 2)).addTo(fsLayer);
+    const p0 = ll[0] || [];
+    if (info.open && p0.length) roadLabels.push({ ll: p0[Math.floor(p0.length / 2)], text: fsLabel(a, f.t === 2) });
   });
+  drawLabels();
 });
+
+// ---------- Names on the map ----------
+// Peaks (with height), hollows and towns come from the USGS place-name list (GNIS), fetched for the area on screen.
+// Forest road numbers come from our own Forest Service file. Labels that would overlap are skipped.
+const roadLabels = [];
+function fsLabel(a, isTrail) {
+  const num = a.id ? (isTrail ? 'Trail ' : 'FS ') + a.id : '';
+  const name = a.name && a.name.trim() ? titleCase(a.name) : '';
+  return name && num && !name.includes(a.id) ? `${name} · ${num}` : (name || num);
+}
+const GNIS = 'https://carto.nationalmap.gov/arcgis/rest/services/geonames/MapServer/';
+const nameCache = new Map(), heightCache = new Map();
+const labelLayer = L.layerGroup().addTo(map);
+async function gnis(layer, where, b) {
+  const g = [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()].map((v) => v.toFixed(3)).join(',');
+  const key = layer + '|' + g;
+  if (nameCache.has(key)) return nameCache.get(key);
+  const url = `${GNIS}${layer}/query?f=json&where=${encodeURIComponent(where)}&geometry=${g}&geometryType=esriGeometryEnvelope&inSR=4326&outSR=4326&outFields=gaz_name,gaz_featureclass&returnGeometry=true&resultRecordCount=300`;
+  const p = fetch(url).then((r) => r.json()).then((j) => { if (j.error) throw new Error('gnis'); return j.features || []; }).catch(() => { nameCache.delete(key); return []; });
+  nameCache.set(key, p);
+  if (nameCache.size > 60) nameCache.delete(nameCache.keys().next().value);
+  return p;
+}
+function peakHeight(ll) {
+  const key = ll.lat.toFixed(5) + ',' + ll.lng.toFixed(5);
+  if (!heightCache.has(key)) {
+    heightCache.set(key, fetch(`https://epqs.nationalmap.gov/v1/json?x=${ll.lng}&y=${ll.lat}&units=Feet&wkid=4326`)
+      .then((r) => r.json()).then((j) => (Number(j.value) > 0 ? Math.round(j.value) : null)).catch(() => null));
+  }
+  return heightCache.get(key);
+}
+let labelRun = 0;
+async function drawLabels() {
+  const run = ++labelRun, z = map.getZoom();
+  if (z < 11) { labelLayer.clearLayers(); return; }
+  const b = map.getBounds();
+  const [lands, towns] = await Promise.all([
+    z >= 12 ? gnis(5, "gaz_featureclass IN ('Summit','Valley','Ridge','Gap')", b) : [],
+    gnis(1, '1=1', b).then((a) => (z >= 12 ? gnis(3, '1=1', b).then((c) => a.concat(c)) : a))
+  ]);
+  if (run !== labelRun) return;
+  const items = [];
+  const ptsOf = (f) => (f.geometry && (f.geometry.points || (f.geometry.x != null ? [[f.geometry.x, f.geometry.y]] : null))) || [];
+  towns.forEach((f) => { if (!f.attributes.gaz_name || !ptsOf(f).length) return; const pt = ptsOf(f)[0]; items.push({ kind: 'town', name: f.attributes.gaz_name, ll: L.latLng(pt[1], pt[0]), pri: 3 }); });
+  if (z >= 13) roadLabels.forEach((r) => { if (b.contains(r.ll) && r.text) items.push({ kind: 'road', name: r.text, ll: r.ll, pri: 2 }); });
+  lands.forEach((f) => {
+    const pts = ptsOf(f), c = f.attributes.gaz_featureclass;
+    if (!f.attributes.gaz_name || !pts.length) return;
+    const pt = pts.length > 1 ? [(pts[0][0] + pts[1][0]) / 2, (pts[0][1] + pts[1][1]) / 2] : pts[0];
+    if (c !== 'Summit' && z < 13) return;
+    items.push({ kind: c === 'Summit' ? 'peak' : 'valley', name: f.attributes.gaz_name, ll: L.latLng(pt[1], pt[0]), pri: c === 'Summit' ? 2.5 : 0 });
+  });
+  items.sort((x, y) => y.pri - x.pri);
+  const taken = [], seen = new Set(), out = [];
+  for (const it of items) {
+    const k = it.kind + it.name; if (seen.has(k)) continue;
+    const p = map.latLngToContainerPoint(it.ll);
+    const w = it.name.length * (it.kind === 'town' ? 8.5 : 7) + 16, h = it.kind === 'peak' ? 44 : 22;
+    const box = [p.x - w / 2, p.y - h / 2, p.x + w / 2, p.y + h / 2];
+    if (taken.some((t) => box[0] < t[2] && box[2] > t[0] && box[1] < t[3] && box[3] > t[1])) continue;
+    taken.push(box); seen.add(k); out.push(it);
+    if (out.length >= 45) break;
+  }
+  labelLayer.clearLayers();
+  out.forEach((it) => {
+    const id = 'h' + Math.random().toString(36).slice(2);
+    const inner = it.kind === 'peak' ? `<b></b>${esc(it.name)}<small id="${id}"></small>` : esc(it.name);
+    L.marker(it.ll, { interactive: false, keyboard: false, zIndexOffset: -100,
+      icon: L.divIcon({ className: '', iconSize: [0, 0], html: `<div class="lbl ${it.kind}">${inner}</div>` }) }).addTo(labelLayer);
+    if (it.kind === 'peak') peakHeight(it.ll).then((ft) => { const el = document.getElementById(id); if (el && ft) el.textContent = ft.toLocaleString('en-US') + ' ft'; });
+  });
+}
+let labelTimer;
+map.on('moveend', () => { clearTimeout(labelTimer); labelTimer = setTimeout(drawLabels, 250); });
+setTimeout(drawLabels, 400);
+map.attributionControl.addAttribution('Names and heights: USGS GNIS, 3DEP');
 
 // ---------- Start ----------
 // For checking the page: ?at=lat,lng skips location; ?open=fs or ?open=dirt opens one line's info box
