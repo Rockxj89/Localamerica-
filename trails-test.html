@@ -86,23 +86,27 @@ function openTo(a) {
     return { label, dates: dates && !/^(01\/01-12\/31|1\/1-12\/31)$/.test(dates) ? dates : '' };
   });
 }
+const isSeasonal = (a) => /seasonal/i.test(String(a.seasonal || '')) || openTo(a).some((o) => o.dates);
+const isRough = (a) => /^\s*[12]\b/.test(String(a.operationalmaintlevel || ''));
 function fsStyle(a, layerId) {
   const who = openTo(a).map((o) => o.label);
-  const seasonal = /^(y|yes|seasonal)/i.test(String(a.seasonal || '')) || openTo(a).some((o) => o.dates);
   let color;
   if (layerId === 2) color = '#dc2626';
   else if (who.some((w) => /ATV|UTV/.test(w))) color = '#ea580c';
-  else if (!who.includes('Any car') && who.length) color = '#92400e';
+  else if (isRough(a) || (!who.includes('Any car') && who.length)) color = '#92400e';
   else color = '#15803d';
-  return { renderer: fsRenderer, pane: 'fsPane', color, weight: 4, opacity: 0.9, dashArray: layerId === 2 ? '8 6' : (seasonal ? '2 6' : null) };
+  return { renderer: fsRenderer, pane: 'fsPane', color, weight: 4, opacity: 0.9, dashArray: layerId === 2 ? '8 6' : (isSeasonal(a) ? '2 6' : null) };
 }
 function fsPopup(a, layerId) {
   const who = openTo(a);
   const name = a.name && a.name.trim() ? a.name : (a.id ? (layerId === 2 ? 'Trail ' : 'Forest Road ') + a.id : 'Forest Service route');
   const miles = a.gis_miles != null ? Number(a.gis_miles).toFixed(1) + ' miles' : '';
   const list = who.length ? '<ul>' + who.map((o) => `<li>${esc(o.label)}${o.dates ? ' · open ' + esc(o.dates) : ''}</li>`).join('') + '</ul>' : '<p class="warn">The Forest Service lists no vehicles for this one.</p>';
-  const surface = a.surfacetype ? `<div>Surface: ${esc(a.surfacetype)}</div>` : '';
-  return `<div class="pop"><h3>${esc(name)}</h3>${miles ? `<div>${miles}${layerId === 2 ? ' · motorized trail' : ''}</div>` : ''}${surface}<div style="margin-top:4px"><b>Open to:</b>${list}</div>
+  const tidy = (v) => String(v || '').replace(/^[A-Z0-9]+\s*-\s*/, '').toLowerCase();
+  const surface = a.surfacetype ? `<div>Surface: ${esc(tidy(a.surfacetype))}</div>` : '';
+  const upkeep = isRough(a) ? '<div>Rough road: high clearance suggested</div>' : '';
+  const season = isSeasonal(a) ? '<div class="warn">Seasonal: check the dates below</div>' : '';
+  return `<div class="pop"><h3>${esc(name)}</h3>${miles ? `<div>${miles}${layerId === 2 ? ' · motorized trail' : ''}</div>` : ''}${surface}${upkeep}${season}<div style="margin-top:4px"><b>Open to:</b>${list}</div>
     <div class="src">Source: Forest Service Motor Vehicle Use Map. "Open" means legal, not that it's passable today.</div></div>`;
 }
 function esriToLatLngs(g) { return (g && g.paths ? g.paths : []).map((p) => p.map(([x, y]) => [y, x])); }
@@ -187,7 +191,7 @@ const Legend = L.Control.extend({
     const d = L.DomUtil.create('div', 'legend');
     const full = `<b>Forest Service (who's allowed)</b>
       <div class="row"><span class="sw" style="border-color:#15803d"></span>Any car</div>
-      <div class="row"><span class="sw" style="border-color:#92400e"></span>High-clearance only (Jeep)</div>
+      <div class="row"><span class="sw" style="border-color:#92400e"></span>Rough, high clearance (Jeep)</div>
       <div class="row"><span class="sw" style="border-color:#ea580c"></span>ATVs and UTVs too</div>
       <div class="row"><span class="sw dash" style="border-color:#dc2626"></span>Motorized trail (50 in or less)</div>
       <div class="row"><span class="sw" style="border-color:#888;border-top-style:dotted"></span>Seasonal</div>
