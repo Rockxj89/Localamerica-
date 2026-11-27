@@ -25,6 +25,7 @@
   .key i { display: inline-block; width: 22px; height: 6px; background: var(--gold); border: 2px solid #111; border-radius: 4px; box-shadow: 0 0 0 1px rgba(255,255,255,.45); }
   .key i.dirt { height: 3px; background: var(--tan); border-width: 1px; box-shadow: none; }
   .key i.land { width: 16px; height: 12px; background: rgba(74,222,128,.35); border: 2px solid #bbf7d0; border-radius: 3px; box-shadow: none; }
+  .key i.hwy { height: 7px; background: #fff; border: 2px solid #111; box-shadow: none; }
   .key i.pin { width: 12px; height: 12px; border: 2px solid var(--tan); border-radius: 50% 50% 50% 0; transform: rotate(-45deg); background: #111; box-shadow: none; }
   .fab { position: absolute; right: 12px; z-index: 1000; width: 54px; height: 54px; border-radius: 16px; border: 1px solid rgba(245,230,200,.18); background: rgba(17,17,17,.88); box-shadow: 0 2px 10px rgba(0,0,0,.4); font-size: 11px; font-weight: 600; color: var(--tan); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: pointer; padding: 0; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
   .fab svg { width: 24px; height: 24px; }
@@ -41,6 +42,8 @@
   .lbl.valley { font-size: 12px; font-style: italic; font-weight: 500; color: #f5f5f4; }
   .lbl.town { font-size: 14px; font-weight: 700; letter-spacing: .02em; }
   .lbl.road { font-size: 11px; font-weight: 700; color: var(--tan); background: rgba(17,17,17,.85); border: 1px solid rgba(245,230,200,.35); border-radius: 6px; padding: 1px 6px; text-shadow: none; }
+  .lbl.shield { font-size: 12px; font-weight: 800; color: #111; background: #fff; border: 2px solid #111; border-radius: 6px; padding: 1px 6px; text-shadow: none; box-shadow: 0 1px 3px rgba(0,0,0,.6); letter-spacing: .01em; }
+  .lbl.shield.us { border-radius: 6px 6px 12px 12px; }
   /* Brighten the brown topo lines so they show on the dark satellite photo */
   .contours { filter: brightness(1.7) saturate(.8); opacity: .7; }
   .me-dot { width: 20px; height: 20px; border-radius: 50%; background: var(--me); border: 3px solid #fff; box-shadow: 0 0 0 2px rgba(37,99,235,.35), 0 1px 4px rgba(0,0,0,.4); box-sizing: border-box; position: relative; }
@@ -81,7 +84,7 @@
 <button class="fab" id="me-btn" type="button" aria-label="Show where I am">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="12" cy="12" r="4" fill="currentColor"/><circle cx="12" cy="12" r="8"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3"/></svg>
 </button>
-<div class="key"><span><i></i>Open to drive</span><span><i class="dirt"></i>Dirt road, not checked</span><span><i class="land"></i>Public land</span><span><i class="pin"></i>Local America place</span></div>
+<div class="key"><span><i class="hwy"></i>Highway</span><span><i></i>Open to drive</span><span><i class="dirt"></i>Dirt road, not checked</span><span><i class="land"></i>Public land</span><span><i class="pin"></i>Local America place</span></div>
 <script>
 // ---------- Owner only ----------
 // Same sign-in as the Traffic page. The map starts only after Supabase confirms this is the owner account.
@@ -355,7 +358,8 @@ function drawDirt(fc) {
         <div class="small">Nobody has checked who may drive this one. Some are private land. Map data © OpenStreetMap contributors.</div></div>`);
     }
   }).addTo(map);
-  // keep the Forest Service roads drawn on top
+  // keep the highways, then the Forest Service roads, drawn on top
+  if (map.hasLayer(mainLayer)) { mainLayer.remove(); mainLayer.addTo(map); }
   if (map.hasLayer(fsLayer)) { fsLayer.remove(); fsLayer.addTo(map); }
 }
 async function loadDirt() {
@@ -407,6 +411,65 @@ Promise.allSettled([getJson(DATA + 'fs-roads.json'), getJson(DATA + 'public-land
   drawLabels();
 });
 
+// ---------- Highways and main paved roads ----------
+// Interstates, US highways and Missouri state routes (numbered and lettered, like Hwy 76 or Rte CC) from the
+// USGS road map, fetched for the area on screen. Drawn white with a dark edge so they stand apart from the
+// gold Forest Service roads and the thin tan dirt roads.
+const ROADS = 'https://carto.nationalmap.gov/arcgis/rest/services/transportation/MapServer/';
+const roadCache = new Map();
+const mainLayer = L.layerGroup().addTo(map);
+let mainLabels = [], mainRun = 0;
+function mainQuery(layer, b, z) {
+  const g = [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()].map((v) => v.toFixed(3)).join(',');
+  const key = layer + '|' + z + '|' + g;
+  if (roadCache.has(key)) return roadCache.get(key);
+  const off = (360 / (256 * 2 ** z)) * 1.5; // simplify to about a pixel and a half
+  const url = `${ROADS}${layer}/query?f=json&where=1%3D1&geometry=${g}&geometryType=esriGeometryEnvelope&inSR=4326&outSR=4326&spatialRel=esriSpatialRelIntersects&outFields=name,interstate,us_route,state_route&returnGeometry=true&maxAllowableOffset=${off.toFixed(6)}&resultRecordCount=2000`;
+  const p = fetch(url).then((r) => r.json()).then((j) => { if (j.error) throw new Error('roads'); return j.features || []; }).catch(() => { roadCache.delete(key); return []; });
+  roadCache.set(key, p);
+  if (roadCache.size > 40) roadCache.delete(roadCache.keys().next().value);
+  return p;
+}
+// "US 60", "I-44", "Hwy 76", "Rte CC" from the route fields
+function shieldOf(a) {
+  const first = (v) => String(v || '').split(',').map((x) => x.trim()).find((x) => x && !/^(bus|byp|alt|spur|loop)$/i.test(x)) || '';
+  const i = first(a.interstate), u = first(a.us_route), s = first(a.state_route);
+  if (i) return { text: 'I-' + i, cls: 'us', rank: 3 };
+  if (u) return { text: 'US ' + u, cls: 'us', rank: 2 };
+  if (s) return { text: (/^\d+$/.test(s) ? 'Hwy ' : 'Rte ') + s, cls: '', rank: 1 };
+  return null;
+}
+async function drawMain() {
+  const run = ++mainRun, z = map.getZoom();
+  if (z < 8) { mainLayer.clearLayers(); mainLabels = []; return; }
+  const b = map.getBounds().pad(0.15);
+  const sets = await Promise.all([29, 30].concat(z >= 10 ? [31] : []).map((l) => mainQuery(l, b, z)));
+  if (run !== mainRun) return;
+  const feats = [].concat(...sets);
+  const big = z >= 12, round = { lineCap: 'round', lineJoin: 'round' };
+  mainLayer.clearLayers();
+  const labels = [];
+  // all dark edges first, then the white cores, so crossings look clean
+  const lines = feats.map((f) => {
+    const sh = shieldOf(f.attributes || {});
+    const ll = ((f.geometry && f.geometry.paths) || []).map((path) => path.map(([x, y]) => [y, x])).filter((p) => p.length > 1);
+    return { f, sh, ll, w: (sh && sh.rank >= 2 ? 1.4 : 1) * (big ? 5 : 3.5) };
+  }).filter((x) => x.ll.length);
+  lines.forEach((x) => L.polyline(x.ll, { renderer, color: '#111', weight: x.w + 4, opacity: 0.9, interactive: false, ...round }).addTo(mainLayer));
+  lines.forEach((x) => {
+    const name = (x.f.attributes && x.f.attributes.name) || (x.sh && x.sh.text) || 'Highway';
+    L.polyline(x.ll, { renderer, color: '#ffffff', weight: x.w, opacity: 1, ...round })
+      .bindPopup(() => `<div class="pop"><h3>${esc(name)}</h3><div class="big">Paved highway${x.sh ? ' · ' + esc(x.sh.text) : ''}</div><div class="small">Road map: USGS The National Map.</div></div>`)
+      .addTo(mainLayer);
+    if (x.sh) {
+      const longest = x.ll.reduce((m, p) => (p.length > m.length ? p : m), x.ll[0]);
+      labels.push({ text: x.sh.text, cls: x.sh.cls, rank: x.sh.rank, ll: L.latLng(longest[Math.floor(longest.length / 2)]), n: longest.length });
+    }
+  });
+  mainLabels = labels;
+  if (map.hasLayer(fsLayer)) { fsLayer.remove(); fsLayer.addTo(map); }
+}
+
 // ---------- Names on the map ----------
 // Peaks (with height), hollows and towns come from the USGS place-name list (GNIS), fetched for the area on screen.
 // Forest road numbers come from our own Forest Service file. Labels that would overlap are skipped.
@@ -440,14 +503,17 @@ function peakHeight(ll) {
 let labelRun = 0;
 async function drawLabels() {
   const run = ++labelRun, z = map.getZoom();
-  if (z < 11) { labelLayer.clearLayers(); return; }
+  if (z < 8) { labelLayer.clearLayers(); return; }
   const b = map.getBounds();
   const [lands, towns] = await Promise.all([
     z >= 12 ? gnis(5, "gaz_featureclass IN ('Summit','Valley','Ridge','Gap')", b) : [],
-    gnis(1, '1=1', b).then((a) => (z >= 12 ? gnis(3, '1=1', b).then((c) => a.concat(c)) : a))
+    z >= 11 ? gnis(1, '1=1', b).then((a) => (z >= 12 ? gnis(3, '1=1', b).then((c) => a.concat(c)) : a)) : []
   ]);
   if (run !== labelRun) return;
   const items = [];
+  // highway shields: one per route in view, on its longest stretch
+  mainLabels.filter((m) => b.contains(m.ll)).sort((x, y) => y.n - x.n)
+    .forEach((m) => items.push({ kind: 'shield' + (m.cls ? ' ' + m.cls : ''), name: m.text, ll: m.ll, pri: 2.7 + m.rank / 10 }));
   const ptsOf = (f) => (f.geometry && (f.geometry.points || (f.geometry.x != null ? [[f.geometry.x, f.geometry.y]] : null))) || [];
   towns.forEach((f) => { if (!f.attributes.gaz_name || !ptsOf(f).length) return; const pt = ptsOf(f)[0]; items.push({ kind: 'town', name: f.attributes.gaz_name, ll: L.latLng(pt[1], pt[0]), pri: 3 }); });
   if (z >= 13) roadLabels.forEach((r) => { if (b.contains(r.ll) && r.text) items.push({ kind: 'road', name: r.text, ll: r.ll, pri: 2 }); });
@@ -463,7 +529,7 @@ async function drawLabels() {
   for (const it of items) {
     const k = it.kind + it.name; if (seen.has(k)) continue;
     const p = map.latLngToContainerPoint(it.ll);
-    const w = it.name.length * (it.kind === 'town' ? 8.5 : 7) + 16, h = it.kind === 'peak' ? 44 : 22;
+    const w = it.name.length * (it.kind === 'town' ? 8.5 : 7.5) + 16, h = it.kind === 'peak' ? 44 : it.kind.startsWith('shield') ? 24 : 22;
     const box = [p.x - w / 2, p.y - h / 2, p.x + w / 2, p.y + h / 2];
     if (taken.some((t) => box[0] < t[2] && box[2] > t[0] && box[1] < t[3] && box[3] > t[1])) continue;
     taken.push(box); seen.add(k); out.push(it);
@@ -479,9 +545,9 @@ async function drawLabels() {
   });
 }
 let labelTimer;
-map.on('moveend', () => { clearTimeout(labelTimer); labelTimer = setTimeout(drawLabels, 250); });
-setTimeout(drawLabels, 400);
-map.attributionControl.addAttribution('Names and heights: USGS GNIS, 3DEP');
+map.on('moveend', () => { clearTimeout(labelTimer); labelTimer = setTimeout(() => drawMain().finally(drawLabels), 250); });
+setTimeout(() => drawMain().finally(drawLabels), 400);
+map.attributionControl.addAttribution('Names and heights: USGS GNIS, 3DEP; Highways: USGS');
 
 // ---------- Start ----------
 // For checking the page: ?at=lat,lng skips location; ?open=fs or ?open=dirt opens one line's info box
