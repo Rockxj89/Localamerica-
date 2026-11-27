@@ -260,6 +260,7 @@ async function dirtIndex() {
       if (10 + len > head.length) head = await getRange(url, 0, 9 + len);
       dirtIdx = JSON.parse(new TextDecoder().decode(head.slice(10, 10 + len)));
       dirtStart = 10 + len;
+      if (new URLSearchParams(location.search).has('debug')) note('Dirt roads from ' + (url.startsWith('http') ? 'R2' : 'this site'), 8000);
       return;
     } catch (e) { /* try the next copy */ }
   }
