@@ -38,6 +38,9 @@ self.addEventListener('fetch', (event) => {
   if (url.pathname.endsWith('/pins.html') || url.pathname.endsWith('/pins')) return;
   if (url.pathname.endsWith('/trails.html') || url.pathname.endsWith('/trails')) return;
 
+  // Trails map data (read in pieces, so never saved whole) and its map data function: straight from the network
+  if (url.pathname.startsWith('/trails-data/') || url.pathname.startsWith('/api/trails-')) return;
+
   // Trails map tiles, aerial photos and topo lines (USGS): the browser's own cache handles these, so they don't pile up on the phone
   if (url.hostname === 'nationalmap.gov' || url.hostname.endsWith('.nationalmap.gov')) return;
 
