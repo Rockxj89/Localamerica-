@@ -666,6 +666,7 @@ let roadBytesSize = 0;
 const roadCase = L.layerGroup().addTo(map), roadLow = L.layerGroup().addTo(map), roadHigh = L.layerGroup().addTo(map);
 const mainLayer = roadHigh; // kept so other code can find the highways
 let mainLabels = [], mainRun = 0;
+const retiredRoads = new Map(); // squares on screen that the latest move no longer wants
 async function rangeOf(f, from, to) {
   if (f.whole) return f.whole.slice(from, to + 1);
   const r = await fetch(f.url, { headers: { Range: `bytes=${from}-${to}` } });
@@ -785,11 +786,11 @@ async function drawMain() {
         if (f.idx.tiles[i + '_' + j]) want.add(set + '|' + i + '_' + j + '|' + wk);
   }
   // squares no longer wanted (off screen, the other file, or drawn for another zoom) stay up
-  // until the new ones are drawn, so the roads never blink off
-  const old = [];
-  for (const [k, c] of roadCells) if (!want.has(k)) { roadCells.delete(k); if (!(c instanceof Promise)) old.push(c); }
+  // until the newest move has drawn its squares, so the roads never blink off
+  for (const [k, c] of roadCells) if (!want.has(k)) { roadCells.delete(k); if (!(c instanceof Promise) && c.shown) retiredRoads.set(k, c); }
   await Promise.all([...want].map(async (k) => {
     let c = roadCells.get(k);
+    if (!c && retiredRoads.has(k)) { c = retiredRoads.get(k); retiredRoads.delete(k); roadCells.set(k, c); }
     if (!c) {
       const [, tile] = k.split('|');
       const p = squareBytes(f, set + '|' + tile, tile).then(gunzipJson).then((rows) => buildCell(set, rows, z));
@@ -801,9 +802,9 @@ async function drawMain() {
     if (run !== mainRun || roadCells.get(k) !== c) return;
     if (!c.shown) showCell(c);
   }));
-  old.forEach((c) => { if (c.shown) hideCell(c); });
-  // a run that was overtaken still clears its old squares; the newer run draws the labels
   if (run !== mainRun) return;
+  for (const c of retiredRoads.values()) if (c.shown) hideCell(c);
+  retiredRoads.clear();
   mainLabels = [];
   for (const k of want) { const c = roadCells.get(k); if (c && !(c instanceof Promise)) mainLabels.push(...c.shields); }
 }
