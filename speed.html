@@ -8,7 +8,7 @@ const bbox=(z,x,y)=>{const s=2*MERC/2**z;return [-MERC+x*s,MERC-(y+1)*s,-MERC+(x
 async function batch(name, urls){const t=performance.now();const r=await Promise.all(urls.map(img));const w=performance.now()-t;const ok=r.filter(x=>x[0]>=0);
  out.push(`${name}: ${ok.length}/${urls.length} ok, slowest ${Math.round(Math.max(...ok.map(x=>x[0])))} ms, median ${Math.round(ok.map(x=>x[0]).sort((a,b)=>a-b)[ok.length>>1])} ms, px ${ok[0]&&ok[0][1]}`);o.innerHTML=out.join('<br>');}
 // Mountain Grove area, z15 x=7790..7792 y=12767..12769 ; z12 x=973..975 y=1595..1597
-const t15=[],t12=[];for(let dx=0;dx<3;dx++)for(let dy=0;dy<3;dy++){t15.push([15,7590+dx,12867+dy]);t12.push([12,948+dx,1608+dy]);}
+const t15=[],t12=[];for(let dx=0;dx<3;dx++)for(let dy=0;dy<3;dy++){t15.push([15,7985+dx,12738+dy]);t12.push([12,997+dx,1591+dy]);}
 (async()=>{
 await batch('USGS photo z12 (9)', t12.map(([z,x,y])=>`https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/${z}/${y}/${x}`));
 await batch('USGS photo z15 (9)', t15.map(([z,x,y])=>`https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/${z}/${y}/${x}`));
