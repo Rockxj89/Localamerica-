@@ -10,7 +10,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <style>
   :root { --tan: #f5e6c8; --gold: #f2b134; --ink: #1c1917; --muted: #57534e; --drive: #f5ecd7; --edge: #3b2f22; --dirt: #d9c7a3; --land: #22c55e; --me: #2563eb; --pin: #111827; }
-  html, body { height: 100%; margin: 0; }
+  html, body { height: 100%; margin: 0; overflow: hidden; }
   body { font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--ink); background: #faf7f2; display: flex; flex-direction: column; }
   header { padding: 10px 14px; background: #111; color: #f5e6c8; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
   header h1 { margin: 0; font-size: 17px; font-weight: 600; }
@@ -58,7 +58,35 @@
   .pop .closed { color: #b91c1c; font-weight: 600; }
   .pop .small { color: var(--muted); font-size: 13px; margin-top: 6px; }
   .pop a.btn { display: inline-block; margin-top: 8px; background: #15803d; color: #fff; padding: 6px 12px; border-radius: 8px; text-decoration: none; font-weight: 600; }
-  body.locked #map, body.locked .fab, body.locked .key { display: none; }
+  #lay-btn { bottom: calc(224px + env(safe-area-inset-bottom)); }
+  #lay-btn[aria-expanded="true"] { color: var(--gold); }
+  /* Layers panel: slides up from the bottom */
+  #panel { position: absolute; left: 0; right: 0; bottom: 0; z-index: 1100; max-height: 72vh; overflow-y: auto; background: #111; color: var(--tan); border-radius: 18px 18px 0 0; box-shadow: 0 -4px 18px rgba(0,0,0,.5); padding: 8px 16px calc(18px + env(safe-area-inset-bottom)); transform: translateY(105%); transition: transform .22s ease; -webkit-overflow-scrolling: touch; }
+  #panel.open { transform: none; }
+  #panel .grab { width: 40px; height: 5px; border-radius: 3px; background: #44403c; margin: 2px auto 8px; }
+  #panel .top { display: flex; align-items: center; justify-content: space-between; }
+  #panel h2 { margin: 0; font-size: 18px; color: #fff; }
+  #panel .close { background: none; border: 0; color: var(--tan); font-size: 15px; font-weight: 600; padding: 8px 4px; cursor: pointer; }
+  #panel h3 { margin: 16px 0 4px; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: #a8a29e; font-weight: 600; }
+  #panel .row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid #292524; cursor: pointer; }
+  #panel .row:last-child { border-bottom: 0; }
+  #panel .row .txt { flex: 1; min-width: 0; }
+  #panel .row b { display: block; font-weight: 600; color: #fff; font-size: 16px; }
+  #panel .row small { display: block; color: #a8a29e; font-size: 13px; line-height: 1.3; }
+  #panel .sw { flex: none; width: 46px; height: 28px; border-radius: 14px; background: #44403c; position: relative; transition: background .15s; }
+  #panel .sw::after { content: ""; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; transition: transform .15s; }
+  #panel .row[aria-checked="true"] .sw { background: #15803d; }
+  #panel .row[aria-checked="true"] .sw::after { transform: translateX(18px); }
+  #panel .chips { display: flex; flex-wrap: wrap; gap: 8px; padding: 6px 0 10px; }
+  #panel .chip { border: 1px solid #57534e; background: #1c1917; color: var(--tan); border-radius: 999px; padding: 7px 12px; font-size: 14px; font-weight: 600; cursor: pointer; }
+  #panel .chip[aria-pressed="true"] { background: var(--tan); color: #111; border-color: var(--tan); }
+  #panel .chips.off { display: none; }
+  .key i.easy, .key i.mod, .key i.hard, .key i.unk { height: 0; background: none; border: 0; border-top: 4px dashed #22c55e; border-radius: 0; box-shadow: none; }
+  .key i.mod { border-top-color: #3b82f6; } .key i.hard { border-top-color: #ef4444; } .key i.unk { border-top-color: #fff; }
+  .key .k-trail { display: none; } body.trails-on .key .k-trail { display: inline-flex; }
+  .pop .uses { color: #15803d; font-weight: 600; }
+  .pop .lvl { font-weight: 700; }
+  body.locked #map, body.locked .fab, body.locked .key, body.locked #panel { display: none; }
   #gate { display: none; max-width: 420px; margin: 32px auto; padding: 0 16px; text-align: center; }
   body.locked #gate { display: block; }
   #gate h2 { font-size: 20px; margin: 0 0 8px; }
@@ -79,12 +107,14 @@
 <div id="gate"><h2 id="gate-title">Checking your sign-in…</h2><p id="gate-text"></p><div id="gate-extra"></div></div>
 <div id="note"></div>
 <div id="map"></div>
+<button class="fab" id="lay-btn" type="button" aria-label="Open layers" aria-expanded="false" aria-controls="panel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="9" cy="6" r="2" fill="currentColor"/><circle cx="15" cy="12" r="2" fill="currentColor"/><circle cx="7" cy="18" r="2" fill="currentColor"/></svg><span>Layers</span></button>
 <button class="fab" id="topo-btn" type="button" aria-label="Hide topo lines" aria-pressed="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 17c3-4 6-4 9-1s6 2 9-2"/><path d="M3 12c3-4 6-4 9-1s6 2 9-2"/><path d="M3 7c3-4 6-4 9-1s6 2 9-2"/></svg><span>Topo on</span></button>
 <button class="fab" id="sat-btn" type="button" aria-label="Switch to the plain map"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 3 2 8l10 5 10-5-10-5Z"/><path d="m2 13 10 5 10-5"/></svg><span>Map</span></button>
 <button class="fab" id="me-btn" type="button" aria-label="Show where I am">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="12" cy="12" r="4" fill="currentColor"/><circle cx="12" cy="12" r="8"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3"/></svg>
 </button>
-<div class="key"><span><i class="hwy"></i>Highway</span><span><i></i>Open to drive</span><span><i class="dirt"></i>Dirt road, not checked</span><span><i class="land"></i>Public land</span><span><i class="pin"></i>Local America place</span></div>
+<div class="key"><span><i class="hwy"></i>Highway</span><span><i></i>Open to drive</span><span><i class="dirt"></i>Dirt road, not checked</span><span><i class="land"></i>Public land</span><span><i class="pin"></i>Local America place</span><span class="k-trail"><i class="easy"></i>Easy trail</span><span class="k-trail"><i class="mod"></i>Moderate</span><span class="k-trail"><i class="hard"></i>Hard</span><span class="k-trail"><i class="unk"></i>Not rated</span></div>
+<div id="panel" role="dialog" aria-label="Map layers" aria-hidden="true"><div class="grab"></div><div class="top"><h2>Layers</h2><button class="close" type="button">Done</button></div><div id="panel-body"></div></div>
 <script>
 // ---------- Owner only ----------
 // Same sign-in as the Traffic page. The map starts only after Supabase confirms this is the owner account.
@@ -126,9 +156,60 @@ function startMap() {
 const SUPABASE_URL = 'https://ycdlxdijrlfsxvxksyrq.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_2ExdXbNtW9HpuOGAq1Oa7g_gPdONH_s';
 const WILLOW_SPRINGS = [36.9923, -91.9690];
+const VEH_OK = ['any', 'jeep', 'wide', 'atv', 'moto'];
 const MISSOURI = L.latLngBounds([35.99, -95.77], [40.62, -89.10]);
 
 const map = L.map('map', { zoomControl: true, preferCanvas: true, tap: true, maxZoom: 19 }).setView(WILLOW_SPRINGS, 12);
+
+// ---------- Layers panel ----------
+// The Layers button opens a panel of switches. Choices are kept on this phone only (browser
+// storage); if the phone won't keep them, the map just starts with the usual choices.
+const PREF_KEY = 'la-trails-layers';
+const prefs = (() => { try { const p = JSON.parse(localStorage.getItem(PREF_KEY)); return p && typeof p === 'object' && !Array.isArray(p) ? p : {}; } catch (e) { return {}; } })();
+if (!VEH_OK.includes(prefs.veh)) prefs.veh = 'any';
+function savePrefs() { try { localStorage.setItem(PREF_KEY, JSON.stringify(prefs)); } catch (e) { /* not kept, that's fine */ } }
+const panel = document.getElementById('panel'), panelBody = document.getElementById('panel-body'), layBtn = document.getElementById('lay-btn');
+function setPanel(open) { panel.classList.toggle('open', open); panel.setAttribute('aria-hidden', String(!open)); layBtn.setAttribute('aria-expanded', String(open)); }
+layBtn.addEventListener('click', () => setPanel(!panel.classList.contains('open')));
+panel.querySelector('.close').addEventListener('click', () => setPanel(false));
+map.on('click', () => setPanel(false));
+const sections = {};
+function section(id, title, sub) {
+  if (!sections[id]) {
+    const h = document.createElement('h3'); h.textContent = title;
+    const box = document.createElement('div');
+    panelBody.append(h, box);
+    if (sub) { const p = document.createElement('div'); p.className = 'row'; p.style.cursor = 'default'; p.innerHTML = '<div class="txt"><small></small></div>'; p.querySelector('small').textContent = sub; box.append(p); }
+    sections[id] = box;
+  }
+  return sections[id];
+}
+// One on/off switch. key is the saved name; on(true/false) shows or hides the layer.
+function toggle(sec, key, title, sub, on, def = false) {
+  const row = document.createElement('div');
+  row.className = 'row'; row.setAttribute('role', 'switch'); row.tabIndex = 0;
+  row.innerHTML = '<div class="txt"><b></b><small></small></div><span class="sw"></span>';
+  row.querySelector('b').textContent = title;
+  row.querySelector('small').textContent = sub || '';
+  const set = (v, save) => { row.setAttribute('aria-checked', String(v)); prefs[key] = v; if (save) savePrefs(); on(v); };
+  row.addEventListener('click', () => set(row.getAttribute('aria-checked') !== 'true', true));
+  row.addEventListener('keydown', (e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); row.click(); } });
+  sec.append(row);
+  set(prefs[key] != null ? !!prefs[key] : def, false);
+  return row;
+}
+// A row of buttons to pick from
+function chips(sec, items, isOn, onTap) {
+  const box = document.createElement('div'); box.className = 'chips';
+  const paint = () => box.querySelectorAll('.chip').forEach((b) => b.setAttribute('aria-pressed', String(isOn(b.dataset.k))));
+  items.forEach(([k, label]) => {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'chip'; b.textContent = label; b.dataset.k = k;
+    b.addEventListener('click', () => { onTap(k); paint(); });
+    box.append(b);
+  });
+  paint(); sec.append(box);
+  return box;
+}
 const renderer = L.canvas({ tolerance: 12 });
 
 const topo = L.tileLayer('https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{z}/{y}/{x}', {
@@ -299,17 +380,33 @@ function openToday(rs) {
   const t = new Date(), today = (t.getMonth() + 1) * 100 + t.getDate();
   return rs.some(({ a, b }) => (a <= b ? today >= a && today <= b : today >= a || today <= b));
 }
-function fsInfo(a) {
+// Which vehicles each Forest Service field covers (Motor Vehicle Use Map)
+const VEHICLES = {
+  any: { name: 'Any vehicle' },
+  jeep: { name: 'Jeep or truck', short: 'Jeeps and trucks', f: [['passengervehicle', 'passengervehicle_datesopen'], ['highclearancevehicle', 'highclearancevehicle_datesopen'], ['fourwd_gt50inches', 'fourwd_gt50_datesopen']] },
+  wide: { name: 'Side-by-side over 50 in', short: 'side-by-sides over 50 inches wide', f: [['otherwheeled_ohv', 'otherwheeled_ohv_datesopen'], ['fourwd_gt50inches', 'fourwd_gt50_datesopen']] },
+  atv: { name: 'ATV or side-by-side 50 in or less', short: 'ATVs and side-by-sides 50 inches or less', f: [['atv', 'atv_datesopen'], ['otherwheeled_ohv', 'otherwheeled_ohv_datesopen'], ['fourwd_gt50inches', 'fourwd_gt50_datesopen']] },
+  moto: { name: 'Dirt bike', short: 'dirt bikes', f: [['motorcycle', 'motorcycle_datesopen']] },
+};
+function fsInfo(a, veh) {
   const jeep = isOpen(a.highclearancevehicle) || isOpen(a.fourwd_gt50inches);
   const car = isOpen(a.passengervehicle);
   const atv = isOpen(a.atv) || isOpen(a.otherwheeled_ohv);
   const moto = isOpen(a.motorcycle);
   if (!jeep && !car && !atv && !moto) return null;
-  const dateField = car ? a.passengervehicle_datesopen : jeep ? (a.highclearancevehicle_datesopen || a.fourwd_gt50_datesopen) : atv ? (a.atv_datesopen || a.otherwheeled_ohv_datesopen) : a.motorcycle_datesopen;
-  const rs = ranges(dateField).filter((r) => !(r.a === 101 && r.b === 1231));
   const label = car ? 'Any car' : jeep ? 'Jeep friendly' : atv ? 'ATV and side-by-side only' : 'Dirt bikes only';
   const extra = (car || jeep) && atv ? ', ATVs too' : '';
-  return { label: label + extra, rough: /^\s*[12]\b/.test(String(a.operationalmaintlevel || '')), rs, open: openToday(rs) };
+  let dateField = car ? a.passengervehicle_datesopen : jeep ? (a.highclearancevehicle_datesopen || a.fourwd_gt50_datesopen) : atv ? (a.atv_datesopen || a.otherwheeled_ohv_datesopen) : a.motorcycle_datesopen;
+  let pick = '';
+  const v = VEHICLES[veh];
+  if (v && v.f) {
+    const hit = v.f.find(([k]) => isOpen(a[k]));
+    if (!hit) return null; // not open to the vehicle picked in Layers
+    dateField = a[hit[1]];
+    pick = 'Open to ' + v.short;
+  }
+  const rs = ranges(dateField).filter((r) => !(r.a === 101 && r.b === 1231));
+  return { label: label + extra, pick, rough: /^\s*[12]\b/.test(String(a.operationalmaintlevel || '')), rs, open: openToday(rs) };
 }
 function fsPopup(a, info, latlngs, isTrail) {
   const num = a.id ? (isTrail ? 'Trail ' : 'Forest Road ') + a.id : '';
@@ -317,7 +414,7 @@ function fsPopup(a, info, latlngs, isTrail) {
   const len = a.gis_miles != null ? Number(a.gis_miles) : lineMiles(latlngs);
   const season = !info.open ? `<div class="closed">Closed right now. Open ${esc(info.rs.map((r) => r.text).join(', '))}</div>`
     : info.rs.length ? `<div>Open ${esc(info.rs.map((r) => r.text).join(', '))}</div>` : '';
-  return `<div class="pop"><h3>${esc(name)}</h3><div class="big">${esc(info.label)} · ${miles(len).replace(' mi', ' miles')}</div>${season}${info.rough && info.label === 'Any car' ? '<div>Rough in spots</div>' : ''}${placeAndYou(latlngs)}
+  return `<div class="pop"><h3>${esc(name)}</h3><div class="big">${esc(info.label)} · ${miles(len).replace(' mi', ' miles')}</div>${info.pick ? `<div>${esc(info.pick)}</div>` : ''}${season}${info.rough && info.label === 'Any car' ? '<div>Rough in spots</div>' : ''}${placeAndYou(latlngs)}
     <div class="small">${esc(num && name !== num ? num + ' · ' : '')}From the Forest Service. Open means allowed, not that it's in good shape today.</div></div>`;
 }
 // Forest Service roads come from our own site (a saved copy), not live from the Forest Service.
@@ -411,12 +508,20 @@ Promise.allSettled([getJson(DATA + 'fs-roads.json'), getJson(DATA + 'public-land
   loadDirt();
   map.on('moveend', loadDirt);
   if (fs.status !== 'fulfilled') { note("Couldn't load the Forest Service roads. Pull down to reload the page.", 8000); return; }
-  (fs.value.features || []).forEach((f) => {
+  fsFeatures = fs.value.features || [];
+  drawFs();
+});
+// Draws the Forest Service roads for the vehicle picked in Layers (or any vehicle)
+let fsFeatures = [];
+function drawFs() {
+  fsLayer.clearLayers();
+  roadLabels.length = 0;
+  const round = { lineCap: 'round', lineJoin: 'round' };
+  fsFeatures.forEach((f) => {
     const a = f.a || {};
-    const info = fsInfo(a);
+    const info = fsInfo(a, prefs.veh);
     if (!info) return;
-    const ll = f.p.map((path) => path.map(([x, y]) => L.latLng(y, x)));
-    const round = { lineCap: 'round', lineJoin: 'round' };
+    const ll = f.ll || (f.ll = f.p.map((path) => path.map(([x, y]) => L.latLng(y, x))));
     if (info.open) L.polyline(ll, { renderer, color: '#fff', weight: 13, opacity: 0.22, interactive: false, ...round }).addTo(fsLayer);
     L.polyline(ll, { renderer, color: '#111', weight: info.open ? 9 : 5, opacity: info.open ? 0.95 : 0.6, interactive: false, ...round }).addTo(fsLayer);
     L.polyline(ll, { renderer, color: info.open ? '#f2b134' : '#a8a29e', weight: info.open ? 4.5 : 2.5, opacity: 1, dashArray: info.open ? null : '6 6', ...round })
@@ -425,7 +530,7 @@ Promise.allSettled([getJson(DATA + 'fs-roads.json'), getJson(DATA + 'public-land
     if (info.open && p0.length) roadLabels.push({ ll: p0[Math.floor(p0.length / 2)], text: fsLabel(a, f.t === 2) });
   });
   drawLabels();
-});
+}
 
 // ---------- Highways and main paved roads ----------
 // Interstates, US highways and Missouri state routes (numbered and lettered, like Hwy 76 or Rte CC) from the
@@ -580,7 +685,190 @@ async function drawLabels() {
 let labelTimer;
 map.on('moveend', () => { clearTimeout(labelTimer); labelTimer = setTimeout(() => drawMain().finally(drawLabels), 250); });
 setTimeout(() => drawMain().finally(drawLabels), 400);
-map.attributionControl.addAttribution('Names and heights: USGS GNIS, 3DEP; Highways: USGS');
+map.attributionControl.addAttribution('Names and heights: USGS GNIS, 3DEP; Highways: USGS; Trails: USDA Forest Service, © OpenStreetMap contributors');
+
+// ---------- Hiking, bike and horse trails (off until switched on in Layers) ----------
+// Forest Service trails (Mark Twain National Forest) and OpenStreetMap paths. They load one small
+// square at a time through our own site (api/trails-data), only while the switch is on.
+const trailLayer = L.layerGroup();
+const TRAIL_MIN_ZOOM = 11, PATH_MIN_ZOOM = 12, CELL = 0.25;
+const TRAIL_SQ = { x0: -384, x1: -356, y0: 143, y1: 163 }; // same squares the map data service takes
+const TRAIL_COLORS = { easy: '#22c55e', mod: '#3b82f6', hard: '#ef4444', unk: '#ffffff' };
+const TRAIL_LEVEL = { easy: 'Easy', mod: 'Moderate', hard: 'Hard', unk: 'Not rated' };
+if (!prefs.uses || typeof prefs.uses !== 'object') prefs.uses = { foot: true, bike: true, horse: true };
+const trailAsked = new Set(), fsTrailNames = new Map(), fsCellLoads = new Map(), trailItems = [];
+// Forest Service trail names by square, so a copy of the same trail from OpenStreetMap is only skipped close by
+function fsNamesNear(i, j, key) {
+  for (let di = -1; di <= 1; di++) for (let dj = -1; dj <= 1; dj++) { const s = fsTrailNames.get((i + di) + '_' + (j + dj)); if (s && s.has(key)) return true; }
+  return false;
+}
+let trailsOn = false, trailZoomNote = false, trailFailNote = false;
+const said = (v) => v != null && String(v).trim() !== '';
+const nameKey = (n) => String(n || '').toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\b(trail|tr|spur|loop|section|segment|the|nrt|ot)\b/g, ' ').replace(/\s+/g, ' ').trim();
+function usesText(u) {
+  const t = [u.foot && 'Hiking', u.horse && 'horses', u.bike && 'bikes'].filter(Boolean);
+  return t.length ? t.join(', ').replace(/^./, (c) => c.toUpperCase()) : '';
+}
+// Forest Service trail class 1 is the roughest, 5 the most built up
+function fsTrailLevel(a) {
+  const c = String(a.trail_class || '').trim();
+  return c === '1' || c === '2' ? 'hard' : c === '3' ? 'mod' : c === '4' || c === '5' ? 'easy' : 'unk';
+}
+const CLASS_TEXT = { 1: 'barely built, rough and hard to follow', 2: 'narrow and rough', 3: 'a clear, worn path', 4: 'wide and smooth', 5: 'fully built, often paved' };
+const YES = /^(yes|designated|permissive|official)$/;
+function osmUses(a) {
+  const h = a.highway;
+  return {
+    foot: a.foot ? YES.test(a.foot) : h === 'path' || h === 'footway',
+    bike: a.bicycle ? YES.test(a.bicycle) : h === 'cycleway' || said(a['mtb:scale']),
+    horse: a.horse ? YES.test(a.horse) : h === 'bridleway',
+  };
+}
+// OpenStreetMap hiking and bike scales, plus "hard to see" trails
+function osmLevel(a) {
+  const rank = { easy: 1, mod: 2, hard: 3 };
+  let lvl = 'unk';
+  const up = (l) => { if (lvl === 'unk' || rank[l] > rank[lvl]) lvl = l; };
+  const sac = a.sac_scale;
+  if (sac === 'hiking') up('easy'); else if (sac === 'mountain_hiking') up('mod'); else if (sac) up('hard');
+  const mtb = parseInt(a['mtb:scale'], 10);
+  if (Number.isFinite(mtb)) up(mtb <= 0 ? 'easy' : mtb <= 2 ? 'mod' : 'hard');
+  if (/^(bad|horrible|no)$/.test(a.trail_visibility || '')) up('hard');
+  return lvl;
+}
+const OSM_KIND = { path: 'Trail', footway: 'Footpath', bridleway: 'Horse trail', cycleway: 'Bike path' };
+function trailPopup(t, latlngs) {
+  const lvl = `<span class="lvl" style="color:${t.lvl === 'unk' ? '#57534e' : TRAIL_COLORS[t.lvl]}">${TRAIL_LEVEL[t.lvl]}</span>`;
+  const len = t.mi != null ? t.mi : lineMiles(latlngs);
+  return `<div class="pop"><h3>${esc(t.name)}</h3><div class="big">${lvl} · ${miles(len).replace(' mi', ' miles')}</div>` +
+    `${t.uses ? `<div class="uses">${esc(t.uses)}</div>` : ''}${t.extra ? `<div>${esc(t.extra)}</div>` : ''}${placeAndYou(latlngs)}<div class="small">${esc(t.src)}</div></div>`;
+}
+function addTrail(ll, uses, t) {
+  const round = { lineCap: 'round', lineJoin: 'round' };
+  const edge = L.polyline(ll, { renderer, color: '#111', weight: 6.5, opacity: 0.75, interactive: false, ...round });
+  const line = L.polyline(ll, { renderer, color: TRAIL_COLORS[t.lvl], weight: 3.5, opacity: 1, dashArray: '8 6', ...round }).bindPopup(() => trailPopup(t, ll));
+  const item = { uses, edge, line };
+  trailItems.push(item);
+  showTrail(item);
+}
+function showTrail(item) {
+  const on = ['foot', 'bike', 'horse'].some((u) => prefs.uses[u] && item.uses[u]);
+  [item.edge, item.line].forEach((l) => (on ? l.addTo(trailLayer) : l.remove()));
+}
+function drawFsTrails(j, cell) {
+  (j.features || []).forEach((f) => {
+    const a = f.a || {};
+    const uses = { foot: said(a.hiker_pedestrian_managed) || said(a.hiker_pedestrian_accpt), horse: said(a.pack_saddle_managed) || said(a.pack_saddle_accpt), bike: said(a.bicycle_managed) || said(a.bicycle_accpt) };
+    if (!uses.foot && !uses.horse && !uses.bike) return; // motor-only trails are already on the map in gold
+    const id = 'fs' + (a.trail_no || '') + '|' + (f.p[0] && f.p[0][0] && f.p[0][0].join(','));
+    if (trailAsked.has(id)) return; trailAsked.add(id);
+    const nk = a.trail_name ? nameKey(a.trail_name) : '';
+    if (nk && cell) { if (!fsTrailNames.has(cell)) fsTrailNames.set(cell, new Set()); fsTrailNames.get(cell).add(nk); }
+    const width = String(a.typical_tread_width || '').match(/(\d+\s*-\s*\d+|\d+\+?)\s*(INCHES|IN|FEET|FT)/i);
+    const extra = [a.trail_surface && a.trail_surface !== 'NATIVE MATERIAL' ? titleCase(a.trail_surface) : 'Dirt', width ? width[1].replace(/\s/g, '') + ' ' + (/^F/i.test(width[2]) ? 'feet' : 'inches') + ' wide' : ''].filter(Boolean).join(', ');
+    const cls = String(a.trail_class || '').trim();
+    addTrail(f.p.map((path) => path.map(([x, y]) => L.latLng(y, x))), uses, {
+      name: a.trail_name ? titleCase(a.trail_name) : a.trail_no ? 'Trail ' + a.trail_no : 'Forest Service trail',
+      lvl: fsTrailLevel(a), mi: a.gis_miles != null ? Number(a.gis_miles) : null, uses: usesText(uses), extra,
+      src: `From the Forest Service${CLASS_TEXT[cls] ? ` (trail class ${cls} of 5: ${CLASS_TEXT[cls]})` : ''}. Allowed doesn't mean it's in good shape today.`,
+    });
+  });
+}
+// OpenStreetMap paths for all of Missouri live in one file on our own site (trails-data/paths-mo.bin),
+// cut into 0.25 degree squares like the dirt road file, so the phone reads only the squares on screen.
+// Each row: [kind, miles, name, coordinates, id, surface]
+const PATHS_FILE = '/trails-data/paths-mo.bin';
+let pathsIdxP = null, pathsWhole = null;
+async function pathRange(from, to) {
+  if (pathsWhole) return pathsWhole.slice(from, to + 1);
+  const r = await fetch(PATHS_FILE, { headers: { Range: `bytes=${from}-${to}` } });
+  if (!r.ok) throw new Error(r.status);
+  const b = new Uint8Array(await r.arrayBuffer());
+  if (r.status === 206) return b;
+  pathsWhole = b; // the site sent the whole file; keep it and cut pieces from it
+  return b.slice(from, to + 1);
+}
+function pathsIndex() {
+  return pathsIdxP || (pathsIdxP = (async () => {
+    let head = await pathRange(0, 65535);
+    const len = +new TextDecoder().decode(head.slice(0, 10));
+    if (!len) throw new Error('bad file');
+    if (10 + len > head.length) head = await pathRange(0, 9 + len);
+    return { idx: JSON.parse(new TextDecoder().decode(head.slice(10, 10 + len))), start: 10 + len };
+  })().catch((e) => { pathsIdxP = null; throw e; }));
+}
+async function pathCell(i, j) {
+  const { idx, start } = await pathsIndex();
+  const t = idx.tiles[i + '_' + j];
+  if (!t) return [];
+  return gunzipJson(await pathRange(start + t[0], start + t[0] + t[1] - 1));
+}
+function drawPaths(rows, i, j) {
+  for (const [kind, mi, name, coords, id, surface] of rows) {
+    if (trailAsked.has('osm' + id)) continue; trailAsked.add('osm' + id);
+    const nk = name ? nameKey(name) : '';
+    if (nk && fsNamesNear(i, j, nk)) continue; // already shown from the Forest Service
+    const a = { highway: kind };
+    const uses = osmUses(a);
+    if (!uses.foot && !uses.horse && !uses.bike) continue;
+    const ll = typeof coords[0][0] === 'number' ? [coords.map(([x, y]) => L.latLng(y, x))] : coords.map((c) => c.map(([x, y]) => L.latLng(y, x)));
+    addTrail(ll, uses, {
+      name: name || OSM_KIND[kind] || 'Trail', lvl: osmLevel(a), mi, uses: usesText(uses),
+      extra: surface ? titleCase(String(surface).replace(/_/g, ' ')) : '',
+      src: 'Map data © OpenStreetMap contributors. Nobody has checked this one, and some cross private land.',
+    });
+  }
+}
+function getCell(src, i, j) {
+  return fetch(`/api/trails-data?src=${src}&x=${i}&y=${j}`).then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
+}
+function loadTrails() {
+  if (!trailsOn) return;
+  const z = map.getZoom();
+  if (z < TRAIL_MIN_ZOOM) { if (!trailZoomNote) { trailZoomNote = true; note('Zoom in to see the trails', 3000); } return; }
+  const b = map.getBounds().pad(0.15);
+  // only the squares the map data covers (Missouri plus a little edge)
+  const i0 = Math.max(TRAIL_SQ.x0, Math.floor(b.getWest() / CELL)), i1 = Math.min(TRAIL_SQ.x1, Math.floor(b.getEast() / CELL));
+  const j0 = Math.max(TRAIL_SQ.y0, Math.floor(b.getSouth() / CELL)), j1 = Math.min(TRAIL_SQ.y1, Math.floor(b.getNorth() / CELL));
+  for (let i = i0; i <= i1; i++) {
+    for (let j = j0; j <= j1; j++) {
+      const cell = i + '_' + j, osmKey = `cell-osm-${cell}`;
+      if (!fsCellLoads.has(cell)) {
+        fsCellLoads.set(cell, getCell('fstrails', i, j).then((d) => drawFsTrails(d, cell)).catch(() => { fsCellLoads.delete(cell); failNote(); }));
+      }
+      if (z >= PATH_MIN_ZOOM && !trailAsked.has(osmKey)) {
+        trailAsked.add(osmKey);
+        // wait for the Forest Service trails here and next door, so the same trail isn't drawn twice
+        const near = [];
+        for (let di = -1; di <= 1; di++) for (let dj = -1; dj <= 1; dj++) { const p = fsCellLoads.get((i + di) + '_' + (j + dj)); if (p) near.push(p); }
+        Promise.all(near).then(() => pathCell(i, j)).then((rows) => drawPaths(rows, i, j)).catch(() => { trailAsked.delete(osmKey); failNote(); });
+      }
+    }
+  }
+}
+function failNote() { if (!trailFailNote) { trailFailNote = true; note("Couldn't load some trails. Move the map to try again.", 5000); setTimeout(() => { trailFailNote = false; }, 20000); } }
+map.on('moveend', loadTrails);
+
+const trailSec = section('trails', 'Trails');
+let useChips;
+toggle(trailSec, 'trails', 'Hiking, bike and horse trails', 'Colored by how hard they are. Forest Service and OpenStreetMap.', (v) => {
+  trailsOn = v;
+  document.body.classList.toggle('trails-on', v);
+  if (useChips) useChips.classList.toggle('off', !v);
+  if (v) { trailLayer.addTo(map); loadTrails(); } else trailLayer.remove();
+});
+useChips = chips(trailSec, [['foot', 'Hiking'], ['bike', 'Bikes'], ['horse', 'Horses']], (k) => !!prefs.uses[k], (k) => {
+  prefs.uses[k] = !prefs.uses[k]; savePrefs();
+  trailItems.forEach(showTrail);
+});
+useChips.classList.toggle('off', !trailsOn);
+
+const vehSec = section('veh', 'Forest roads open to', 'Hides Forest Service roads and trails your vehicle may not use. Dirt roads from OpenStreetMap stay on, unchecked.');
+chips(vehSec, VEH_OK.map((k) => [k, VEHICLES[k].name]), (k) => prefs.veh === k, (k) => {
+  prefs.veh = k; savePrefs();
+  drawFs();
+  if (k !== 'any') note('Showing Forest Service roads open to ' + VEHICLES[k].short, 4000);
+});
 
 // ---------- Start ----------
 // For checking the page: ?at=lat,lng skips location; ?open=fs or ?open=dirt opens one line's info box
