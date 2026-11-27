@@ -99,7 +99,9 @@ function fsStyle(a, layerId) {
 }
 function fsPopup(a, layerId) {
   const who = openTo(a);
-  const name = a.name && a.name.trim() ? a.name : (a.id ? (layerId === 2 ? 'Trail ' : 'Forest Road ') + a.id : 'Forest Service route');
+  const title = (t) => String(t).toLowerCase().replace(/\b([a-z])/g, (m) => m.toUpperCase()).replace(/'S\b/g, "'s");
+  const num = a.id ? (layerId === 2 ? 'Trail ' : 'Forest Road ') + a.id : '';
+  const name = a.name && a.name.trim() ? title(a.name) + (num ? ` (${num})` : '') : (num || 'Forest Service route');
   const miles = a.gis_miles != null ? Number(a.gis_miles).toFixed(1) + ' miles' : '';
   const list = who.length ? '<ul>' + who.map((o) => `<li>${esc(o.label)}${o.dates ? ' · open ' + esc(o.dates) : ''}</li>`).join('') + '</ul>' : '<p class="warn">The Forest Service lists no vehicles for this one.</p>';
   const tidy = (v) => String(v || '').replace(/^[A-Z0-9]+\s*-\s*/, '').toLowerCase();
