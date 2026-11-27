@@ -866,7 +866,7 @@ function liveLayer(src, draw, everyMin) {
   const group = L.layerGroup();
   let timer = null, busy = false, first = true;
   const load = () => {
-    if (busy) return; busy = true;
+    if (busy || (document.hidden && !first)) return; busy = true;
     fetch('/api/trails-data?src=' + src).then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
       .then((d) => { if (!map.hasLayer(group)) return; group.clearLayers(); draw(group, d, first); first = false; })
       .catch(() => note("Couldn't load the live " + src + ' right now. It will try again.', 5000))
@@ -897,8 +897,10 @@ const firePop = (n, ac, pc, d) => '<div class="pop"><h3>' + esc(n || 'Wildfire')
   + (ac != null ? '<div class="big">' + nf(Math.round(ac)) + ' acres</div>' : '')
   + (pc != null ? '<div>' + esc(pc) + '% contained</div>' : '')
   + (d ? '<div class="small">Found ' + esc(when(d)) + '</div>' : '')
-  + '<div class="small">Source: NIFC. Stay clear and follow local orders.</div></div>';
+  + '<div class="small">Source: NIFC. Stay clear and follow local orders.</div>' + (firesAt ? '<div class="small">Checked ' + esc(ago(firesAt)) + '</div>' : '') + '</div>';
+let firesAt = 0;
 const fires = liveLayer('fires', (g, d, first) => {
+  firesAt = d.at;
   (d.areas || []).forEach((a) => {
     const rings = (a.r || []).map((ring) => ring.map(([x, y]) => [y, x]));
     if (rings.length) L.polygon(rings, { renderer, color: '#ea580c', weight: 2, fillColor: '#ea580c', fillOpacity: 0.25 }).bindPopup(firePop(a.n, a.ac, a.pc)).addTo(g);
@@ -938,7 +940,7 @@ const closures = liveLayer('closures', (g, d, first) => {
       + (fromTo.length ? '<div class="small">' + esc(fromTo.join(' to ')) + '</div>' : '')
       + (a.EXT_COMMENT ? '<div class="small">' + esc(a.EXT_COMMENT) + '</div>' : '')
       + ((a.START_DATE || a.END_DATE) ? '<div class="small">' + esc([a.START_DATE && 'From ' + dt(a.START_DATE), a.END_DATE && 'until ' + dt(a.END_DATE)].filter(Boolean).join(' ')) + '</div>' : '')
-      + '<div class="small">Source: MoDOT Traveler Information.</div></div>';
+      + '<div class="small">Source: MoDOT Traveler Information' + (d.at ? ', checked ' + esc(when(d.at)) : '') + '.</div></div>';
     L.circleMarker(c.p, { renderer, radius: 7, color: '#fff', weight: 2, fillColor: CLOSE_COLOR[c.k] || '#dc2626', fillOpacity: 1 }).bindPopup(html).addTo(g);
   });
   if (first && !(d.closures || []).length) note('No road closures listed by MoDOT right now.', 4000);
