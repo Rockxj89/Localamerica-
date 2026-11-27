@@ -1110,11 +1110,18 @@ map.createPane('live'); map.getPane('live').style.zIndex = 450;
 const liveRenderer = L.canvas({ pane: 'live', tolerance: 12 });
 const RADAR = 'https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q-900913/{z}/{x}/{y}.png';
 const radar = L.tileLayer(RADAR + '?t={t}', { pane: 'radar', opacity: 0.6, maxNativeZoom: 12, maxZoom: 19, t: () => Math.floor(Date.now() / 300000), attribution: 'Radar: NOAA NEXRAD via Iowa Environmental Mesonet' });
-let radarTimer = null;
-toggle(liveSec, 'radar', 'Weather radar', 'Rain and storms from NOAA. Refreshes every 5 minutes.', (v) => {
+let radarTimer = null, radarTapped = false, radarErrNoted = false;
+// Clear skies draw nothing, so say so when it's switched on; and say so if the radar pictures won't load
+radar.on('tileerror', () => { if (!radarErrNoted) { radarErrNoted = true; note("Couldn't load the weather radar right now. It will try again.", 5000); } });
+radar.on('load', () => { radarErrNoted = false; });
+toggle(liveSec, 'radar', 'Weather radar', 'Rain and storms from NOAA as green, yellow and red patches. Clear skies show nothing. Refreshes every 5 minutes.', (v) => {
   clearInterval(radarTimer); radarTimer = null;
-  if (v) { radar.addTo(map); radarTimer = setInterval(() => radar.redraw(), 300000); } else radar.remove();
+  if (v) {
+    radar.addTo(map); radarTimer = setInterval(() => radar.redraw(), 300000);
+    if (radarTapped) note("Radar is on. Rain and storms show as green, yellow and red patches. If you see none, there's no rain on this part of the map right now.", 6000);
+  } else radar.remove();
 });
+radarTapped = true;
 
 // Wildfires: current fires and their outlines from the national fire center (NIFC)
 const fireIcon = L.divIcon({ className: '', html: '<div style="width:22px;height:22px;border-radius:50%;background:#ea580c;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;font-weight:700">F</div>', iconSize: [22, 22], iconAnchor: [11, 11] });
