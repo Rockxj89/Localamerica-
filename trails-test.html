@@ -993,7 +993,7 @@ const closures = liveLayer('closures', (g, d, first) => {
 toggle(liveSec, 'closures', 'Road closures', 'Closed roads from MoDOT: crashes, winter weather, flooding, work zones.', closures.on);
 map.attributionControl.addAttribution('Live: NIFC, USGS Water Data, MoDOT');
 
-// ---------- Map layers: hill shading, old topo maps, night lights, forest camping ----------
+// ---------- Map layers: hill shading, old topo maps, night lights, cell coverage, forest camping ----------
 const layerSec = section('maplayers', 'Map layers');
 // Hill shading: USGS shaded relief, blended into the map below so ridges and hollows stand out
 const shade = L.tileLayer('https://basemap.nationalmap.gov/arcgis/rest/services/USGSShadedReliefOnly/MapServer/tile/{z}/{y}/{x}', {
@@ -1014,6 +1014,15 @@ const nightLights = L.tileLayer('https://gibs.earthdata.nasa.gov/wmts/epsg3857/b
   maxNativeZoom: 8, maxZoom: 19, zIndex: 6, opacity: 0.6, attribution: 'Night lights: NASA Black Marble 2016 (GIBS)'
 });
 toggle(layerSec, 'night', 'Dark skies', 'Night lights from NASA. The darker the area, the better for stars.', (v) => { if (v) nightLights.addTo(map); else nightLights.remove(); });
+
+// Cell coverage: FCC National Broadband Map, Missouri 4G LTE (as of Jun 30, 2026), all carriers combined, as carriers report it.
+// Made from the FCC's H3 hexagon file into one picture of Missouri (trails-data/cell-4g-mo.png, about 140 m per pixel).
+// Red = no carrier reports 4G there. Orange = 4G only outdoors standing still, not in a moving vehicle. Clear = 4G in a vehicle.
+map.createPane('cellPane'); map.getPane('cellPane').style.zIndex = 340; map.getPane('cellPane').style.pointerEvents = 'none';
+const cellCov = L.imageOverlay('/trails-data/cell-4g-mo.png?v=1', [[35.99, -95.78], [40.62, -89.09]], {
+  pane: 'cellPane', opacity: 0.5, interactive: false, attribution: 'Cell coverage: FCC National Broadband Map, Jun 2026'
+});
+toggle(layerSec, 'cell', 'Cell coverage', 'Red: no 4G. Orange: 4G only standing still outside, not while driving. All carriers, as they report it to the FCC.', (v) => { if (v) cellCov.addTo(map); else cellCov.remove(); });
 
 // Forest camping: dispersed camping spots and campgrounds in the Mark Twain National Forest (Forest Service list)
 const campLayer = L.layerGroup();
