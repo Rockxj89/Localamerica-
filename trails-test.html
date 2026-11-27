@@ -1208,11 +1208,12 @@ const r5 = (v) => Math.round(v * 1e5) / 1e5;
 const tripSheet = document.getElementById('trip'), tripBody = document.getElementById('trip-body'), tripBtn = document.getElementById('trip-btn');
 function setTrip(open) {
   tripSheet.classList.toggle('open', open); tripSheet.setAttribute('aria-hidden', String(!open)); tripBtn.setAttribute('aria-expanded', String(open));
-  if (open) setPanel(false);
+  if (open) { setPanel(false); cancelPick(); }
 }
+function cancelPick() { if (pinPick) { pinPick = null; tapMode(plan.on); note(''); } }
 tripBtn.addEventListener('click', () => { if (tripSheet.classList.contains('open')) setTrip(false); else { tripMain(); setTrip(true); } });
 tripSheet.querySelector('.close').addEventListener('click', () => setTrip(false));
-layBtn.addEventListener('click', () => setTrip(false));
+layBtn.addEventListener('click', () => { setTrip(false); cancelPick(); });
 const el = (tag, attrs, ...kids) => {
   const e = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs || {})) { if (k === 'on') Object.entries(v).forEach(([ev, f]) => e.addEventListener(ev, f)); else if (k === 'text') e.textContent = v; else e.setAttribute(k, v); }
@@ -1273,6 +1274,7 @@ if (MODES[prefs.tripMode]) plan.mode = prefs.tripMode;
 modeChips.querySelectorAll('.chip').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.k === plan.mode)));
 function tapMode(on) { document.body.classList.toggle('trip-tap', on); if (on) map.closePopup(); }
 function startPlan(r) {
+  if (plan.on && plan.stops.length > 1 && !confirm('Drop the route you are planning now?')) return;
   pinPick = null;
   plan.on = true; plan.editId = r ? r.id : null; plan.stops = r ? r.stops.map(([a, b]) => L.latLng(a, b)) : [];
   if (r && MODES[r.mode]) plan.mode = r.mode;
@@ -1285,7 +1287,7 @@ function startPlan(r) {
   if (r && plan.stops.length) map.fitBounds(L.latLngBounds(plan.stops).pad(0.2));
 }
 function endPlan() {
-  plan.on = false; plan.editId = null; plan.stops = []; plan.run++;
+  plan.on = false; plan.editId = null; plan.stops = []; plan.line = []; plan.mi = 0; plan.run++;
   planbar.hidden = true; document.body.classList.remove('planning'); tapMode(false);
   planLine.clearLayers(); stopLayer.clearLayers(); planLine.remove(); stopLayer.remove();
   drawSaved();
@@ -1346,29 +1348,32 @@ async function replan() {
   saveBtn.disabled = shareBtn.disabled = false;
 }
 map.on('click', (e) => {
-  if (pinPick) { const ll = e.latlng; pinPick = null; tapMode(plan.on); note(''); pinForm(null, ll); return; }
+  if (pinPick) { const ll = e.latlng.wrap(); pinPick = null; tapMode(plan.on); note(''); pinForm(null, ll); return; }
   if (!plan.on) return;
   if (plan.stops.length >= MAX_STOPS) { note(`A route can have up to ${MAX_STOPS} stops.`, 4000); return; }
-  plan.stops.push(e.latlng); replan();
+  plan.stops.push(e.latlng.wrap()); replan();
 });
 // Keep a saved line small enough to store: thin out points that don't change its shape
 function thin(line) {
-  if (line.length <= 15000) return line;
+  if (line.length <= 12000) return line;
   const pts = line.map((p) => map.project(p, 15));
   let tol = 1, out = pts;
-  while (out.length > 15000 && tol < 64) { out = L.LineUtil.simplify(pts, tol); tol *= 2; }
+  while (out.length > 12000 && tol < 1024) { out = L.LineUtil.simplify(pts, tol); tol *= 2; }
   return out.map((p) => { const ll = map.unproject(p, 15); return [ll.lat, ll.lng]; });
 }
 async function saveRoute() {
+  if (plan.saving || document.getElementById('pb-save').disabled) return;
   const name = pbInput.value.trim().slice(0, 80);
   if (!name) { pbInput.focus(); return; }
   if (plan.line.length < 2) return;
   const row = { name, mode: plan.mode, stops: plan.stops.map((p) => [r5(p.lat), r5(p.lng)]), line: thin(plan.line).map(([a, b]) => [r5(a), r5(b)]), miles: Math.round(plan.mi * 100) / 100 };
-  const ok = document.getElementById('pb-ok'); ok.disabled = true;
-  const q = plan.editId ? sb.from('trail_routes').update(row).eq('id', plan.editId) : sb.from('trail_routes').insert(row);
-  const { data, error } = await q.select('id,name,mode,stops,line,miles,created_at').single();
-  ok.disabled = false;
-  if (error || !data) { note("Couldn't save the route. Check your signal and try again.", 6000); return; }
+  const ok = document.getElementById('pb-ok'); ok.disabled = true; plan.saving = true;
+  let data, error;
+  try {
+    const q = plan.editId ? sb.from('trail_routes').update(row).eq('id', plan.editId) : sb.from('trail_routes').insert(row);
+    ({ data, error } = await q.select('id,name,mode,stops,line,miles,created_at').single());
+  } finally { ok.disabled = false; plan.saving = false; }
+  if (error || !data) { note(error && error.code === '23514' ? "That route is too long to save. Try fewer or closer stops." : "Couldn't save the route. Check your signal and try again.", 6000); return; }
   trip.routes = [data, ...trip.routes.filter((r) => r.id !== data.id)];
   endPlan();
   note('Saved ' + data.name, 3000);
@@ -1443,7 +1448,7 @@ async function shrink(file) {
   try { src = await createImageBitmap(file, { imageOrientation: 'from-image' }); w = src.width; h = src.height; }
   catch (e) {
     const url = URL.createObjectURL(file);
-    try { src = await new Promise((ok, no) => { const im = new Image(); im.onload = () => ok(im); im.onerror = no; im.src = url; }); }
+    try { src = await new Promise((ok, no) => { const im = new Image(); im.onload = () => ok(im); im.onerror = () => no(new Error('bad photo')); im.src = url; }); }
     finally { setTimeout(() => URL.revokeObjectURL(url), 1000); }
     w = src.naturalWidth; h = src.naturalHeight;
   }
@@ -1520,7 +1525,7 @@ async function delPin(p) {
 
 // ----- Share as a GPX file (opens in most map apps) -----
 function shareGpx(name, line, pins) {
-  const x = (v) => esc(v);
+  const x = (v) => esc(String(v).replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, ''));
   const gpx = '<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="Local America" xmlns="http://www.topografix.com/GPX/1/1">\n'
     + `<metadata><name>${x(name)}</name></metadata>\n`
     + pins.map((p) => `<wpt lat="${p.lat}" lon="${p.lng}"><name>${x(p.name)}</name>${p.note ? `<desc>${x(p.note)}</desc>` : ''}</wpt>\n`).join('')
