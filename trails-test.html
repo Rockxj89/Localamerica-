@@ -231,7 +231,9 @@ function fsPopup(a, info, latlngs, isTrail) {
 const DIRT_KINDS = { 'Dirt track': 'Dirt track', 'Dirt road': 'Dirt road', 'Unpaved road': 'Gravel or dirt road', 'Gravel road': 'Gravel road' };
 const getJson = (url, tries = 3) => fetch(url).then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
   .catch((e) => (tries > 1 ? new Promise((ok) => setTimeout(ok, 1500)).then(() => getJson(url, tries - 1)) : Promise.reject(e)));
-Promise.allSettled([getJson('/trails-test/osm-tracks.json'), getJson('/api/trails-mvum'), getJson('/api/trails-publand')]).then(([dirt, fs, land]) => {
+// Map data files live on Cloudflare R2 (bucket localamerica-trails), apart from the app videos
+const DATA = 'https://pub-2db698c77b2e4668a900baa59fbc0af0.r2.dev/';
+Promise.allSettled([getJson(DATA + 'osm-tracks.json'), getJson(DATA + 'fs-roads.json'), getJson(DATA + 'public-land.json')]).then(([dirt, fs, land]) => {
   if (land.status === 'fulfilled') drawLand(land.value);
   else note("Couldn't load the public land. Pull down to reload the page.", 6000);
   if (dirt.status === 'fulfilled') {
