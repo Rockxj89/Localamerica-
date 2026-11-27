@@ -144,13 +144,71 @@ async function camping() {
   return { at: Date.now(), spots: out };
 }
 
+// ---------- MDC conservation areas and river accesses (all of Missouri) ----------
+// Missouri Department of Conservation area list: one point per area, with its MDC page. Changes rarely, so kept a day.
+const MDC = 'https://gisblue.mdc.mo.gov/arcgis/rest/services/Discover_Nature/MDC_Administrative_Areas/MapServer/4/query';
+async function mdc() {
+  const out = [];
+  for (let offset = 0; offset < 6000; offset += 2000) {
+    const q = new URLSearchParams({
+      where: '1=1', outFields: 'Area_ID,Area_Name,County,Acreage,Sum_Link', returnGeometry: 'true', outSR: '4326',
+      orderByFields: 'OBJECTID', resultOffset: String(offset), resultRecordCount: '2000', f: 'json'
+    });
+    const j = await getJson(`${MDC}?${q}`, { timeout: 20000 });
+    const feats = j.features || [];
+    for (const f of feats) {
+      const a = f.attributes || {}, g = f.geometry || {}, lat = Number(g.y), lng = Number(g.x);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < 35.9 || lat > 40.7 || lng < -95.8 || lng > -89) continue;
+      const name = String(a.Area_Name || '').trim().slice(0, 100);
+      if (!name) continue;
+      const url = typeof a.Sum_Link === 'string' && /^https:\/\/mdc\.mo\.gov\/conservation-area\/a\d{1,6}$/.test(a.Sum_Link.trim()) ? a.Sum_Link.trim() : null;
+      const acres = Number(a.Acreage);
+      out.push({ n: name, k: /\baccess\b/i.test(name) ? 'access' : 'area', c: String(a.County || '').slice(0, 60) || null,
+        ac: Number.isFinite(acres) && acres > 0 ? Math.round(acres) : null, u: url, p: [r5(lat), r5(lng)] });
+    }
+    if (!j.exceededTransferLimit || !feats.length) break;
+  }
+  if (!out.length) throw new Error('mdc: no areas');
+  return { at: Date.now(), areas: out };
+}
+
+// ---------- Old mines from USGS MRDS (by square) ----------
+// USGS Mineral Resources Data System: past and current producing mines. Shown on the map as history markers only.
+const MRDS = 'https://energy.usgs.gov/arcgis/rest/services/Hosted/Mineral_Resource_Data_System/FeatureServer/0/query';
+const COMMODITY = { PB: 'lead', ZN: 'zinc', CU: 'copper', FE: 'iron', BA: 'barite', AG: 'silver', AU: 'gold', CO: 'cobalt', NI: 'nickel', MN: 'manganese',
+  CLY: 'clay', COA: 'coal', SDG: 'sand and gravel', STN: 'stone', LST: 'limestone', DOL: 'dolomite', SIL: 'silica', TRP: 'tripoli', W: 'tungsten', MO: 'molybdenum' };
+async function mines([w, s, e, n]) {
+  const out = [];
+  for (let offset = 0; offset < 6000; offset += 2000) {
+    const q = new URLSearchParams({
+      where: "dev_stat IN ('Past Producer','Producer')", geometry: `${w},${s},${e},${n}`, geometryType: 'esriGeometryEnvelope', inSR: '4326',
+      spatialRel: 'esriSpatialRelIntersects', outFields: 'site_name,dep_id,dev_stat,code_list', returnGeometry: 'true', outSR: '4326',
+      orderByFields: 'dep_id', resultOffset: String(offset), resultRecordCount: '2000', f: 'json'
+    });
+    const j = await getJson(`${MRDS}?${q}`);
+    const feats = j.features || [];
+    for (const f of feats) {
+      const a = f.attributes || {}, g = f.geometry || {}, lat = Number(g.y), lng = Number(g.x);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+      const codes = String(a.code_list || '').split(/[\s,;]+/).map((c) => COMMODITY[c.toUpperCase()]).filter(Boolean);
+      const id = /^\d{1,9}$/.test(String(a.dep_id || '')) ? String(a.dep_id) : null;
+      out.push({ n: String(a.site_name || '').slice(0, 100) || null, s: a.dev_stat === 'Producer' ? 'producer' : 'past',
+        m: [...new Set(codes)].slice(0, 4), id, p: [r5(lat), r5(lng)] });
+    }
+    if (!j.exceededTransferLimit || !feats.length) break;
+  }
+  return { mines: out };
+}
+
 const SOURCES = {
   fstrails: { run: fsTrails, days: 7 },
+  mines: { run: mines, days: 7 },
   // live sources cover the whole state at once (no squares) and are only kept a few minutes
   closures: { run: closures, whole: true, minutes: 10 },
   fires: { run: fires, whole: true, minutes: 15 },
   rivers: { run: rivers, whole: true, minutes: 15 },
   camping: { run: camping, whole: true, minutes: 1440 },
+  mdc: { run: mdc, whole: true, minutes: 1440 },
 };
 
 module.exports = async (req, res) => {
