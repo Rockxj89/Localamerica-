@@ -911,7 +911,7 @@ const firePop = (n, ac, pc, d) => '<div class="pop"><h3>' + esc(n || 'Wildfire')
   + (ac != null ? '<div class="big">' + nf(Math.round(ac)) + ' acres</div>' : '')
   + (pc != null ? '<div>' + esc(pc) + '% contained</div>' : '')
   + (d ? '<div class="small">Found ' + esc(when(d)) + '</div>' : '')
-  + '<div class="small">Source: NIFC. Stay clear and follow local orders.</div>' + (firesAt ? '<div class="small">Checked ' + esc(ago(firesAt)) + '</div>' : '') + '</div>';
+  + '<div class="small">Source: NIFC. Stay clear and follow local orders.</div>' + (firesAt ? '<div class="small">Checked ' + esc(when(firesAt)) + '</div>' : '') + '</div>';
 let firesAt = 0;
 const fires = liveLayer('fires', (g, d, first) => {
   firesAt = d.at;
