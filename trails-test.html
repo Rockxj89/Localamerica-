@@ -34,6 +34,8 @@
   #map.leaflet-container { background: #1c1917; } /* dark, not gray, while pictures load */
   /* Fade the base map so the trails stand out */
   .base-topo { filter: saturate(.35) brightness(1.06) contrast(.9); }
+  /* Satellite photo a little darker and softer, so the gray roads and white names read clearly */
+  .sat { filter: brightness(.8) saturate(.8) contrast(1.05); }
   #find { display: none; }
   body:not(.locked) header { right: 8px; }
   body:not(.locked) header a { flex: none; }
@@ -50,10 +52,10 @@
   .key { position: absolute; left: 10px; right: 76px; bottom: calc(56px + env(safe-area-inset-bottom)); z-index: 1000; max-width: 420px; background: rgba(17,17,17,.86); color: var(--tan); border-radius: 14px; box-shadow: 0 2px 10px rgba(0,0,0,.35); padding: 8px 12px; font-size: 13px; display: flex; gap: 6px 14px; flex-wrap: wrap; pointer-events: none; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
   .key span { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
   .key i { display: inline-block; width: 22px; height: 6px; background: var(--gold); border: 2px solid #111; border-radius: 4px; box-shadow: 0 0 0 1px rgba(255,255,255,.45); }
-  .key i.dirt { height: 2px; background: #e7e5e4; opacity: .7; border: 0; border-radius: 0; box-shadow: none; }
+  .key i.dirt { height: 3px; background: #c4c4c8; border: 1px solid #27272a; box-shadow: none; }
   .key i.topo { height: 0; background: none; border: 0; border-top: 2px solid #c98a4e; border-radius: 0; box-shadow: none; }
   .key i.land { width: 16px; height: 12px; background: rgba(74,222,128,.35); border: 2px solid #bbf7d0; border-radius: 3px; box-shadow: none; }
-  .key i.hwy { height: 7px; background: #fff; border: 2px solid #111; box-shadow: none; }
+  .key i.hwy { height: 5px; background: #d4d4d8; border: 1px solid #27272a; box-shadow: none; }
   .key i.pin { width: 12px; height: 12px; border: 2px solid var(--tan); border-radius: 50% 50% 50% 0; transform: rotate(-45deg); background: #111; box-shadow: none; }
   .fab { position: absolute; right: 12px; z-index: 1000; width: 54px; height: 54px; border-radius: 16px; border: 1px solid rgba(245,230,200,.18); background: rgba(17,17,17,.88); box-shadow: 0 2px 10px rgba(0,0,0,.4); font-size: 11px; font-weight: 600; color: var(--tan); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: pointer; padding: 0; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
   .fab svg { width: 24px; height: 24px; }
@@ -70,8 +72,8 @@
   .lbl.valley { font-size: 12px; font-style: italic; font-weight: 500; color: #f5f5f4; }
   .lbl.town { font-size: 14px; font-weight: 700; letter-spacing: .02em; }
   .lbl.road { font-size: 11px; font-weight: 700; color: var(--tan); background: rgba(17,17,17,.85); border: 1px solid rgba(245,230,200,.35); border-radius: 6px; padding: 1px 6px; text-shadow: none; }
-  .lbl.shield { font-size: 12px; font-weight: 800; color: #111; background: #fff; border: 2px solid #111; border-radius: 6px; padding: 1px 6px; text-shadow: none; box-shadow: 0 1px 3px rgba(0,0,0,.6); letter-spacing: .01em; }
-  .lbl.shield.us { border-radius: 6px 6px 12px 12px; }
+  .lbl.shield { font-size: 11px; font-weight: 700; color: #27272a; background: #e4e4e7; border: 1.5px solid #3f3f46; border-radius: 999px; min-width: 22px; height: 22px; line-height: 19px; padding: 0 5px; box-sizing: border-box; text-shadow: none; box-shadow: 0 1px 2px rgba(0,0,0,.5); }
+  .lbl.shield.us { background: #fff; }
   /* Brighten the brown topo lines so they show on the dark satellite photo */
   /* Topo lines: thin copper-brown, so they never look like the cream dirt roads */
   .contours { filter: brightness(1.05) saturate(1.15); opacity: .8; }
@@ -196,7 +198,7 @@
 </button>
 <button class="mini" id="key-btn" type="button" aria-expanded="false" aria-label="Show the map key">Key</button>
 <button class="mini" id="cred-btn" type="button" aria-expanded="false" aria-label="Show map credits">i</button>
-<div class="key"><span><i class="hwy"></i>Highway</span><span><i></i>Open to drive</span><span><i class="dirt"></i>Dirt road, not checked</span><span><i class="topo"></i>Topo line</span><span><i class="land"></i>Public land</span><span><i class="pin"></i>Local America place</span><span class="k-trail"><i class="easy"></i>Easy trail</span><span class="k-trail"><i class="mod"></i>Moderate</span><span class="k-trail"><i class="hard"></i>Hard</span><span class="k-trail"><i class="unk"></i>Not rated</span></div>
+<div class="key"><span><i class="hwy"></i>Highway</span><span><i></i>Open to drive</span><span><i class="dirt"></i>Other roads</span><span><i class="topo"></i>Topo line</span><span><i class="land"></i>Public land</span><span><i class="pin"></i>Local America place</span><span class="k-trail"><i class="easy"></i>Easy trail</span><span class="k-trail"><i class="mod"></i>Moderate</span><span class="k-trail"><i class="hard"></i>Hard</span><span class="k-trail"><i class="unk"></i>Not rated</span></div>
 <div id="trip" role="dialog" aria-label="Trips" aria-hidden="true"><div class="grab"></div><div class="top"><h2 id="trip-title">Trips</h2><button class="close" type="button">Done</button></div><div id="trip-body"></div></div>
 <div id="planbar" hidden><div class="pb-top"><b id="pb-sum">Tap the map to add stops</b><button class="tbtn" id="pb-x" type="button">Close</button></div><div id="pb-modes"></div><div class="tbtns"><button class="tbtn" id="pb-undo" type="button">Undo</button><button class="tbtn" id="pb-clear" type="button">Clear</button><button class="tbtn" id="pb-share" type="button">Share</button><button class="tbtn pri" id="pb-save" type="button">Save</button></div><div class="pb-name" hidden><input id="pb-input" type="text" maxlength="80" placeholder="Name this route" aria-label="Route name"><button class="tbtn pri" id="pb-ok" type="button">Save</button></div><small>Tap a stop to take it out, or drag it to move it. Routes follow roads and trails in OpenStreetMap (routing by FOSSGIS Valhalla). <a href="https://www.openstreetmap.org/fixthemap" target="_blank" rel="noopener">Fix the map</a></small></div>
 <div id="panel" role="dialog" aria-label="Map layers" aria-hidden="true"><div class="grab"></div><div class="top"><h2>Layers</h2><button class="close" type="button">Done</button></div><div id="panel-body"></div></div>
@@ -312,12 +314,12 @@ const topo = L.tileLayer('https://basemap.nationalmap.gov/arcgis/rest/services/U
   maxNativeZoom: 16, maxZoom: 19, className: 'base-topo', keepBuffer: 4, attribution: 'Base map: USGS The National Map'
 });
 const imagery = L.tileLayer('https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/{z}/{y}/{x}', {
-  maxNativeZoom: 16, maxZoom: 19, zIndex: 1, keepBuffer: 4, attribution: 'Base map: USGS The National Map'
+  maxNativeZoom: 16, maxZoom: 19, zIndex: 1, keepBuffer: 4, className: 'sat', attribution: 'Base map: USGS The National Map'
 }).addTo(map);
 // A rough copy of the same photos underneath, from a few big squares, so zooming never shows empty gray squares
 // while the sharp ones load.
 const backstop = L.tileLayer('https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/{z}/{y}/{x}', {
-  maxNativeZoom: 10, maxZoom: 16, zIndex: 0, keepBuffer: 1
+  maxNativeZoom: 10, maxZoom: 16, zIndex: 0, keepBuffer: 1, className: 'sat'
 }).addTo(map);
 
 // Close up, the cached satellite above gets blurry (it stops at about 2.4 m per pixel).
@@ -331,7 +333,7 @@ const ArcExport = L.TileLayer.extend({
     return this._base + '&bbox=' + bbox;
   }
 });
-const sharp = new ArcExport('', { minZoom: 14, maxNativeZoom: 18, maxZoom: 19, zIndex: 2, tileSize: 256, keepBuffer: 4, updateWhenZooming: false });
+const sharp = new ArcExport('', { minZoom: 14, maxNativeZoom: 18, maxZoom: 19, zIndex: 2, tileSize: 256, keepBuffer: 4, updateWhenZooming: false, className: 'sat' });
 sharp._base = 'https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer/exportImage?f=image&format=jpg&bboxSR=3857&imageSR=3857&size=512,512&renderingRule=' + encodeURIComponent('{"rasterFunction":"NaturalColor"}');
 sharp.addTo(map);
 const contours = new ArcExport('', { minZoom: 11, maxZoom: 19, zIndex: 5, className: 'contours', keepBuffer: 4, updateWhenZooming: false });
@@ -572,9 +574,10 @@ async function gunzipJson(bytes) {
   return JSON.parse(await new Response(s).text());
 }
 function drawDirt(fc) {
-  // plain thin road line (no dark edge or glow), so only trails look like trails
+  // same plain gray road style as every other road, so only trails look like trails
+  L.geoJSON(fc, { interactive: false, style: () => ({ renderer, color: '#27272a', weight: 4, opacity: 0.6, lineCap: 'round', lineJoin: 'round' }) }).addTo(map);
   L.geoJSON(fc, {
-    style: () => ({ renderer, color: '#e7e5e4', weight: 2, opacity: 0.7, lineCap: 'round', lineJoin: 'round' }),
+    style: () => ({ renderer, color: '#c4c4c8', weight: 2, opacity: 1, lineCap: 'round', lineJoin: 'round' }),
     onEachFeature: (f, layer) => {
       const p = f.properties;
       layer.bindPopup(() => `<div class="pop"><h3>${esc(p.n || DIRT_KINDS[p.k])}</h3><div class="big">${esc(DIRT_KINDS[p.k])} · ${miles(Number(p.mi)).replace(' mi', ' miles')}</div>${placeAndYou(layer.getLatLngs())}
@@ -660,29 +663,31 @@ function mainQuery(layer, b, z) {
   const url = `${ROADS}${layer}/query?f=json&where=1%3D1&geometry=${g}&geometryType=esriGeometryEnvelope&inSR=4326&outSR=4326&spatialRel=esriSpatialRelIntersects&outFields=name,interstate,us_route,state_route&returnGeometry=true&maxAllowableOffset=${off.toFixed(6)}&geometryPrecision=5&resultRecordCount=2000`;
   const p = fetch(url).then((r) => r.json()).then((j) => { if (j.error) throw new Error('roads'); return j.features || []; }).catch(() => { roadCache.delete(key); return []; });
   roadCache.set(key, p);
-  if (roadCache.size > 40) roadCache.delete(roadCache.keys().next().value);
+  if (roadCache.size > 80) roadCache.delete(roadCache.keys().next().value);
   return p;
 }
 // "US 60", "I-44", "Hwy 76", "Rte CC" from the route fields
 function shieldOf(a) {
   const first = (v) => String(v || '').split(',').map((x) => x.trim().replace(/^(I-|I |US |MO |SR )/i, '')).find((x) => x && !/^(bus|byp|alt|spur|loop)$/i.test(x)) || '';
   const i = first(a.interstate), u = first(a.us_route), s = first(a.state_route);
-  if (i) return { text: 'I-' + i, cls: 'us', rank: 3 };
-  if (u) return { text: 'US ' + u, cls: 'us', rank: 2 };
-  if (s) return { text: (/^\d+$/.test(s) ? 'Hwy ' : 'Rte ') + s, cls: '', rank: 1 };
+  if (i) return { text: 'I-' + i, short: i, cls: 'us', rank: 3 };
+  if (u) return { text: 'US ' + u, short: u, cls: 'us', rank: 2 };
+  if (s) return { text: (/^\d+$/.test(s) ? 'Hwy ' : 'Rte ') + s, short: s, cls: '', rank: 1 };
   return null;
 }
 async function drawMain() {
   const run = ++mainRun, z = map.getZoom();
   if (z < 8) { mainLayer.clearLayers(); mainLabels = []; mainDrawn = ''; return; }
   const b = map.getBounds().pad(0.15);
-  const layers = [29, 30].concat(z >= 10 ? [31] : []);
+  // 29 highways, 30 secondary highways, 31 county connecting roads, 33 ramps, 32 local roads and town streets
+  const layers = [29, 30].concat(z >= 10 ? [31, 33] : [], z >= 12 ? [32] : []);
   // same downloads as what is already drawn: nothing to redraw
   const sig = layers.map((l) => mainQuery(l, b, z)), sigKey = z + '|' + [...roadCache.keys()].filter((k) => sig.includes(roadCache.get(k))).join(';');
   if (sigKey === mainDrawn) return;
   // draw each kind of road as soon as it arrives (the state routes can take a few seconds)
   const sets = layers.map(() => null);
   await Promise.all(sig.map((p, i) => p.then((fs) => {
+    fs.forEach((f) => { f._lyr = layers[i]; });
     sets[i] = fs;
     if (run !== mainRun) return;
     try { renderMain([].concat(...sets.filter(Boolean)), z); } catch (e) { return; }
@@ -690,22 +695,27 @@ async function drawMain() {
   })));
 }
 function renderMain(feats, z) {
-  const big = z >= 12, round = { lineCap: 'round', lineJoin: 'round' };
+  const round = { lineCap: 'round', lineJoin: 'round' }, close = z >= 14 ? 1 : z >= 12 ? 0.8 : 0.6;
   mainLayer.clearLayers();
   const labels = [];
-  // all dark edges first, then the white cores, so crossings look clean
+  // Every road in one gray style with a thin dark edge; highways only a little wider.
+  // Smaller roads first so highways draw on top; all dark edges first, then the gray cores, so crossings look clean.
+  const size = (x) => (x.sh || x.lyr === 29 ? 4.5 : x.lyr === 30 || x.lyr === 31 ? 3.5 : 2.5) * close;
   const lines = feats.map((f) => {
     const sh = shieldOf(f.attributes || {});
     const ll = ((f.geometry && f.geometry.paths) || []).map((path) => path.map(([x, y]) => [y, x])).filter((p) => p.length > 1);
-    return { f, sh, ll, w: (sh && sh.rank >= 2 ? 1.4 : 1) * (big ? 5 : 3.5) };
-  }).filter((x) => x.ll.length);
-  lines.forEach((x) => L.polyline(x.ll, { renderer, color: '#111', weight: x.w + 4, opacity: 0.9, interactive: false, ...round }).addTo(mainLayer));
+    const x = { f, sh, ll, lyr: f._lyr };
+    x.w = size(x);
+    return x;
+  }).filter((x) => x.ll.length).sort((a, b) => a.w - b.w);
+  lines.forEach((x) => L.polyline(x.ll, { renderer, color: '#27272a', weight: x.w + 2, opacity: 0.85, interactive: false, ...round }).addTo(mainLayer));
   lines.forEach((x) => {
-    const name = (x.f.attributes && x.f.attributes.name) || (x.sh && x.sh.text) || 'Highway';
-    L.polyline(x.ll, { renderer, color: '#ffffff', weight: x.w, opacity: 1, ...round })
-      .bindPopup(() => `<div class="pop"><h3>${esc(name)}</h3><div class="big">Paved highway${x.sh ? ' · ' + esc(x.sh.text) : ''}</div><div class="small">Road map: USGS The National Map.</div></div>`)
+    const hwy = !!x.sh || x.lyr === 29 || x.lyr === 30;
+    const name = (x.f.attributes && x.f.attributes.name) || (x.sh && x.sh.text) || (hwy ? 'Highway' : 'Road');
+    L.polyline(x.ll, { renderer, color: hwy ? '#d4d4d8' : '#c4c4c8', weight: x.w, opacity: 1, ...round })
+      .bindPopup(() => `<div class="pop"><h3>${esc(name)}</h3><div class="big">${hwy ? 'Paved highway' : 'Road'}${x.sh ? ' · ' + esc(x.sh.text) : ''}</div><div class="small">Road map: USGS The National Map.</div></div>`)
       .addTo(mainLayer);
-    if (x.sh) labels.push({ text: x.sh.text, cls: x.sh.cls, rank: x.sh.rank, ll: x.ll });
+    if (x.sh) labels.push({ text: x.sh.short, cls: x.sh.cls, rank: x.sh.rank, ll: x.ll });
   });
   mainLabels = labels;
   if (map.hasLayer(fsLayer)) { fsLayer.remove(); fsLayer.addTo(map); }
@@ -763,7 +773,7 @@ async function drawLabels() {
     if (on.length) items.push({ kind: 'shield' + (m.cls ? ' ' + m.cls : ''), name: m.text, ll: L.latLng(on[Math.floor(on.length / 2)]), pri: 2.7 + m.rank / 10 + on.length / 1e6 });
   });
   const ptsOf = (f) => (f.geometry && (f.geometry.points || (f.geometry.x != null ? [[f.geometry.x, f.geometry.y]] : null))) || [];
-  towns.forEach((f) => { if (!f.attributes.gaz_name || !ptsOf(f).length) return; const pt = ptsOf(f)[0]; items.push({ kind: 'town', name: f.attributes.gaz_name, ll: L.latLng(pt[1], pt[0]), pri: 3 }); });
+  towns.forEach((f) => { if (!f.attributes.gaz_name || !ptsOf(f).length || /^(City|Town|Village) of /i.test(f.attributes.gaz_name)) return; const pt = ptsOf(f)[0]; items.push({ kind: 'town', name: f.attributes.gaz_name, ll: L.latLng(pt[1], pt[0]), pri: 3 }); });
   if (z >= 13) roadLabels.forEach((r) => { if (b.contains(r.ll) && r.text) items.push({ kind: 'road', name: r.text, ll: r.ll, pri: 2 }); });
   lands.forEach((f) => {
     const pts = ptsOf(f), c = f.attributes.gaz_featureclass;
