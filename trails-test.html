@@ -313,17 +313,22 @@ const renderer = L.canvas({ tolerance: 12, padding: 0.5 }); // draws half a scre
 const topo = L.tileLayer('https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{z}/{y}/{x}', {
   maxNativeZoom: 16, maxZoom: 19, className: 'base-topo', keepBuffer: 4, attribution: 'Base map: USGS The National Map'
 });
-const imagery = L.tileLayer('https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/{z}/{y}/{x}', {
-  maxNativeZoom: 16, maxZoom: 19, zIndex: 1, keepBuffer: 4, className: 'sat', attribution: 'Base map: USGS The National Map'
-}).addTo(map);
+// On sharp phone screens (2 or 3 screen dots per pixel) each photo square is drawn half size, one zoom step closer,
+// so the picture has twice the detail. These saved squares come back fast (about a tenth of a second each).
+const HI_DPI = (window.devicePixelRatio || 1) >= 1.5;
+const imagery = L.tileLayer('https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/{z}/{y}/{x}', HI_DPI
+  ? { tileSize: 128, zoomOffset: 1, maxNativeZoom: 15, maxZoom: 19, zIndex: 1, keepBuffer: 3, className: 'sat', attribution: 'Base map: USGS The National Map' }
+  : { maxNativeZoom: 16, maxZoom: 19, zIndex: 1, keepBuffer: 4, className: 'sat', attribution: 'Base map: USGS The National Map' }
+).addTo(map);
 // A rough copy of the same photos underneath, from a few big squares, so zooming never shows empty gray squares
 // while the sharp ones load.
 const backstop = L.tileLayer('https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/{z}/{y}/{x}', {
   maxNativeZoom: 10, maxZoom: 16, zIndex: 0, keepBuffer: 1, className: 'sat'
 }).addTo(map);
 
-// Close up, the cached satellite above gets blurry (it stops at about 2.4 m per pixel).
-// From zoom 14 the full-detail aerial photos (USDA NAIP, about 0.6 m per pixel) are drawn on top, straight from USGS.
+// Close up, the saved satellite squares above run out of detail (they stop at about 2.4 m per pixel).
+// From zoom 16 the full-detail aerial photos (USDA NAIP, about 0.6 m per pixel) are drawn on top, straight from USGS.
+// These are made to order and take 1 to 2 seconds a square, so they only start where the saved ones run out.
 // Topo lines: USGS elevation contours (brown lines with heights), drawn over the satellite from zoom 11.
 const MERC = 20037508.342789244;
 const ArcExport = L.TileLayer.extend({
@@ -333,7 +338,7 @@ const ArcExport = L.TileLayer.extend({
     return this._base + '&bbox=' + bbox;
   }
 });
-const sharp = new ArcExport('', { minZoom: 14, maxNativeZoom: 18, maxZoom: 19, zIndex: 2, tileSize: 256, keepBuffer: 4, updateWhenZooming: false, className: 'sat' });
+const sharp = new ArcExport('', { minZoom: 16, maxNativeZoom: 18, maxZoom: 19, zIndex: 2, tileSize: 256, keepBuffer: 4, updateWhenZooming: false, className: 'sat' });
 sharp._base = 'https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer/exportImage?f=image&format=jpg&bboxSR=3857&imageSR=3857&size=512,512&renderingRule=' + encodeURIComponent('{"rasterFunction":"NaturalColor"}');
 sharp.addTo(map);
 const contours = new ArcExport('', { minZoom: 11, maxZoom: 19, zIndex: 5, className: 'contours', keepBuffer: 4, updateWhenZooming: false });
@@ -575,7 +580,8 @@ async function gunzipJson(bytes) {
 }
 function drawDirt(fc) {
   // same plain gray road style as every other road, so only trails look like trails
-  L.geoJSON(fc, { interactive: false, style: () => ({ renderer, color: '#27272a', weight: 4.5, opacity: 0.7, lineCap: 'round', lineJoin: 'round' }) }).addTo(map);
+  L.geoJSON(fc, { interactive: false, style: () => ({ renderer, color: '#27272a', weight: 4.5, opacity: 0.7, lineCap: 'round', lineJoin: 'round' }) }).addTo(map)
+    .eachLayer((l) => l.bringToBack());
   L.geoJSON(fc, {
     style: () => ({ renderer, color: '#b9bdc4', weight: 2.5, opacity: 1, lineCap: 'round', lineJoin: 'round' }),
     onEachFeature: (f, layer) => {
@@ -585,7 +591,7 @@ function drawDirt(fc) {
     }
   }).addTo(map);
   // keep the highways, then the Forest Service roads, drawn on top
-  if (map.hasLayer(mainLayer)) { mainLayer.remove(); mainLayer.addTo(map); }
+  roadHigh.eachLayer((l) => l.bringToFront());
   if (map.hasLayer(fsLayer)) { fsLayer.remove(); fsLayer.addTo(map); }
 }
 async function loadDirt() {
@@ -615,7 +621,7 @@ async function loadDirt() {
 }
 
 Promise.allSettled([getJson(DATA + 'fs-roads.json'), getJson(DATA + 'public-land.json')]).then(([fs, land]) => {
-  if (land.status === 'fulfilled') { drawLand(land.value); [mainLayer, fsLayer].forEach((g) => { if (map.hasLayer(g)) { g.remove(); g.addTo(map); } }); }
+  if (land.status === 'fulfilled') { drawLand(land.value); roadLow.eachLayer((l) => l.bringToFront()); roadHigh.eachLayer((l) => l.bringToFront()); if (map.hasLayer(fsLayer)) { fsLayer.remove(); fsLayer.addTo(map); } }
   else note("Couldn't load the public land. Pull down to reload the page.", 6000);
   // dirt roads start after the land so they draw above it, and load more as the map moves
   loadDirt();
@@ -645,103 +651,156 @@ function drawFs() {
   drawLabels();
 }
 
-// ---------- Highways and main paved roads ----------
-// Interstates, US highways and Missouri state routes (numbered and lettered, like Hwy 76 or Rte CC) from the
-// USGS road map, fetched for the area on screen. Drawn white with a dark edge so they stand apart from the
-// gold Forest Service roads and the thin gray dirt roads.
-const ROADS = 'https://carto.nationalmap.gov/arcgis/rest/services/transportation/MapServer/';
-const roadCache = new Map();
-const mainLayer = L.layerGroup().addTo(map);
-let mainLabels = [], mainRun = 0, mainDrawn = '';
-function mainQuery(layer, b, z) {
-  // snap the box out to a grid so small pans reuse the same download
-  const step = z < 10 ? 0.5 : z < 12 ? 0.25 : 0.1, dn = (v) => Math.floor(v / step) * step, up = (v) => Math.ceil(v / step) * step;
-  const g = [dn(b.getWest()), dn(b.getSouth()), up(b.getEast()), up(b.getNorth())].map((v) => v.toFixed(2)).join(',');
-  const key = layer + '|' + z + '|' + g;
-  if (roadCache.has(key)) return roadCache.get(key);
-  const off = (360 / (256 * 2 ** z)) * 1.5; // simplify to about a pixel and a half
-  const url = `${ROADS}${layer}/query?f=json&where=1%3D1&geometry=${g}&geometryType=esriGeometryEnvelope&inSR=4326&outSR=4326&spatialRel=esriSpatialRelIntersects&outFields=name,interstate,us_route,state_route&returnGeometry=true&maxAllowableOffset=${off.toFixed(6)}&geometryPrecision=5&resultRecordCount=2000`;
-  const p = fetch(url).then((r) => r.json()).then((j) => { if (j.error) throw new Error('roads'); return j.features || []; }).catch(() => { roadCache.delete(key); return []; });
-  roadCache.set(key, p);
-  if (roadCache.size > 80) roadCache.delete(roadCache.keys().next().value);
-  return p;
+// ---------- Paved roads: highways, county roads and town streets ----------
+// All of Missouri's paved roads (OpenStreetMap data) live in two files on this site, cut into squares.
+// The map reads only the squares on screen with small range requests, so roads show up in a blink
+// instead of waiting on a slow government server every time the map moves.
+//   roads-mo-main.bin: highways only, simplified, for zoomed out (zoom 8-11)
+//   roads-mo-all.bin: every paved road, town streets too, full detail (zoom 12 and closer)
+// Dirt and gravel roads stay in their own file (dirt-roads-mo.bin).
+const ROAD_FILES = { main: '/trails-data/roads-mo-main.bin?v=1', all: '/trails-data/roads-mo-all.bin?v=1' };
+const roadFile = { main: null, all: null };
+const roadCells = new Map(); // "set|i_j" -> { set, cas: [], low: [], high: [], shields: [] } or a promise while loading
+const roadRows = new Map(); // downloaded squares, kept so panning back needs no new download
+const roadCase = L.layerGroup().addTo(map), roadLow = L.layerGroup().addTo(map), roadHigh = L.layerGroup().addTo(map);
+const mainLayer = roadHigh; // kept so other code can find the highways
+let mainLabels = [], mainRun = 0;
+async function rangeOf(f, from, to) {
+  if (f.whole) return f.whole.slice(from, to + 1);
+  const r = await fetch(f.url, { headers: { Range: `bytes=${from}-${to}` } });
+  if (!r.ok) throw new Error(r.status);
+  const b = new Uint8Array(await r.arrayBuffer());
+  if (r.status === 206) return b;
+  f.whole = b; // server sent the whole file; cut pieces from it from now on
+  return b.slice(from, to + 1);
 }
-// "US 60", "I-44", "Hwy 76", "Rte CC" from the route fields
-function shieldOf(a) {
-  const first = (v) => String(v || '').split(',').map((x) => x.trim().replace(/^(I-|I |US |MO |SR )/i, '')).find((x) => x && !/^(bus|byp|alt|spur|loop)$/i.test(x)) || '';
-  const i = first(a.interstate), u = first(a.us_route), s = first(a.state_route);
-  if (i) return { text: 'I-' + i, short: i, cls: 'us', rank: 3 };
-  if (u) return { text: 'US ' + u, short: u, cls: 'us', rank: 2 };
-  if (s) return { text: (/^\d+$/.test(s) ? 'Hwy ' : 'Rte ') + s, short: s, cls: '', rank: 1 };
-  return null;
+function openRoadFile(set) {
+  if (!roadFile[set]) {
+    const f = { url: ROAD_FILES[set], whole: null };
+    roadFile[set] = (async () => {
+      let head = await rangeOf(f, 0, 65535);
+      const len = +new TextDecoder().decode(head.slice(0, 10));
+      if (!len) throw new Error('bad file');
+      if (10 + len > head.length) head = await rangeOf(f, 0, 9 + len);
+      f.idx = JSON.parse(new TextDecoder().decode(head.slice(10, 10 + len)));
+      f.start = 10 + len;
+      return f;
+    })().catch((e) => { roadFile[set] = null; throw e; });
+  }
+  return roadFile[set];
+}
+// "I-44", "US 60", "Hwy 76", "Rte CC" -> the number or letters for the small round badge
+function shieldOf(text) {
+  if (!text) return null;
+  const m = /^(I-|US |Hwy |Rte )(.+)$/.exec(text);
+  if (!m) return null;
+  return { text, short: m[2], cls: m[1] === 'I-' || m[1] === 'US ' ? 'us' : '', rank: { 'I-': 3, 'US ': 2, 'Hwy ': 1, 'Rte ': 1 }[m[1]] };
+}
+// one line from the file: [x0, y0, dx, dy, ...] in 1/100000 degrees -> Leaflet points
+function unpack(a) {
+  const out = []; let x = 0, y = 0;
+  for (let i = 0; i < a.length; i += 2) { x += a[i]; y += a[i + 1]; out.push([y / 1e5, x / 1e5]); }
+  return out;
+}
+const ROAD_KIND = { 1: 'Freeway', 2: 'Paved highway', 3: 'Paved road', 4: 'Paved road' };
+function roadWidth(kind, z) {
+  const close = z >= 13 ? 1 : z >= 12 ? 0.8 : 0.6;
+  return (kind === 1 ? 4.5 : kind === 2 ? 3.5 : kind === 3 ? 3 : 2.5) * close;
+}
+function buildCell(set, rows, z) {
+  const cell = { set, cas: [], low: [], high: [], shields: [] };
+  const round = { lineCap: 'round', lineJoin: 'round' };
+  for (const [kind, name, sh, parts] of rows) {
+    if (set === 'main' && kind === 3 && z < 10) continue;
+    const ll = parts.map(unpack), w = roadWidth(kind, z), hwy = kind <= 2 || !!sh;
+    cell.cas.push(L.polyline(ll, { renderer, color: '#27272a', weight: w + 2, opacity: 0.85, interactive: false, ...round }));
+    const s = shieldOf(sh);
+    const title = name || (s && s.text) || (hwy ? 'Highway' : 'Road');
+    const line = L.polyline(ll, { renderer, color: hwy ? '#cfd3d9' : '#b9bdc4', weight: w, opacity: 1, ...round })
+      .bindPopup(() => `<div class="pop"><h3>${esc(title)}</h3><div class="big">${ROAD_KIND[kind]}${s && s.text !== title ? ' · ' + esc(s.text) : ''}</div><div class="small">Map data © OpenStreetMap contributors.</div></div>`);
+    (hwy ? cell.high : cell.low).push(line);
+    if (s) cell.shields.push({ text: s.short, cls: s.cls, rank: s.rank, ll });
+  }
+  cell.z = z;
+  return cell;
+}
+// Keeps crossings clean: every dark edge under every gray line, highways over small roads, Forest Service roads on top
+function restackRoads(newCas) {
+  newCas.forEach((l) => l.bringToBack());
+  roadHigh.eachLayer((l) => l.bringToFront());
+  if (map.hasLayer(fsLayer)) { fsLayer.remove(); fsLayer.addTo(map); }
+}
+function showCell(c) {
+  c.cas.forEach((l) => roadCase.addLayer(l));
+  c.low.forEach((l) => roadLow.addLayer(l));
+  c.high.forEach((l) => roadHigh.addLayer(l));
+  c.shown = true;
+}
+function hideCell(c) {
+  c.cas.forEach((l) => roadCase.removeLayer(l));
+  c.low.forEach((l) => roadLow.removeLayer(l));
+  c.high.forEach((l) => roadHigh.removeLayer(l));
+  c.shown = false;
 }
 async function drawMain() {
   const run = ++mainRun, z = map.getZoom();
-  if (z < 8) { mainLayer.clearLayers(); mainLabels = []; mainDrawn = ''; return; }
-  const b = map.getBounds().pad(0.15);
-  // 29 highways, 30 secondary highways, 31 county connecting roads, 33 ramps, 32 local roads and town streets
-  const layers = [29, 30].concat(z >= 10 ? [31, 33] : [], z >= 12 ? [32] : []);
-  // same downloads as what is already drawn: nothing to redraw
-  const sig = layers.map((l) => mainQuery(l, b, z)), sigKey = z + '|' + [...roadCache.keys()].filter((k) => sig.includes(roadCache.get(k))).join(';');
-  if (sigKey === mainDrawn) return;
-  // draw each kind of road as soon as it arrives (the state routes can take a few seconds)
-  const sets = layers.map(() => null);
-  await Promise.all(sig.map((p, i) => p.then((fs) => {
-    fs.forEach((f) => { f._lyr = layers[i]; });
-    sets[i] = fs;
-    if (run !== mainRun) return;
-    try { renderMain([].concat(...sets.filter(Boolean)), z); } catch (e) { return; }
-    if (sets.every(Boolean)) mainDrawn = sigKey; else drawLabels();
-  })));
-}
-function renderMain(feats, z) {
-  const round = { lineCap: 'round', lineJoin: 'round' }, close = z >= 13 ? 1 : z >= 12 ? 0.8 : 0.6;
-  mainLayer.clearLayers();
-  const labels = [];
-  // Every road in one gray style with a thin dark edge; highways only a little wider.
-  // Smaller roads first so highways draw on top; all dark edges first, then the gray cores, so crossings look clean.
-  const size = (x) => (x.sh || x.lyr === 29 ? 4.5 : x.lyr === 30 || x.lyr === 31 ? 3.5 : 2.5) * close;
-  const lines = feats.map((f) => {
-    const sh = shieldOf(f.attributes || {});
-    const ll = ((f.geometry && f.geometry.paths) || []).map((path) => path.map(([x, y]) => [y, x])).filter((p) => p.length > 1);
-    const x = { f, sh, ll, lyr: f._lyr };
-    x.w = size(x);
-    return x;
-  }).filter((x) => x.ll.length).sort((a, b) => a.w - b.w);
-  lines.forEach((x) => L.polyline(x.ll, { renderer, color: '#27272a', weight: x.w + 2, opacity: 0.85, interactive: false, ...round }).addTo(mainLayer));
-  lines.forEach((x) => {
-    const hwy = !!x.sh || x.lyr === 29 || x.lyr === 30;
-    const name = (x.f.attributes && x.f.attributes.name) || (x.sh && x.sh.text) || (hwy ? 'Highway' : 'Road');
-    L.polyline(x.ll, { renderer, color: hwy ? '#cfd3d9' : '#b9bdc4', weight: x.w, opacity: 1, ...round })
-      .bindPopup(() => `<div class="pop"><h3>${esc(name)}</h3><div class="big">${hwy ? 'Paved highway' : 'Road'}${x.sh ? ' · ' + esc(x.sh.text) : ''}</div><div class="small">Road map: USGS The National Map.</div></div>`)
-      .addTo(mainLayer);
-    if (x.sh) labels.push({ text: x.sh.short, cls: x.sh.cls, rank: x.sh.rank, ll: x.ll });
-  });
-  mainLabels = labels;
-  if (map.hasLayer(fsLayer)) { fsLayer.remove(); fsLayer.addTo(map); }
+  const set = z >= 12 ? 'all' : z >= 8 ? 'main' : null;
+  let f = null;
+  if (set) { try { f = await openRoadFile(set); } catch (e) { note("Couldn't load the roads. Move the map to try again.", 5000); return; } }
+  if (run !== mainRun) return;
+  const want = new Set();
+  if (f) {
+    const C = f.idx.cell, b = map.getBounds().pad(0.25);
+    for (let i = Math.floor(b.getWest() / C); i <= Math.floor(b.getEast() / C); i++)
+      for (let j = Math.floor(b.getSouth() / C); j <= Math.floor(b.getNorth() / C); j++)
+        if (f.idx.tiles[i + '_' + j]) want.add(set + '|' + i + '_' + j);
+  }
+  // take away squares that are now far off screen, or from the other file, or drawn for another zoom width
+  for (const [k, c] of roadCells) {
+    if (c instanceof Promise) continue;
+    const widthChanged = c.set === 'main' ? (c.z < 10) !== (z < 10) || roadWidth(2, c.z) !== roadWidth(2, z) : roadWidth(2, c.z) !== roadWidth(2, z);
+    if (!want.has(k) || widthChanged) { if (c.shown) hideCell(c); roadCells.delete(k); }
+  }
+  const newCas = [];
+  await Promise.all([...want].map(async (k) => {
+    let c = roadCells.get(k);
+    if (!c) {
+      const [off, len] = f.idx.tiles[k.split('|')[1]];
+      const rowsP = roadRows.get(k) || rangeOf(f, f.start + off, f.start + off + len - 1).then(gunzipJson);
+      roadRows.delete(k); roadRows.set(k, rowsP);
+      if (roadRows.size > 200) roadRows.delete(roadRows.keys().next().value);
+      rowsP.catch(() => roadRows.delete(k));
+      const p = rowsP.then((rows) => buildCell(set, rows, z));
+      roadCells.set(k, p);
+      try { c = await p; roadCells.set(k, c); } catch (e) { roadCells.delete(k); return; }
+    } else if (c instanceof Promise) { try { c = await c; } catch (e) { return; } }
+    if (run !== mainRun || roadCells.get(k) !== c) return;
+    if (!c.shown) { showCell(c); newCas.push(...c.cas); }
+  }));
+  if (run !== mainRun) return;
+  if (newCas.length) restackRoads(newCas);
+  mainLabels = [];
+  for (const k of want) { const c = roadCells.get(k); if (c && !(c instanceof Promise)) mainLabels.push(...c.shields); }
 }
 
 // ---------- Names on the map ----------
-// Peaks (with height), hollows and towns come from the USGS place-name list (GNIS), fetched for the area on screen.
-// Forest road numbers come from our own Forest Service file. Labels that would overlap are skipped.
+// Peaks (with height), hollows and towns come from the USGS place-name list (GNIS), one small file on this site
+// loaded once, so names show up right away. Forest road numbers come from our own Forest Service file.
+// Labels that would overlap are skipped.
 const roadLabels = [];
 function fsLabel(a, isTrail) {
   const num = a.id ? (isTrail ? 'Trail ' : 'FS ') + a.id : '';
   const name = a.name && a.name.trim() ? titleCase(a.name) : '';
   return name && num && !name.includes(a.id) ? `${name} · ${num}` : (name || num);
 }
-const GNIS = 'https://carto.nationalmap.gov/arcgis/rest/services/geonames/MapServer/';
-const nameCache = new Map(), heightCache = new Map();
+const heightCache = new Map();
 const labelLayer = L.layerGroup().addTo(map);
-async function gnis(layer, where, b) {
-  const g = [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()].map((v) => v.toFixed(3)).join(',');
-  const key = layer + '|' + g;
-  if (nameCache.has(key)) return nameCache.get(key);
-  const url = `${GNIS}${layer}/query?f=json&where=${encodeURIComponent(where)}&geometry=${g}&geometryType=esriGeometryEnvelope&inSR=4326&outSR=4326&outFields=gaz_name,gaz_featureclass&returnGeometry=true&resultRecordCount=300`;
-  const p = fetch(url).then((r) => r.json()).then((j) => { if (j.error) throw new Error('gnis'); return j.features || []; }).catch(() => { nameCache.delete(key); return []; });
-  nameCache.set(key, p);
-  if (nameCache.size > 60) nameCache.delete(nameCache.keys().next().value);
-  return p;
+// Rows: [kind, name, lng, lat]; kind T incorporated town, t other town, p peak, v hollow, r ridge, g gap
+let namesP = null;
+function placeNames() {
+  if (!namesP) namesP = fetch('/trails-data/names-mo.bin?v=1').then((r) => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); })
+    .then((b) => gunzipJson(new Uint8Array(b))).catch(() => { namesP = null; return []; });
+  return namesP;
 }
 function peakHeight(ll) {
   const key = ll.lat.toFixed(5) + ',' + ll.lng.toFixed(5);
@@ -756,10 +815,7 @@ async function drawLabels() {
   const run = ++labelRun, z = map.getZoom();
   if (z < 8) { labelLayer.clearLayers(); return; }
   const b = map.getBounds();
-  const [lands, towns] = await Promise.all([
-    z >= 12 ? gnis(5, "gaz_featureclass IN ('Summit','Valley','Ridge','Gap')", b) : [],
-    z >= 11 ? gnis(1, '1=1', b).then((a) => (z >= 12 ? gnis(3, '1=1', b).then((c) => a.concat(c)) : a)) : []
-  ]);
+  const names = z >= 10 ? (await placeNames()).filter((n) => b.contains([n[3], n[2]])) : [];
   if (run !== labelRun) return;
   const items = [];
   // highway shields: one per route, halfway along the part that is on screen (kept off the edges)
@@ -772,16 +828,14 @@ async function drawLabels() {
     }));
     if (on.length) items.push({ kind: 'shield' + (m.cls ? ' ' + m.cls : ''), name: m.text, ll: L.latLng(on[Math.floor(on.length / 2)]), pri: 2.7 + m.rank / 10 + on.length / 1e6 });
   });
-  const ptsOf = (f) => (f.geometry && (f.geometry.points || (f.geometry.x != null ? [[f.geometry.x, f.geometry.y]] : null))) || [];
-  towns.forEach((f) => { if (!f.attributes.gaz_name || !ptsOf(f).length || /^(City|Town|Village) of /i.test(f.attributes.gaz_name)) return; const pt = ptsOf(f)[0]; items.push({ kind: 'town', name: f.attributes.gaz_name, ll: L.latLng(pt[1], pt[0]), pri: 3 }); });
-  if (z >= 13) roadLabels.forEach((r) => { if (b.contains(r.ll) && r.text) items.push({ kind: 'road', name: r.text, ll: r.ll, pri: 2 }); });
-  lands.forEach((f) => {
-    const pts = ptsOf(f), c = f.attributes.gaz_featureclass;
-    if (!f.attributes.gaz_name || !pts.length) return;
-    const pt = pts.length > 1 ? [(pts[0][0] + pts[1][0]) / 2, (pts[0][1] + pts[1][1]) / 2] : pts[0];
-    if (c !== 'Summit' && z < 13) return;
-    items.push({ kind: c === 'Summit' ? 'peak' : 'valley', name: f.attributes.gaz_name, ll: L.latLng(pt[1], pt[0]), pri: c === 'Summit' ? 2.5 : 0 });
+  const LAND = { p: 'peak', v: 'valley', r: 'valley', g: 'valley' };
+  names.forEach(([k, name, x, y]) => {
+    const ll = L.latLng(y, x);
+    if (k === 'T' || (k === 't' && z >= 12)) items.push({ kind: 'town', name, ll, pri: k === 'T' ? 3 : 2.8 });
+    else if (k === 'p' && z >= 12) items.push({ kind: 'peak', name, ll, pri: 2.5 });
+    else if (LAND[k] && k !== 'p' && z >= 13) items.push({ kind: 'valley', name, ll, pri: 0 });
   });
+  if (z >= 13) roadLabels.forEach((r) => { if (b.contains(r.ll) && r.text) items.push({ kind: 'road', name: r.text, ll: r.ll, pri: 2 }); });
   items.sort((x, y) => y.pri - x.pri);
   const taken = [], seen = new Set(), out = [];
   for (const it of items) {
@@ -805,7 +859,7 @@ async function drawLabels() {
 let labelTimer;
 map.on('moveend', () => { clearTimeout(labelTimer); labelTimer = setTimeout(() => drawMain().finally(drawLabels), 250); });
 setTimeout(() => drawMain().finally(drawLabels), 400);
-map.attributionControl.addAttribution('Names and heights: USGS GNIS, 3DEP; Highways: USGS; Trails: USDA Forest Service, © OpenStreetMap contributors');
+map.attributionControl.addAttribution('Names and heights: USGS GNIS, 3DEP; Trails: USDA Forest Service; Roads: © OpenStreetMap contributors');
 
 // ---------- Hiking, bike and horse trails (off until switched on in Layers) ----------
 // Forest Service trails (Mark Twain National Forest) and OpenStreetMap paths. They load one small
