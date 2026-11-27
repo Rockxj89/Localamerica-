@@ -947,10 +947,11 @@ const closures = liveLayer('closures', (g, d, first) => {
     const fromTo = [a.BEGIN_DESCRIPTION || a.BEG_REF_PT, a.END_DESCRIPTION || a.END_REF_PT].filter((v) => v != null && v !== '');
     const dt = (v) => (typeof v === 'number' ? when(v) : String(v));
     const html = '<div class="pop"><h3>' + esc(road) + (a.DIRECTION ? ' ' + esc(a.DIRECTION) : '') + '</h3>'
-      + '<div class="closed">Closed: ' + esc(CLOSE_KIND[c.k] || 'Closure') + '</div>'
+      + '<div class="closed">Closed: ' + esc(a.TYPE_CODE ? titleCase(a.TYPE_CODE) : (CLOSE_KIND[c.k] || 'Closure')) + '</div>'
       + (a.COUNTY_NAME ? '<div>' + esc(titleCase(a.COUNTY_NAME)) + ' County</div>' : '')
       + (a.RIVER_NAME ? '<div>' + esc(a.RIVER_NAME) + '</div>' : '')
-      + (a.WORK_TYPE ? '<div>' + esc(a.WORK_TYPE) + '</div>' : '')
+      + (a.WORK_TYPE ? '<div>Work zone: ' + esc(titleCase(a.WORK_TYPE)) + '</div>' : '')
+      + (a.START_TIME && a.END_TIME && !(a.START_TIME === '12:00 AM' && a.END_TIME === '12:00 AM') ? '<div class="small">Closed ' + esc(a.START_TIME) + ' to ' + esc(a.END_TIME) + ' each day</div>' : '')
       + (fromTo.length ? '<div class="small">' + esc(fromTo.join(' to ')) + '</div>' : '')
       + (a.EXT_COMMENT ? '<div class="small">' + esc(a.EXT_COMMENT) + '</div>' : '')
       + ((a.START_DATE || a.END_DATE) ? '<div class="small">' + esc([a.START_DATE && 'From ' + dt(a.START_DATE), a.END_DATE && 'until ' + dt(a.END_DATE)].filter(Boolean).join(' ')) + '</div>' : '')
