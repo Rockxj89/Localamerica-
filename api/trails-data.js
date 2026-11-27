@@ -121,12 +121,36 @@ async function rivers() {
   return { at: Date.now(), gauges: [...by.values()].filter((g) => g.ft != null || g.cfs != null) };
 }
 
+// ---------- Forest camping spots, Mark Twain National Forest ----------
+// Forest Service recreation list: dispersed camping spots and campgrounds. Changes rarely, so kept a day.
+const FS_REC = 'https://apps.fs.usda.gov/arcx/rest/services/EDW/EDW_RecreationOpportunities_01/MapServer/0/query';
+async function camping() {
+  const q = new URLSearchParams({
+    where: "forestorgcode='0905' AND markeractivity IN ('Dispersed Camping','Campground Camping')",
+    outFields: 'recareaname,latitude,longitude,openstatus,recareaurl,markeractivity,recareaid', returnGeometry: 'false', resultRecordCount: '1000', f: 'json'
+  });
+  const j = await getJson(`${FS_REC}?${q}`, { timeout: 20000 });
+  const seen = new Set(), out = [];
+  for (const f of j.features || []) {
+    const a = f.attributes || {}, lat = Number(a.latitude), lng = Number(a.longitude);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < 35.9 || lat > 40.7 || lng < -95.8 || lng > -89) continue;
+    const key = (a.recareaid || (a.recareaname + '@' + r5(lat) + ',' + r5(lng))) + '|' + a.markeractivity;
+    if (seen.has(key)) continue; seen.add(key);
+    const url = typeof a.recareaurl === 'string' && /^https:\/\/www\.fs\.usda\.gov\/[\w\/?=&.-]*$/.test(a.recareaurl) ? a.recareaurl : null;
+    out.push({ n: String(a.recareaname || '').slice(0, 100), k: a.markeractivity === 'Dispersed Camping' ? 'dispersed' : 'campground',
+      closed: String(a.openstatus || '').toLowerCase() === 'closed', u: url, p: [r5(lat), r5(lng)] });
+  }
+  if (!out.length) throw new Error('camping: no spots');
+  return { at: Date.now(), spots: out };
+}
+
 const SOURCES = {
   fstrails: { run: fsTrails, days: 7 },
   // live sources cover the whole state at once (no squares) and are only kept a few minutes
   closures: { run: closures, whole: true, minutes: 10 },
   fires: { run: fires, whole: true, minutes: 15 },
   rivers: { run: rivers, whole: true, minutes: 15 },
+  camping: { run: camping, whole: true, minutes: 1440 },
 };
 
 module.exports = async (req, res) => {

@@ -1,5 +1,5 @@
 // Local America service worker: app shell cached, data always fresh
-const CACHE = 'local-america-v8';
+const CACHE = 'local-america-v9';
 const SHELL = ['./', './index.html', './manifest.json', './pixel.js'];
 
 self.addEventListener('install', (event) => {
@@ -43,6 +43,9 @@ self.addEventListener('fetch', (event) => {
 
   // Trails map tiles, aerial photos and topo lines (USGS): the browser's own cache handles these, so they don't pile up on the phone
   if (url.hostname === 'nationalmap.gov' || url.hostname.endsWith('.nationalmap.gov')) return;
+
+  // Weather radar, old topo maps and night lights for the trails map: the browser's own cache handles these too
+  if (['mesonet.agron.iastate.edu', 'historical1.arcgis.com', 'gibs.earthdata.nasa.gov'].includes(url.hostname)) return;
 
   // The video list: always fresh, so new videos show up right away
   if (url.pathname === '/videos.json') return;
