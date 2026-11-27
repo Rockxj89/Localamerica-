@@ -149,7 +149,7 @@ async function camping() {
 const MDC = 'https://gisblue.mdc.mo.gov/arcgis/rest/services/Discover_Nature/MDC_Administrative_Areas/MapServer/4/query';
 async function mdc() {
   const out = [];
-  for (let offset = 0; offset < 6000; offset += 2000) {
+  for (let offset = 0; offset < 6000;) {
     const q = new URLSearchParams({
       where: '1=1', outFields: 'Area_ID,Area_Name,County,Acreage,Sum_Link', returnGeometry: 'true', outSR: '4326',
       orderByFields: 'OBJECTID', resultOffset: String(offset), resultRecordCount: '2000', f: 'json'
@@ -166,6 +166,7 @@ async function mdc() {
       out.push({ n: name, k: /\baccess\b/i.test(name) ? 'access' : 'area', c: String(a.County || '').slice(0, 60) || null,
         ac: Number.isFinite(acres) && acres > 0 ? Math.round(acres) : null, u: url, p: [r5(lat), r5(lng)] });
     }
+    offset += feats.length;
     if (!j.exceededTransferLimit || !feats.length) break;
   }
   if (!out.length) throw new Error('mdc: no areas');
@@ -179,7 +180,7 @@ const COMMODITY = { PB: 'lead', ZN: 'zinc', CU: 'copper', FE: 'iron', BA: 'barit
   CLY: 'clay', COA: 'coal', SDG: 'sand and gravel', STN: 'stone', LST: 'limestone', DOL: 'dolomite', SIL: 'silica', TRP: 'tripoli', W: 'tungsten', MO: 'molybdenum' };
 async function mines([w, s, e, n]) {
   const out = [];
-  for (let offset = 0; offset < 6000; offset += 2000) {
+  for (let offset = 0; offset < 6000;) {
     const q = new URLSearchParams({
       where: "dev_stat IN ('Past Producer','Producer')", geometry: `${w},${s},${e},${n}`, geometryType: 'esriGeometryEnvelope', inSR: '4326',
       spatialRel: 'esriSpatialRelIntersects', outFields: 'site_name,dep_id,dev_stat,code_list', returnGeometry: 'true', outSR: '4326',
@@ -195,6 +196,7 @@ async function mines([w, s, e, n]) {
       out.push({ n: String(a.site_name || '').slice(0, 100) || null, s: a.dev_stat === 'Producer' ? 'producer' : 'past',
         m: [...new Set(codes)].slice(0, 4), id, p: [r5(lat), r5(lng)] });
     }
+    offset += feats.length;
     if (!j.exceededTransferLimit || !feats.length) break;
   }
   return { mines: out };
