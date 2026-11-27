@@ -98,6 +98,7 @@
   .leaflet-control-zoom { display: none; }
   @media (min-width: 700px) { .leaflet-control-zoom { display: block; } }
   .shade { mix-blend-mode: multiply; }
+  .place-ic { width:26px;height:26px;border-radius:50%;background:#fff;border:2px solid #1c1917;box-shadow:0 1px 4px rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;font-size:14px;line-height:1; }
   .camp-ic { width:24px;height:24px;border-radius:6px;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:700; }
 </style>
 </head>
@@ -1012,6 +1013,143 @@ toggle(layerSec, 'camping', 'Forest camping', 'Dispersed camping spots (DC) and 
   if (v) { campLayer.addTo(map); loadCamping(); } else campLayer.remove();
 });
 map.attributionControl.addAttribution('Camping: USDA Forest Service');
+
+// ---------- Places: river accesses, campgrounds, gas, food, springs, waterfalls, caves, cemeteries, old towns, old mines ----------
+// Most places live in one file on our own site (trails-data/places-mo.bin), cut into 0.25 degree squares like the paths file.
+// Each row: [kind, name, lng, lat, extra]. MDC areas come from the MDC list (whole state) and old mines from USGS (by square).
+const PLACES_FILE = '/trails-data/places-mo.bin';
+const PK = {
+  mdc: { ic: '🛶', title: 'River accesses & conservation areas', sub: 'Boat ramps, river accesses and conservation areas from MDC.', z: 9 },
+  camp: { ic: '⛺', title: 'Campgrounds', sub: 'Campgrounds and RV parks, public and private. OpenStreetMap and Overture.', z: 10, name: 'Campground' },
+  gas: { ic: '⛽', title: 'Gas', sub: 'Gas stations and truck stops.', z: 12, name: 'Gas station' },
+  food: { ic: '🍴', title: 'Food', sub: 'Restaurants, fast food and cafes.', z: 12, name: 'Restaurant' },
+  spring: { ic: '💧', title: 'Springs', sub: 'Named and mapped springs. USGS and OpenStreetMap.', z: 11, name: 'Spring' },
+  falls: { ic: '💦', title: 'Waterfalls', sub: 'Waterfalls and named falls. USGS and OpenStreetMap.', z: 11, name: 'Waterfall' },
+  cave: { ic: '🦇', title: 'Caves', sub: 'Cave openings and show caves. Many are closed to protect bats.', z: 11, name: 'Cave' },
+  cem: { ic: '🪦', title: 'Cemeteries', sub: 'Mapped cemeteries, including small family plots.', z: 11, name: 'Cemetery' },
+  ghost: { ic: '🏚️', title: 'Ghost towns', sub: 'Old town sites from USGS records. Little or nothing may be left.', z: 11, name: 'Old town site' },
+  mines: { ic: '⛏️', title: 'Old mines', sub: 'History markers from USGS. Look only: never enter old mines or shafts.', z: 11 },
+};
+const PLACE_NOTE = {
+  camp: 'Call or check their site before you go. Hours, fees and openings change.',
+  gas: 'Hours change. Call ahead in the backcountry, where stations are far apart.',
+  food: 'Hours change. Check before you drive out.',
+  spring: "Don't drink spring water without treating it. Some springs are on private land.",
+  falls: 'Many only run after rain. Some are on private land.',
+  cave: 'Never go in a cave without permission and the right gear. Many caves are closed to protect bats (white-nose syndrome), and many are on private land.',
+  cem: 'Many are on private land. Ask before you visit, and be respectful.',
+  ghost: 'Often on private land now. Ask before you walk in.',
+};
+const placeLayers = {}, placeOn = {}, placeRows = new Map(), placeAsked = new Set(), mineRows = new Map(), mineAsked = new Set();
+let mdcAreas = null, mdcLoading = false, placeFailNote = false, placeZoomNote = {};
+for (const k of Object.keys(PK)) placeLayers[k] = L.layerGroup();
+const placeIcon = (ic) => L.divIcon({ className: '', html: '<div class="place-ic">' + ic + '</div>', iconSize: [26, 26], iconAnchor: [13, 13], popupAnchor: [0, -10] });
+const placeIcons = {}; for (const k of Object.keys(PK)) placeIcons[k] = placeIcon(PK[k].ic);
+placeIcons.access = placeIcon('🛶'); placeIcons.area = placeIcon('🌳');
+let placesIdxP = null, placesWhole = null;
+async function placeRange(from, to) {
+  if (placesWhole) return placesWhole.slice(from, to + 1);
+  const r = await fetch(PLACES_FILE, { headers: { Range: `bytes=${from}-${to}` } });
+  if (!r.ok) throw new Error(r.status);
+  const b = new Uint8Array(await r.arrayBuffer());
+  if (r.status === 206) return b;
+  placesWhole = b;
+  return b.slice(from, to + 1);
+}
+function placesIndex() {
+  return placesIdxP || (placesIdxP = (async () => {
+    let head = await placeRange(0, 65535);
+    const len = +new TextDecoder().decode(head.slice(0, 10));
+    if (!len) throw new Error('bad file');
+    if (10 + len > head.length) head = await placeRange(0, 9 + len);
+    return { idx: JSON.parse(new TextDecoder().decode(head.slice(10, 10 + len))), start: 10 + len };
+  })().catch((e) => { placesIdxP = null; throw e; }));
+}
+async function placeCell(i, j) {
+  const { idx, start } = await placesIndex();
+  const t = idx.tiles[i + '_' + j];
+  if (!t) return [];
+  return gunzipJson(await placeRange(start + t[0], start + t[0] + t[1] - 1));
+}
+function placePop(k, name, extra) {
+  const label = PK[k].name;
+  return '<div class="pop"><h3>' + esc(name || label) + '</h3>'
+    + (name || extra ? '<div class="big">' + esc([name ? label : '', extra || ''].filter(Boolean).join(' · ')) + '</div>' : '')
+    + (PLACE_NOTE[k] ? '<div class="small">' + esc(PLACE_NOTE[k]) + '</div>' : '')
+    + '<div class="small">' + (k === 'ghost' ? 'From USGS place names (GNIS).' : 'Map data © OpenStreetMap contributors, Overture Maps and USGS. Nobody has checked this one.') + '</div></div>';
+}
+function mdcPop(a) {
+  return '<div class="pop"><h3>' + esc(a.n) + '</h3>'
+    + '<div class="big">' + (a.k === 'access' ? 'River or lake access' : 'Conservation area') + (a.ac ? ' · ' + a.ac.toLocaleString() + ' acres' : '') + '</div>'
+    + (a.c ? '<div class="small">' + esc(a.c) + ' County</div>' : '')
+    + '<div class="small">Missouri Department of Conservation. Check the area rules, hours and hunting seasons before you go.</div>'
+    + (a.u ? '<a class="btn" target="_blank" rel="noopener" href="' + esc(a.u) + '">MDC area page</a>' : '') + '</div>';
+}
+function minePop(m) {
+  return '<div class="pop"><h3>' + esc(m.n || 'Old mine') + '</h3>'
+    + '<div class="big">' + (m.s === 'producer' ? 'Mine' : 'Old mine') + (m.m && m.m.length ? ' · ' + esc(m.m.join(', ')) : '') + '</div>'
+    + '<div class="closed">Look only. Never enter old mines or shafts: bad air, cave-ins and deep drops. Most are on private land.</div>'
+    + '<div class="small">History marker from the USGS Mineral Resources Data System. The spot can be off by a long way.</div>'
+    + (m.id ? '<a class="btn" target="_blank" rel="noopener" href="https://mrdata.usgs.gov/mrds/show-mrds.php?dep_id=' + encodeURIComponent(m.id) + '">USGS record</a>' : '') + '</div>';
+}
+// Only draws what's on screen (plus a margin), so busy towns stay quick
+const PLACE_MAX = 300;
+function drawPlaces() {
+  const z = map.getZoom(), b = map.getBounds().pad(0.3);
+  const busy = [];
+  for (const k of Object.keys(PK)) {
+    const lay = placeLayers[k];
+    lay.clearLayers();
+    if (!placeOn[k] || z < PK[k].z) continue;
+    let n = 0;
+    const add = (ll, icon, html) => { if (n >= PLACE_MAX) return; if (!b.contains(ll)) return; n++; L.marker(ll, { icon, keyboard: false }).bindPopup(html).addTo(lay); };
+    if (k === 'mdc') { (mdcAreas || []).forEach((a) => add(a.p, placeIcons[a.k], mdcPop(a))); }
+    else if (k === 'mines') { for (const rows of mineRows.values()) rows.forEach((m) => add(m.p, placeIcons.mines, minePop(m))); }
+    else { for (const rows of placeRows.values()) for (const r of rows) if (r[0] === k) add([r[3], r[2]], placeIcons[k], placePop(k, r[1], r[4])); }
+    if (n >= PLACE_MAX) busy.push(PK[k].title.toLowerCase());
+  }
+  if (busy.length) note('Zoom in to see all the ' + busy.join(' and '), 3000);
+}
+function loadPlaces() {
+  const on = Object.keys(PK).filter((k) => placeOn[k]);
+  if (!on.length) return;
+  const z = map.getZoom();
+  for (const k of on) if (z < PK[k].z && !placeZoomNote[k]) { placeZoomNote[k] = true; note('Zoom in to see ' + PK[k].title.toLowerCase(), 3000); }
+  if (placeOn.mdc && !mdcAreas && !mdcLoading) {
+    mdcLoading = true;
+    fetch('/api/trails-data?src=mdc').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then((d) => { mdcAreas = d.areas || []; drawPlaces(); })
+      .catch(() => placeFail()).finally(() => { mdcLoading = false; });
+  }
+  const b = map.getBounds().pad(0.15);
+  const i0 = Math.max(TRAIL_SQ.x0, Math.floor(b.getWest() / CELL)), i1 = Math.min(TRAIL_SQ.x1, Math.floor(b.getEast() / CELL));
+  const j0 = Math.max(TRAIL_SQ.y0, Math.floor(b.getSouth() / CELL)), j1 = Math.min(TRAIL_SQ.y1, Math.floor(b.getNorth() / CELL));
+  const wantPack = on.some((k) => k !== 'mdc' && k !== 'mines' && z >= PK[k].z), wantMines = placeOn.mines && z >= PK.mines.z;
+  if ((wantPack || wantMines) && (i1 - i0 + 1) * (j1 - j0 + 1) <= 16) {
+    for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) {
+      const cell = i + '_' + j;
+      if (wantPack && !placeAsked.has(cell)) {
+        placeAsked.add(cell);
+        placeCell(i, j).then((rows) => { placeRows.set(cell, rows); drawPlaces(); }).catch(() => { placeAsked.delete(cell); placeFail(); });
+      }
+      if (wantMines && !mineAsked.has(cell)) {
+        mineAsked.add(cell);
+        getCell('mines', i, j).then((d) => { mineRows.set(cell, d.mines || []); drawPlaces(); }).catch(() => { mineAsked.delete(cell); placeFail(); });
+      }
+    }
+  }
+  drawPlaces();
+}
+function placeFail() { if (!placeFailNote) { placeFailNote = true; note("Couldn't load some places. Move the map to try again.", 5000); setTimeout(() => { placeFailNote = false; }, 20000); } }
+map.on('moveend', loadPlaces);
+const placeSec = section('places', 'Places', 'Zoom in to see them. Nobody checks these, so call ahead and ask before crossing private land.');
+for (const k of Object.keys(PK)) {
+  toggle(placeSec, 'place-' + k, PK[k].ic + ' ' + PK[k].title, PK[k].sub, (v) => {
+    placeOn[k] = v;
+    if (v) { placeLayers[k].addTo(map); loadPlaces(); } else { placeLayers[k].remove(); placeLayers[k].clearLayers(); }
+  });
+}
+map.attributionControl.addAttribution('Places: MDC; USGS GNIS and MRDS; Overture Maps; © OpenStreetMap contributors');
 
 // ---------- Start ----------
 // For checking the page: ?at=lat,lng skips location; ?open=fs or ?open=dirt opens one line's info box
