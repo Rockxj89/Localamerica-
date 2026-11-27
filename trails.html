@@ -1,0 +1,389 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Trails · Local America</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<style>
+  :root { --ink: #1c1917; --muted: #57534e; --drive: #f5ecd7; --edge: #3b2f22; --dirt: #d9c7a3; --land: #22c55e; --me: #2563eb; --pin: #111827; }
+  html, body { height: 100%; margin: 0; }
+  body { font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--ink); background: #faf7f2; display: flex; flex-direction: column; }
+  header { padding: 10px 14px; background: #111; color: #f5e6c8; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  header h1 { margin: 0; font-size: 17px; font-weight: 600; }
+  header a { color: #f5e6c8; font-size: 14px; }
+  #map { flex: 1; min-height: 0; }
+  /* Fade the base map so the trails stand out */
+  .base-topo { filter: saturate(.35) brightness(1.06) contrast(.9); }
+  #note { position: absolute; left: 50%; transform: translateX(-50%); top: 60px; z-index: 1000; background: rgba(17,17,17,.88); color: #fff; padding: 8px 14px; border-radius: 999px; font-size: 15px; display: none; max-width: 88vw; text-align: center; }
+  .key { position: absolute; left: 10px; right: 10px; bottom: calc(24px + env(safe-area-inset-bottom)); z-index: 1000; margin: 0 auto; max-width: 420px; background: rgba(255,255,255,.95); border-radius: 12px; box-shadow: 0 1px 6px rgba(0,0,0,.25); padding: 8px 12px; font-size: 14px; display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; pointer-events: none; }
+  .key span { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .key i { display: inline-block; width: 22px; height: 5px; background: var(--drive); border: 2px solid var(--edge); border-radius: 3px; }
+  .key i.dirt { height: 2px; background: var(--dirt); border-width: 1.5px; }
+  .key i.land { width: 16px; height: 12px; background: rgba(34,197,94,.35); border: 2px solid #16a34a; border-radius: 2px; }
+  .key i.pin { width: 12px; height: 12px; border: 0; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); background: var(--pin); }
+  .fab { position: absolute; right: 12px; z-index: 1000; width: 52px; height: 52px; border-radius: 50%; border: 0; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.3); font-size: 13px; font-weight: 600; color: var(--ink); display: grid; place-items: center; cursor: pointer; padding: 0; }
+  .fab svg { width: 24px; height: 24px; }
+  #me-btn { bottom: calc(90px + env(safe-area-inset-bottom)); color: var(--me); }
+  #sat-btn { bottom: calc(152px + env(safe-area-inset-bottom)); font-size: 12px; }
+  .me-dot { width: 20px; height: 20px; border-radius: 50%; background: var(--me); border: 3px solid #fff; box-shadow: 0 0 0 2px rgba(37,99,235,.35), 0 1px 4px rgba(0,0,0,.4); box-sizing: border-box; position: relative; }
+  .me-dot::after { content: ""; position: absolute; inset: -12px; border-radius: 50%; background: rgba(37,99,235,.25); animation: pulse 2s ease-out infinite; z-index: -1; }
+  @keyframes pulse { from { transform: scale(.4); opacity: 1; } to { transform: scale(1.4); opacity: 0; } }
+  .pin { width: 26px; height: 26px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); background: var(--pin); border: 3px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.45); box-sizing: border-box; }
+  .pop { font-size: 15px; }
+  .pop h3 { margin: 0 0 4px; font-size: 17px; }
+  .pop .big { font-weight: 600; }
+  .pop .closed { color: #b91c1c; font-weight: 600; }
+  .pop .small { color: var(--muted); font-size: 13px; margin-top: 6px; }
+  .pop a.btn { display: inline-block; margin-top: 8px; background: #15803d; color: #fff; padding: 6px 12px; border-radius: 8px; text-decoration: none; font-weight: 600; }
+  body.locked #map, body.locked .fab, body.locked .key { display: none; }
+  #gate { display: none; max-width: 420px; margin: 32px auto; padding: 0 16px; text-align: center; }
+  body.locked #gate { display: block; }
+  #gate h2 { font-size: 20px; margin: 0 0 8px; }
+  #gate p { color: var(--muted); margin: 0 0 16px; }
+  #gate .err { background: #fee2e2; color: #991b1b; padding: 10px; border-radius: 8px; font-size: 14px; }
+  #gate a.go { display: block; background: #15803d; color: #fff; padding: 12px 16px; border-radius: 10px; text-decoration: none; font-weight: 600; }
+  .leaflet-control-zoom { display: none; }
+  @media (min-width: 700px) { .leaflet-control-zoom { display: block; } }
+</style>
+</head>
+<body class="locked">
+<header>
+  <h1>Trails near you</h1>
+  <a href="/">Back to Local America</a>
+</header>
+<div id="gate"><h2 id="gate-title">Checking your sign-in…</h2><p id="gate-text"></p><div id="gate-extra"></div></div>
+<div id="note"></div>
+<div id="map"></div>
+<button class="fab" id="sat-btn" type="button" aria-label="Switch to the plain map">Map</button>
+<button class="fab" id="me-btn" type="button" aria-label="Show where I am">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="12" cy="12" r="4" fill="currentColor"/><circle cx="12" cy="12" r="8"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3"/></svg>
+</button>
+<div class="key"><span><i></i>Open to drive</span><span><i class="dirt"></i>Dirt road, not checked</span><span><i class="land"></i>Public land</span><span><i class="pin"></i>Local America place</span></div>
+<script>
+// ---------- Owner only ----------
+// Same sign-in as the Traffic page. The map starts only after Supabase confirms this is the owner account.
+const sb = supabase.createClient('https://ycdlxdijrlfsxvxksyrq.supabase.co', 'sb_publishable_2ExdXbNtW9HpuOGAq1Oa7g_gPdONH_s', {
+  auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: 'pkce', storageKey: 'la-traffic-auth' }
+});
+function gate(title, text, extra) {
+  document.getElementById('gate-title').textContent = title;
+  document.getElementById('gate-text').textContent = text || '';
+  document.getElementById('gate-extra').innerHTML = extra || '';
+}
+const SIGN_IN = '<a class="go" href="/traffic.html">Go to the Traffic page to sign in</a>';
+(async () => {
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) return gate('Sign in to see this page', 'This page is private. It uses the same sign-in as the Traffic page. Sign in there, then come back here.', SIGN_IN);
+    const { data: ok, error } = await sb.rpc('is_traffic_admin');
+    if (error) return gate('Could not check your sign-in', 'Pull down to reload the page.');
+    if (ok !== true) {
+      const email = session.user && session.user.email;
+      await sb.auth.signOut();
+      return gate('Sign in to see this page', `${email || 'That account'} is not allowed to see this page. Sign in with the Local America Gmail.`, SIGN_IN);
+    }
+    document.body.classList.remove('locked');
+    startMap();
+  } catch (e) {
+    gate('Could not check your sign-in', 'Pull down to reload the page.');
+  }
+})();
+
+function startMap() {
+// Owner-only trails map (only the Local America owner account can open it; not linked from the app).
+// - starts where you are (blue dot), or Willow Springs if location is off
+// - satellite photo underneath (USGS, public domain); the Map button switches to the plain topo map
+// - green = public land (Forest Service land from PAD-US)
+// - cream lines with dark edges = Forest Service roads and trails open to vehicles today
+// - thin tan lines = OpenStreetMap dirt and gravel roads (nobody has checked who may drive them)
+// - pins = free Local America places (paid places have no public GPS)
+const SUPABASE_URL = 'https://ycdlxdijrlfsxvxksyrq.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_2ExdXbNtW9HpuOGAq1Oa7g_gPdONH_s';
+const WILLOW_SPRINGS = [36.9923, -91.9690];
+const MISSOURI = L.latLngBounds([35.99, -95.77], [40.62, -89.10]);
+
+const map = L.map('map', { zoomControl: true, preferCanvas: true, tap: true }).setView(WILLOW_SPRINGS, 12);
+const renderer = L.canvas({ tolerance: 12 });
+
+const topo = L.tileLayer('https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{z}/{y}/{x}', {
+  maxZoom: 16, className: 'base-topo', attribution: 'Base map: USGS The National Map'
+});
+const imagery = L.tileLayer('https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/{z}/{y}/{x}', {
+  maxNativeZoom: 16, maxZoom: 17, attribution: 'Base map: USGS The National Map'
+}).addTo(map);
+map.attributionControl.setPrefix('');
+map.attributionControl.addAttribution('Roads: Forest Service; Public land: USGS PAD-US; © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors');
+
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+let noteTimer;
+const note = (msg, ms) => {
+  const n = document.getElementById('note'); clearTimeout(noteTimer);
+  n.textContent = msg || ''; n.style.display = msg ? 'block' : 'none';
+  if (msg && ms) noteTimer = setTimeout(() => note(''), ms);
+};
+const titleCase = (t) => String(t).toLowerCase().replace(/\b([a-z])/g, (m) => m.toUpperCase()).replace(/'S\b/g, "'s");
+const miles = (m) => (m < 0.1 ? 'under 0.1' : m < 10 ? m.toFixed(1) : Math.round(m)) + ' mi';
+
+// ---------- Where am I ----------
+let me = null, meMarker = null, followed = false;
+const meIcon = L.divIcon({ className: '', html: '<div class="me-dot"></div>', iconSize: [20, 20], iconAnchor: [10, 10] });
+function showMe(ll) {
+  me = L.latLng(ll);
+  if (!meMarker) meMarker = L.marker(me, { icon: meIcon, interactive: false, zIndexOffset: 1000 }).addTo(map);
+  else meMarker.setLatLng(me);
+}
+function startLocation(centerOnIt) {
+  if (!navigator.geolocation) { fallback("This phone isn't sharing its location, so here's Willow Springs."); return; }
+  if (centerOnIt) note('Finding you…');
+  navigator.geolocation.watchPosition((p) => {
+    showMe([p.coords.latitude, p.coords.longitude]);
+    if (!followed || centerOnIt) {
+      followed = true; centerOnIt = false;
+      if (MISSOURI.contains(me)) { map.setView(me, 14); note(''); }
+      else fallback("You're outside Missouri, where this map has trails. Here's Willow Springs.");
+    }
+  }, () => { if (!followed) { followed = true; fallback('Location is off, so here is Willow Springs. Tap the blue button to try again.'); } },
+  { enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 });
+}
+function fallback(msg) { map.setView(WILLOW_SPRINGS, 12); note(msg, 6000); }
+document.getElementById('me-btn').onclick = () => {
+  if (me) { map.setView(me, Math.max(map.getZoom(), 14)); return; }
+  followed = false; startLocation(true);
+};
+let sat = true;
+document.getElementById('sat-btn').onclick = (e) => {
+  sat = !sat;
+  if (sat) { map.removeLayer(topo); imagery.addTo(map); e.currentTarget.textContent = 'Map'; e.currentTarget.ariaLabel = 'Switch to the plain map'; }
+  else { map.removeLayer(imagery); topo.addTo(map); e.currentTarget.textContent = 'Satellite'; e.currentTarget.ariaLabel = 'Switch to satellite'; }
+};
+
+// ---------- Places (pins) ----------
+const placeList = [];
+const pinIcon = L.divIcon({ className: '', html: '<div class="pin"></div>', iconSize: [26, 26], iconAnchor: [3, 26], popupAnchor: [10, -24] });
+fetch(`${SUPABASE_URL}/rest/v1/poi_public_locations?select=id,name,category,latitude,longitude`, {
+  headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+}).then((r) => r.json()).then((rows) => {
+  (rows || []).filter((l) => l.latitude != null && l.longitude != null).forEach((l) => {
+    const ll = L.latLng(l.latitude, l.longitude);
+    placeList.push({ name: l.name, ll });
+    L.marker(ll, { icon: pinIcon, zIndexOffset: 500 }).bindPopup(() => {
+      const away = me ? `<div>${miles(me.distanceTo(ll) / 1609.34)} from you</div>` : '';
+      return `<div class="pop"><h3>${esc(l.name)}</h3><div>${esc(l.category || '')}</div>${away}<a class="btn" href="/#/p/${encodeURIComponent(l.id)}">Open in Local America</a></div>`;
+    }).addTo(map);
+  });
+}).catch(() => {});
+
+// Closest place to a line, and how far
+function nearestPlace(latlngs) {
+  const pts = latlngs.flat(3);
+  const step = Math.max(1, Math.floor(pts.length / 40));
+  let best = null;
+  for (const p of placeList) {
+    for (let i = 0; i < pts.length; i += step) {
+      const d = p.ll.distanceTo(pts[i]);
+      if (!best || d < best.d) best = { name: p.name, d };
+    }
+  }
+  return best && best.d < 16000 ? best : null; // within about 10 miles
+}
+function lineMiles(latlngs) {
+  let m = 0;
+  (Array.isArray(latlngs[0]) ? latlngs : [latlngs]).forEach((seg) => { for (let i = 1; i < seg.length; i++) m += L.latLng(seg[i - 1]).distanceTo(seg[i]); });
+  return m / 1609.34;
+}
+function placeAndYou(latlngs) {
+  let out = '';
+  const near = nearestPlace(latlngs);
+  if (near) out += `<div>Leads toward <b>${esc(near.name)}</b>${near.d > 400 ? ' (' + miles(near.d / 1609.34) + ' away)' : ''}</div>`;
+  if (me) {
+    const pts = latlngs.flat(3); let d = Infinity;
+    pts.forEach((p) => { d = Math.min(d, me.distanceTo(p)); });
+    out += `<div>${d < 150 ? "You're on it" : miles(d / 1609.34) + ' from you'}</div>`;
+  }
+  return out;
+}
+
+// ---------- Public land (green) ----------
+// Drawn first on the same canvas as the roads, so roads sit on top and win a tap when you're close
+// to one; a tap anywhere else inside the green says what land it is.
+function landPopup(a) {
+  const name = a.n ? `${a.k}: ${a.n}` : a.k;
+  const access = a.o ? 'Open to the public.' : 'Open to the public with some limits. Check the rules before you go.';
+  return `<div class="pop"><h3>${esc(name)}</h3><div>${access}</div>${me ? `<div>${miles(nearestOnLand(a.ll) / 1609.34)} from you</div>` : ''}
+    <div class="small">Public land from USGS PAD-US and the Forest Service. Driving is only allowed on roads marked open.</div></div>`;
+}
+function nearestOnLand(rings) {
+  let best = Infinity;
+  for (const ring of rings) for (const p of ring) best = Math.min(best, me.distanceTo(p));
+  return best;
+}
+function drawLand(j) {
+  (j.areas || []).forEach((a) => {
+    a.ll = a.r.map((ring) => ring.map(([x, y]) => L.latLng(y, x)));
+    L.polygon(a.ll, { renderer, color: '#16a34a', weight: 1.5, opacity: 0.9, fillColor: '#22c55e', fillOpacity: 0.22 })
+      .bindPopup(() => landPopup(a)).addTo(landLayer);
+  });
+}
+const landLayer = L.layerGroup().addTo(map);
+
+// ---------- Forest Service roads and trails open to vehicles ----------
+const fsLayer = L.layerGroup().addTo(map);
+const isOpen = (v) => v != null && String(v).trim() !== '' && !/^(n|no|null)$/i.test(String(v).trim());
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+// Dates look like "04/01-12/15" (sometimes several, split by commas)
+function ranges(s) {
+  return String(s || '').split(/[,;]/).map((r) => r.trim().match(/^(\d{1,2})\/(\d{1,2})\s*-\s*(\d{1,2})\/(\d{1,2})$/)).filter(Boolean)
+    .map((m) => ({ a: +m[1] * 100 + +m[2], b: +m[3] * 100 + +m[4], text: `${MONTHS[+m[1] - 1]} ${+m[2]} to ${MONTHS[+m[3] - 1]} ${+m[4]}` }));
+}
+function openToday(rs) {
+  if (!rs.length) return true;
+  const t = new Date(), today = (t.getMonth() + 1) * 100 + t.getDate();
+  return rs.some(({ a, b }) => (a <= b ? today >= a && today <= b : today >= a || today <= b));
+}
+function fsInfo(a) {
+  const jeep = isOpen(a.highclearancevehicle) || isOpen(a.fourwd_gt50inches);
+  const car = isOpen(a.passengervehicle);
+  const atv = isOpen(a.atv) || isOpen(a.otherwheeled_ohv);
+  const moto = isOpen(a.motorcycle);
+  if (!jeep && !car && !atv && !moto) return null;
+  const dateField = car ? a.passengervehicle_datesopen : jeep ? (a.highclearancevehicle_datesopen || a.fourwd_gt50_datesopen) : atv ? (a.atv_datesopen || a.otherwheeled_ohv_datesopen) : a.motorcycle_datesopen;
+  const rs = ranges(dateField).filter((r) => !(r.a === 101 && r.b === 1231));
+  const label = car ? 'Any car' : jeep ? 'Jeep friendly' : atv ? 'ATV and side-by-side only' : 'Dirt bikes only';
+  const extra = (car || jeep) && atv ? ', ATVs too' : '';
+  return { label: label + extra, rough: /^\s*[12]\b/.test(String(a.operationalmaintlevel || '')), rs, open: openToday(rs) };
+}
+function fsPopup(a, info, latlngs, isTrail) {
+  const num = a.id ? (isTrail ? 'Trail ' : 'Forest Road ') + a.id : '';
+  const name = a.name && a.name.trim() ? titleCase(a.name) : (num || 'Forest Service road');
+  const len = a.gis_miles != null ? Number(a.gis_miles) : lineMiles(latlngs);
+  const season = !info.open ? `<div class="closed">Closed right now. Open ${esc(info.rs.map((r) => r.text).join(', '))}</div>`
+    : info.rs.length ? `<div>Open ${esc(info.rs.map((r) => r.text).join(', '))}</div>` : '';
+  return `<div class="pop"><h3>${esc(name)}</h3><div class="big">${esc(info.label)} · ${miles(len).replace(' mi', ' miles')}</div>${season}${info.rough && info.label === 'Any car' ? '<div>Rough in spots</div>' : ''}${placeAndYou(latlngs)}
+    <div class="small">${esc(num && name !== num ? num + ' · ' : '')}From the Forest Service. Open means allowed, not that it's in good shape today.</div></div>`;
+}
+// Forest Service roads come from our own site (a saved copy), not live from the Forest Service.
+// Dirt roads draw first and Forest Service roads on top, all on one canvas so taps work everywhere.
+const DIRT_KINDS = { 'Dirt track': 'Dirt track', 'Dirt road': 'Dirt road', 'Unpaved road': 'Gravel or dirt road', 'Gravel road': 'Gravel road' };
+const getJson = (url, tries = 3) => fetch(url).then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
+  .catch((e) => (tries > 1 ? new Promise((ok) => setTimeout(ok, 1500)).then(() => getJson(url, tries - 1)) : Promise.reject(e)));
+// Map data files live on Cloudflare R2 (bucket localamerica-trails), apart from the app videos
+const DATA = 'https://pub-2db698c77b2e4668a900baa59fbc0af0.r2.dev/';
+// ---------- Dirt and gravel roads (OpenStreetMap), all of Missouri ----------
+// One file holds the whole state cut into small pieces by area (0.25 degree squares). The map
+// reads only the pieces on screen, a few KB each, so the phone never downloads the whole state.
+const DIRT_FILES = [DATA + 'dirt-roads-mo.bin'];
+const DIRT_MIN_ZOOM = 10;
+let dirtSrc = null, dirtWhole = null, dirtIdx = null, dirtStart = 0, dirtIdxP = null, dirtFailed = false;
+const dirtAsked = new Set(), dirtShown = new Set();
+async function getRange(url, from, to) {
+  if (dirtWhole && url === dirtSrc) return dirtWhole.slice(from, to + 1);
+  const r = await fetch(url, { headers: { Range: `bytes=${from}-${to}` } });
+  if (!r.ok) throw new Error(r.status);
+  const b = new Uint8Array(await r.arrayBuffer());
+  if (r.status === 206) return b;
+  dirtWhole = b; // server sent the whole file instead of a piece; keep it and cut pieces from it
+  return b.slice(from, to + 1);
+}
+async function dirtIndex() {
+  for (const url of DIRT_FILES) {
+    try {
+      dirtSrc = url; dirtWhole = null;
+      let head = await getRange(url, 0, 65535);
+      const len = +new TextDecoder().decode(head.slice(0, 10));
+      if (!len) throw new Error('bad file');
+      if (10 + len > head.length) head = await getRange(url, 0, 9 + len);
+      dirtIdx = JSON.parse(new TextDecoder().decode(head.slice(10, 10 + len)));
+      dirtStart = 10 + len;
+      if (new URLSearchParams(location.search).has('debug')) note('Dirt roads from ' + (url.startsWith('http') ? 'R2' : 'this site'), 8000);
+      return;
+    } catch (e) { /* try the next copy */ }
+  }
+  throw new Error('dirt roads unavailable');
+}
+async function gunzipJson(bytes) {
+  const s = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+  return JSON.parse(await new Response(s).text());
+}
+function drawDirt(fc) {
+  // dark edge first so the thin tan line shows on the satellite photo
+  L.geoJSON(fc, { interactive: false, style: () => ({ renderer, color: '#3b2f22', weight: 5, opacity: 0.55 }) }).addTo(map);
+  L.geoJSON(fc, {
+    style: () => ({ renderer, color: '#d9c7a3', weight: 2.5, opacity: 0.95 }),
+    onEachFeature: (f, layer) => {
+      const p = f.properties;
+      layer.bindPopup(() => `<div class="pop"><h3>${esc(p.n || DIRT_KINDS[p.k])}</h3><div class="big">${esc(DIRT_KINDS[p.k])} · ${miles(Number(p.mi)).replace(' mi', ' miles')}</div>${placeAndYou(layer.getLatLngs())}
+        <div class="small">Nobody has checked who may drive this one. Some are private land. Map data © OpenStreetMap contributors.</div></div>`);
+    }
+  }).addTo(map);
+  // keep the Forest Service roads drawn on top
+  if (map.hasLayer(fsLayer)) { fsLayer.remove(); fsLayer.addTo(map); }
+}
+async function loadDirt() {
+  if (dirtFailed || map.getZoom() < DIRT_MIN_ZOOM) return;
+  try { await (dirtIdxP = dirtIdxP || dirtIndex()); }
+  catch (e) { dirtFailed = true; note("Couldn't load the dirt roads. Pull down to reload the page.", 6000); return; }
+  const C = dirtIdx.cell, b = map.getBounds().pad(0.2), keys = [];
+  for (let i = Math.floor(b.getWest() / C); i <= Math.floor(b.getEast() / C); i++) {
+    for (let j = Math.floor(b.getSouth() / C); j <= Math.floor(b.getNorth() / C); j++) {
+      const k = i + '_' + j;
+      if (dirtIdx.tiles[k] && !dirtAsked.has(k)) { dirtAsked.add(k); keys.push(k); }
+    }
+  }
+  if (!keys.length) return;
+  const rows = (await Promise.all(keys.map(async (k) => {
+    const [off, len] = dirtIdx.tiles[k];
+    try { return await gunzipJson(await getRange(dirtSrc, dirtStart + off, dirtStart + off + len - 1)); }
+    catch (e) { dirtAsked.delete(k); return []; }
+  }))).flat();
+  const features = [];
+  for (const [k, mi, n, coords, id] of rows) {
+    if (dirtShown.has(id) || !DIRT_KINDS[k]) continue;
+    dirtShown.add(id);
+    features.push({ type: 'Feature', properties: { k, mi, n }, geometry: { type: typeof coords[0][0] === 'number' ? 'LineString' : 'MultiLineString', coordinates: coords } });
+  }
+  if (features.length) drawDirt({ type: 'FeatureCollection', features });
+}
+
+Promise.allSettled([getJson(DATA + 'fs-roads.json'), getJson(DATA + 'public-land.json')]).then(([fs, land]) => {
+  if (land.status === 'fulfilled') drawLand(land.value);
+  else note("Couldn't load the public land. Pull down to reload the page.", 6000);
+  // dirt roads start after the land so they draw above it, and load more as the map moves
+  loadDirt();
+  map.on('moveend', loadDirt);
+  if (fs.status !== 'fulfilled') { note("Couldn't load the Forest Service roads. Pull down to reload the page.", 8000); return; }
+  (fs.value.features || []).forEach((f) => {
+    const a = f.a || {};
+    const info = fsInfo(a);
+    if (!info) return;
+    const ll = f.p.map((path) => path.map(([x, y]) => L.latLng(y, x)));
+    L.polyline(ll, { renderer, color: '#3b2f22', weight: info.open ? 8 : 5, opacity: info.open ? 0.95 : 0.6, interactive: false }).addTo(fsLayer);
+    L.polyline(ll, { renderer, color: info.open ? '#f5ecd7' : '#a8a29e', weight: info.open ? 4 : 2.5, opacity: 1, dashArray: info.open ? null : '6 6' })
+      .bindPopup(() => fsPopup(a, info, ll, f.t === 2)).addTo(fsLayer);
+  });
+});
+
+// ---------- Start ----------
+// For checking the page: ?at=lat,lng skips location; ?open=fs or ?open=dirt opens one line's info box
+const qs = new URLSearchParams(location.search);
+const at = qs.get('at');
+const atLL = at ? at.split(',').map(Number) : [];
+if (atLL.length === 2 && atLL.every(Number.isFinite)) { showMe(atLL); followed = true; map.setView(me, 14); }
+else startLocation(false);
+const openParam = qs.get('open');
+let tries = 0;
+function demoOpen() {
+  let first;
+  const take = (l) => { if (!first && l.getPopup && l.getPopup()) first = l; };
+  if (openParam === 'fs') fsLayer.eachLayer(take); else if (openParam === 'land') landLayer.eachLayer((l) => { if (!first && /Conservation area: Peck/.test(l.getPopup()._content() || '')) first = l; }); else map.eachLayer((l) => { if (l.feature) take(l); });
+  if (!first) { if (++tries < 30) setTimeout(demoOpen, 1000); return; }
+  const ll = first.getLatLngs().flat(3); first.openPopup(ll[Math.floor(ll.length / 2)]);
+}
+if (openParam) setTimeout(demoOpen, 1500);
+}
+</script>
+</body>
+</html>
