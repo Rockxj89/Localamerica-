@@ -73,8 +73,8 @@ const renderer = L.canvas({ tolerance: 12 });
 const topo = L.tileLayer('https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{z}/{y}/{x}', {
   maxZoom: 16, className: 'base-topo', attribution: 'Base map: USGS The National Map'
 });
-const imagery = L.tileLayer('https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryTopo/MapServer/tile/{z}/{y}/{x}', {
-  maxZoom: 16, attribution: 'Base map: USGS The National Map'
+const imagery = L.tileLayer('https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/{z}/{y}/{x}', {
+  maxNativeZoom: 16, maxZoom: 17, attribution: 'Base map: USGS The National Map'
 }).addTo(map);
 map.attributionControl.setPrefix('');
 map.attributionControl.addAttribution('Roads and public land: Forest Service; © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors');
