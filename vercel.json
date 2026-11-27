@@ -65,5 +65,22 @@
         "pathname": "/wikipedia/commons/thumb/**"
       }
     ]
-  }
+  },
+  "headers": [
+    {
+      "source": "/trails-test/osm-tracks.json",
+      "has": [
+        {
+          "type": "query",
+          "key": "download"
+        }
+      ],
+      "headers": [
+        {
+          "key": "Content-Disposition",
+          "value": "attachment; filename=\"osm-tracks.json\""
+        }
+      ]
+    }
+  ]
 }

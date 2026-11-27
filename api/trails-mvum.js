@@ -52,6 +52,8 @@ module.exports = async (req, res) => {
   try {
     const [roads, trails] = await Promise.all([layer(1), layer(2)]);
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    // ?download=1 saves it as a file (for uploading to Cloudflare R2 by hand)
+    if (req.query && req.query.download) res.setHeader('Content-Disposition', 'attachment; filename="fs-roads.json"');
     // Saved copy on Vercel for a week; an old copy keeps being used for up to 30 more days if the Forest Service is down
     res.setHeader('Cache-Control', 'public, max-age=3600');
     res.setHeader('CDN-Cache-Control', 'public, s-maxage=604800, stale-while-revalidate=2592000, stale-if-error=2592000');

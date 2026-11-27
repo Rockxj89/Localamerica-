@@ -98,6 +98,8 @@ module.exports = async (req, res) => {
       areas.push({ k: kind(a), n: title(a.Unit_Nm), o: a.Pub_Access === 'OA' ? 1 : 0, r });
     }
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    // ?download=1 saves it as a file (for uploading to Cloudflare R2 by hand)
+    if (req.query && req.query.download) res.setHeader('Content-Disposition', 'attachment; filename="public-land.json"');
     res.setHeader('Cache-Control', 'public, max-age=3600');
     res.setHeader('CDN-Cache-Control', 'public, s-maxage=604800, stale-while-revalidate=2592000, stale-if-error=2592000');
     res.end(JSON.stringify({ saved: new Date().toISOString(), source: 'USGS PAD-US 4.1 and USDA Forest Service', areas }));
