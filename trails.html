@@ -9,7 +9,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <style>
-  :root { --tan: #f5e6c8; --gold: #f2b134; --ink: #1c1917; --muted: #57534e; --drive: #f5ecd7; --edge: #3b2f22; --dirt: #d9c7a3; --land: #22c55e; --me: #2563eb; --pin: #111827; }
+  :root { --tan: #f5e6c8; --gold: #f2b134; --ink: #1c1917; --muted: #57534e; --drive: #f5ecd7; --edge: #3b2f22; --dirt: #d9c7a3; --land: #22c55e; --me: #2563eb; --pin: #111827; --freeblue: #1D5FA8; }
   html, body { height: 100%; margin: 0; overflow: hidden; }
   body { font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--ink); background: #faf7f2; display: flex; flex-direction: column; }
   header { padding: 10px 14px; background: #111; color: #f5e6c8; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
@@ -56,7 +56,7 @@
   .key i.topo { height: 0; background: none; border: 0; border-top: 2px solid #c98a4e; border-radius: 0; box-shadow: none; }
   .key i.land { width: 16px; height: 12px; background: rgba(74,222,128,.35); border: 2px solid #bbf7d0; border-radius: 3px; box-shadow: none; }
   .key i.hwy { height: 5px; background: #cfd3d9; border: 1px solid #27272a; box-shadow: none; }
-  .key i.pin { width: 12px; height: 12px; border: 2px solid var(--tan); border-radius: 50% 50% 50% 0; transform: rotate(-45deg); background: #111; box-shadow: none; }
+  .key i.pin { width: 12px; height: 12px; border: 2px solid #fff; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); background: var(--freeblue); box-shadow: none; }
   .fab { position: absolute; right: 12px; z-index: 1000; width: 54px; height: 54px; border-radius: 16px; border: 1px solid rgba(245,230,200,.18); background: rgba(17,17,17,.88); box-shadow: 0 2px 10px rgba(0,0,0,.4); font-size: 11px; font-weight: 600; color: var(--tan); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: pointer; padding: 0; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
   .fab svg { width: 24px; height: 24px; }
   .fab:active { transform: scale(.95); }
@@ -80,8 +80,9 @@
   .me-dot { width: 20px; height: 20px; border-radius: 50%; background: var(--me); border: 3px solid #fff; box-shadow: 0 0 0 2px rgba(37,99,235,.35), 0 1px 4px rgba(0,0,0,.4); box-sizing: border-box; position: relative; }
   .me-dot::after { content: ""; position: absolute; inset: -12px; border-radius: 50%; background: rgba(37,99,235,.25); animation: pulse 2s ease-out infinite; z-index: -1; }
   @keyframes pulse { from { transform: scale(.4); opacity: 1; } to { transform: scale(1.4); opacity: 0; } }
-  .pin { width: 30px; height: 30px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); background: #111; border: 3px solid var(--tan); box-shadow: 0 2px 6px rgba(0,0,0,.55); box-sizing: border-box; display: grid; place-items: center; }
-  .pin::after { content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--tan); }
+  /* Free Local America places: the app's own Free blue with a white edge, so they stand out on the photo */
+  .pin { width: 30px; height: 30px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); background: var(--freeblue); border: 3px solid #fff; box-shadow: 0 2px 6px rgba(0,0,0,.55); box-sizing: border-box; display: grid; place-items: center; }
+  .pin::after { content: ""; width: 9px; height: 9px; border-radius: 50%; background: #fff; }
   .leaflet-popup-content-wrapper { border-radius: 14px; }
   .pop { font-size: 15px; }
   .pop h3 { margin: 0 0 4px; font-size: 17px; }
@@ -198,7 +199,7 @@
 </button>
 <button class="mini" id="key-btn" type="button" aria-expanded="false" aria-label="Show the map key">Key</button>
 <button class="mini" id="cred-btn" type="button" aria-expanded="false" aria-label="Show map credits">i</button>
-<div class="key"><span><i class="hwy"></i>Highway</span><span><i></i>Open to drive</span><span><i class="dirt"></i>Other roads</span><span><i class="topo"></i>Topo line</span><span><i class="land"></i>Public land</span><span><i class="pin"></i>Local America place</span><span class="k-trail"><i class="easy"></i>Easy trail</span><span class="k-trail"><i class="mod"></i>Moderate</span><span class="k-trail"><i class="hard"></i>Hard</span><span class="k-trail"><i class="unk"></i>Not rated</span></div>
+<div class="key"><span><i class="hwy"></i>Highway</span><span><i></i>Open to drive</span><span><i class="dirt"></i>Other roads</span><span><i class="topo"></i>Topo line</span><span><i class="land"></i>Public land</span><span><i class="pin"></i>Free Local America place</span><span class="k-trail"><i class="easy"></i>Easy trail</span><span class="k-trail"><i class="mod"></i>Moderate</span><span class="k-trail"><i class="hard"></i>Hard</span><span class="k-trail"><i class="unk"></i>Not rated</span></div>
 <div id="trip" role="dialog" aria-label="Trips" aria-hidden="true"><div class="grab"></div><div class="top"><h2 id="trip-title">Trips</h2><button class="close" type="button">Done</button></div><div id="trip-body"></div></div>
 <div id="planbar" hidden><div class="pb-top"><b id="pb-sum">Tap the map to add stops</b><button class="tbtn" id="pb-x" type="button">Close</button></div><div id="pb-modes"></div><div class="tbtns"><button class="tbtn" id="pb-undo" type="button">Undo</button><button class="tbtn" id="pb-clear" type="button">Clear</button><button class="tbtn" id="pb-share" type="button">Share</button><button class="tbtn pri" id="pb-save" type="button">Save</button></div><div class="pb-name" hidden><input id="pb-input" type="text" maxlength="80" placeholder="Name this route" aria-label="Route name"><button class="tbtn pri" id="pb-ok" type="button">Save</button></div><small>Tap a stop to take it out, or drag it to move it. Routes follow roads and trails in OpenStreetMap (routing by FOSSGIS Valhalla). <a href="https://www.openstreetmap.org/fixthemap" target="_blank" rel="noopener">Fix the map</a></small></div>
 <div id="panel" role="dialog" aria-label="Map layers" aria-hidden="true"><div class="grab"></div><div class="top"><h2>Layers</h2><button class="close" type="button">Done</button></div><div id="panel-body"></div></div>
