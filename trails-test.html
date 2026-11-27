@@ -424,7 +424,7 @@ function mainQuery(layer, b, z) {
   const key = layer + '|' + z + '|' + g;
   if (roadCache.has(key)) return roadCache.get(key);
   const off = (360 / (256 * 2 ** z)) * 1.5; // simplify to about a pixel and a half
-  const url = `${ROADS}${layer}/query?f=json&where=1%3D1&geometry=${g}&geometryType=esriGeometryEnvelope&inSR=4326&outSR=4326&spatialRel=esriSpatialRelIntersects&outFields=name,interstate,us_route,state_route&returnGeometry=true&maxAllowableOffset=${off.toFixed(6)}&resultRecordCount=2000`;
+  const url = `${ROADS}${layer}/query?f=json&where=1%3D1&geometry=${g}&geometryType=esriGeometryEnvelope&inSR=4326&outSR=4326&spatialRel=esriSpatialRelIntersects&outFields=name,interstate,us_route,state_route&returnGeometry=true&maxAllowableOffset=${off.toFixed(6)}&geometryPrecision=5&resultRecordCount=2000`;
   const p = fetch(url).then((r) => r.json()).then((j) => { if (j.error) throw new Error('roads'); return j.features || []; }).catch(() => { roadCache.delete(key); return []; });
   roadCache.set(key, p);
   if (roadCache.size > 40) roadCache.delete(roadCache.keys().next().value);
@@ -443,9 +443,14 @@ async function drawMain() {
   const run = ++mainRun, z = map.getZoom();
   if (z < 8) { mainLayer.clearLayers(); mainLabels = []; return; }
   const b = map.getBounds().pad(0.15);
-  const sets = await Promise.all([29, 30].concat(z >= 10 ? [31] : []).map((l) => mainQuery(l, b, z)));
-  if (run !== mainRun) return;
-  const feats = [].concat(...sets);
+  // draw each kind of road as soon as it arrives (the state routes can take a few seconds)
+  const sets = [29, 30].concat(z >= 10 ? [31] : []).map(() => null);
+  await Promise.all(sets.map((_, i) => mainQuery([29, 30, 31][i], b, z).then((fs) => {
+    sets[i] = fs;
+    if (run === mainRun) { renderMain([].concat(...sets.filter(Boolean)), z); if (sets.every(Boolean)) return; drawLabels(); }
+  })));
+}
+function renderMain(feats, z) {
   const big = z >= 12, round = { lineCap: 'round', lineJoin: 'round' };
   mainLayer.clearLayers();
   const labels = [];
