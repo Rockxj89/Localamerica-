@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <style>
-  :root { --ink: #1c1917; --muted: #57534e; --drive: #f97316; --dirt: #c4a27c; --me: #2563eb; --pin: #111827; }
+  :root { --ink: #1c1917; --muted: #57534e; --drive: #f5ecd7; --edge: #3b2f22; --dirt: #d9c7a3; --land: #22c55e; --me: #2563eb; --pin: #111827; }
   html, body { height: 100%; margin: 0; }
   body { font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--ink); background: #faf7f2; display: flex; flex-direction: column; }
   header { padding: 10px 14px; background: #111; color: #f5e6c8; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
@@ -20,8 +20,9 @@
   #note { position: absolute; left: 50%; transform: translateX(-50%); top: 60px; z-index: 1000; background: rgba(17,17,17,.88); color: #fff; padding: 8px 14px; border-radius: 999px; font-size: 15px; display: none; max-width: 88vw; text-align: center; }
   .key { position: absolute; left: 10px; right: 10px; bottom: calc(24px + env(safe-area-inset-bottom)); z-index: 1000; margin: 0 auto; max-width: 420px; background: rgba(255,255,255,.95); border-radius: 12px; box-shadow: 0 1px 6px rgba(0,0,0,.25); padding: 8px 12px; font-size: 14px; display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; pointer-events: none; }
   .key span { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
-  .key i { display: inline-block; width: 22px; height: 0; border-top: 5px solid var(--drive); border-radius: 3px; }
-  .key i.dirt { border-top: 3px solid var(--dirt); }
+  .key i { display: inline-block; width: 22px; height: 5px; background: var(--drive); border: 2px solid var(--edge); border-radius: 3px; }
+  .key i.dirt { height: 2px; background: var(--dirt); border-width: 1.5px; }
+  .key i.land { width: 16px; height: 12px; background: rgba(34,197,94,.35); border: 2px solid #16a34a; border-radius: 2px; }
   .key i.pin { width: 12px; height: 12px; border: 0; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); background: var(--pin); }
   .fab { position: absolute; right: 12px; z-index: 1000; width: 52px; height: 52px; border-radius: 50%; border: 0; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.3); font-size: 13px; font-weight: 600; color: var(--ink); display: grid; place-items: center; cursor: pointer; padding: 0; }
   .fab svg { width: 24px; height: 24px; }
@@ -48,16 +49,18 @@
 </header>
 <div id="note"></div>
 <div id="map"></div>
-<button class="fab" id="sat-btn" type="button" aria-label="Switch to satellite">Satellite</button>
+<button class="fab" id="sat-btn" type="button" aria-label="Switch to the plain map">Map</button>
 <button class="fab" id="me-btn" type="button" aria-label="Show where I am">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="12" cy="12" r="4" fill="currentColor"/><circle cx="12" cy="12" r="8"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3"/></svg>
 </button>
-<div class="key"><span><i></i>Open to drive</span><span><i class="dirt"></i>Dirt road, not checked</span><span><i class="pin"></i>Local America place</span></div>
+<div class="key"><span><i></i>Open to drive</span><span><i class="dirt"></i>Dirt road, not checked</span><span><i class="land"></i>Public land</span><span><i class="pin"></i>Local America place</span></div>
 <script>
 // Test page only. Not linked from the app. Simple version:
 // - starts where you are (blue dot), or Willow Springs if location is off
-// - orange = Forest Service roads and trails open to vehicles today
-// - faint gray = OpenStreetMap dirt and gravel roads (nobody has checked who may drive them)
+// - satellite photo underneath (USGS, public domain); the Map button switches to the plain topo map
+// - green = public land (Forest Service land from PAD-US)
+// - cream lines with dark edges = Forest Service roads and trails open to vehicles today
+// - thin tan lines = OpenStreetMap dirt and gravel roads (nobody has checked who may drive them)
 // - pins = free Local America places (paid places have no public GPS)
 const SUPABASE_URL = 'https://ycdlxdijrlfsxvxksyrq.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_2ExdXbNtW9HpuOGAq1Oa7g_gPdONH_s';
@@ -69,12 +72,12 @@ const renderer = L.canvas({ tolerance: 12 });
 
 const topo = L.tileLayer('https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{z}/{y}/{x}', {
   maxZoom: 16, className: 'base-topo', attribution: 'Base map: USGS The National Map'
-}).addTo(map);
+});
 const imagery = L.tileLayer('https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryTopo/MapServer/tile/{z}/{y}/{x}', {
   maxZoom: 16, attribution: 'Base map: USGS The National Map'
-});
+}).addTo(map);
 map.attributionControl.setPrefix('');
-map.attributionControl.addAttribution('Roads: Forest Service; © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors');
+map.attributionControl.addAttribution('Roads and public land: Forest Service; © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors');
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 let noteTimer;
@@ -112,11 +115,11 @@ document.getElementById('me-btn').onclick = () => {
   if (me) { map.setView(me, Math.max(map.getZoom(), 14)); return; }
   followed = false; startLocation(true);
 };
-let sat = false;
+let sat = true;
 document.getElementById('sat-btn').onclick = (e) => {
   sat = !sat;
-  if (sat) { map.removeLayer(topo); imagery.addTo(map); e.currentTarget.textContent = 'Map'; }
-  else { map.removeLayer(imagery); topo.addTo(map); e.currentTarget.textContent = 'Satellite'; }
+  if (sat) { map.removeLayer(topo); imagery.addTo(map); e.currentTarget.textContent = 'Map'; e.currentTarget.ariaLabel = 'Switch to the plain map'; }
+  else { map.removeLayer(imagery); topo.addTo(map); e.currentTarget.textContent = 'Satellite'; e.currentTarget.ariaLabel = 'Switch to satellite'; }
 };
 
 // ---------- Places (pins) ----------
@@ -165,6 +168,19 @@ function placeAndYou(latlngs) {
   return out;
 }
 
+// ---------- Public land (green) ----------
+// Drawn on its own layer under the roads; taps go through it to the roads and pins.
+map.createPane('land'); map.getPane('land').style.zIndex = 350; map.getPane('land').style.pointerEvents = 'none';
+const landRenderer = L.canvas({ pane: 'land' });
+fetch('/api/trails-publand').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); }).then((j) => {
+  (j.areas || []).forEach((rings) => {
+    L.polygon(rings.map((ring) => ring.map(([x, y]) => [y, x])), {
+      renderer: landRenderer, pane: 'land', interactive: false,
+      color: '#16a34a', weight: 2, opacity: 0.9, fillColor: '#22c55e', fillOpacity: 0.22
+    }).addTo(map);
+  });
+}).catch(() => note("Couldn't load the public land shading. Pull down to reload the page.", 6000));
+
 // ---------- Forest Service roads and trails open to vehicles ----------
 const fsLayer = L.layerGroup().addTo(map);
 const isOpen = (v) => v != null && String(v).trim() !== '' && !/^(n|no|null)$/i.test(String(v).trim());
@@ -209,8 +225,10 @@ Promise.allSettled([getJson('/trails-test/osm-tracks.json'), getJson('/api/trail
   if (dirt.status === 'fulfilled') {
     const fc = dirt.value;
     fc.features = fc.features.filter((f) => DIRT_KINDS[f.properties.k]);
+    // dark edge first so the thin tan line shows on the satellite photo
+    L.geoJSON(fc, { interactive: false, style: () => ({ renderer, color: '#3b2f22', weight: 5, opacity: 0.55 }) }).addTo(map);
     L.geoJSON(fc, {
-      style: () => ({ renderer, color: '#c4a27c', weight: 3, opacity: 0.9 }),
+      style: () => ({ renderer, color: '#d9c7a3', weight: 2.5, opacity: 0.95 }),
       onEachFeature: (f, layer) => {
         const p = f.properties;
         layer.bindPopup(() => `<div class="pop"><h3>${esc(p.n || DIRT_KINDS[p.k])}</h3><div class="big">${esc(DIRT_KINDS[p.k])} · ${miles(Number(p.mi)).replace(' mi', ' miles')}</div>${placeAndYou(layer.getLatLngs())}
@@ -224,8 +242,8 @@ Promise.allSettled([getJson('/trails-test/osm-tracks.json'), getJson('/api/trail
     const info = fsInfo(a);
     if (!info) return;
     const ll = f.p.map((path) => path.map(([x, y]) => L.latLng(y, x)));
-    if (info.open) L.polyline(ll, { renderer, color: '#fff', weight: 9, opacity: 0.9, interactive: false }).addTo(fsLayer);
-    L.polyline(ll, { renderer, color: info.open ? '#f97316' : '#9ca3af', weight: info.open ? 5 : 3, opacity: info.open ? 1 : 0.85, dashArray: info.open ? null : '6 6' })
+    L.polyline(ll, { renderer, color: '#3b2f22', weight: info.open ? 8 : 5, opacity: info.open ? 0.95 : 0.6, interactive: false }).addTo(fsLayer);
+    L.polyline(ll, { renderer, color: info.open ? '#f5ecd7' : '#a8a29e', weight: info.open ? 4 : 2.5, opacity: 1, dashArray: info.open ? null : '6 6' })
       .bindPopup(() => fsPopup(a, info, ll, f.t === 2)).addTo(fsLayer);
   });
 });
