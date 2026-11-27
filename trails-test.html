@@ -32,7 +32,7 @@
   #topo-btn { bottom: calc(214px + env(safe-area-inset-bottom)); font-size: 12px; line-height: 1.1; }
   #topo-btn[aria-pressed="false"] { color: var(--muted); }
   /* Brighten the brown topo lines so they show on the dark satellite photo */
-  .contours { filter: brightness(1.9) saturate(1.2); }
+  .contours { filter: brightness(1.7) saturate(.8); opacity: .7; }
   .me-dot { width: 20px; height: 20px; border-radius: 50%; background: var(--me); border: 3px solid #fff; box-shadow: 0 0 0 2px rgba(37,99,235,.35), 0 1px 4px rgba(0,0,0,.4); box-sizing: border-box; position: relative; }
   .me-dot::after { content: ""; position: absolute; inset: -12px; border-radius: 50%; background: rgba(37,99,235,.25); animation: pulse 2s ease-out infinite; z-index: -1; }
   @keyframes pulse { from { transform: scale(.4); opacity: 1; } to { transform: scale(1.4); opacity: 0; } }
@@ -121,7 +121,12 @@ const sharp = new ArcExport('', { minZoom: 14, maxNativeZoom: 18, maxZoom: 19, z
 sharp._base = 'https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer/exportImage?f=image&format=jpg&bboxSR=3857&imageSR=3857&size=512,512&renderingRule=' + encodeURIComponent('{"rasterFunction":"NaturalColor"}');
 sharp.addTo(map);
 const contours = new ArcExport('', { minZoom: 11, maxZoom: 19, zIndex: 5, className: 'contours' });
-contours._base = 'https://carto.nationalmap.gov/arcgis/rest/services/contours/MapServer/export?f=image&format=png32&transparent=true&bboxSR=3857&imageSR=3857&size=512,512&dpi=192';
+contours._base = 'https://carto.nationalmap.gov/arcgis/rest/services/contours/MapServer/export?f=image&format=png32&transparent=true&bboxSR=3857&imageSR=3857&size=512,512&dpi=144';
+// Zoomed out: only the bold every-5th lines with heights. Close up (16+): every line.
+contours.getTileUrl = function (c) {
+  const show = c.z >= 16 ? '2,10,11,15,16,21,22,25,26' : '2,10,11,15,16,21,25';
+  return ArcExport.prototype.getTileUrl.call(this, c) + '&layers=show:' + show;
+};
 contours.addTo(map);
 map.attributionControl.addAttribution('Aerial photos: USDA NAIP; Topo lines: USGS 3DEP');
 map.attributionControl.setPrefix('');
