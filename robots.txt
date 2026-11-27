@@ -4,6 +4,7 @@ Disallow: /cards.html
 Disallow: /towns.html
 Disallow: /pins.html
 Disallow: /trails.html
+Disallow: /trails-beta.html
 Disallow: /api/
 
 Sitemap: https://localamerica.us/sitemap.xml

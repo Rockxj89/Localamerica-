@@ -1,0 +1,1902 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Trails · Local America</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<style>
+  :root { --tan: #f5e6c8; --gold: #f2b134; --ink: #1c1917; --muted: #57534e; --drive: #f5ecd7; --edge: #3b2f22; --dirt: #d9c7a3; --land: #22c55e; --me: #2563eb; --pin: #111827; }
+  html, body { height: 100%; margin: 0; overflow: hidden; }
+  body { font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--ink); background: #faf7f2; display: flex; flex-direction: column; }
+  header { padding: 10px 14px; background: #111; color: #f5e6c8; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  header h1 { margin: 0; font-size: 17px; font-weight: 600; }
+  header a { color: #f5e6c8; font-size: 14px; }
+  /* Once the map is showing, the top bar shrinks to one small floating button */
+  body:not(.locked) header { position: absolute; top: calc(8px + env(safe-area-inset-top)); left: 8px; z-index: 1000; padding: 0; background: none; }
+  body:not(.locked) header h1 { display: none; }
+  body:not(.locked) header a { display: inline-flex; align-items: center; gap: 4px; background: rgba(17,17,17,.86); border: 1px solid rgba(245,230,200,.18); border-radius: 999px; padding: 7px 12px 7px 9px; font-size: 13px; font-weight: 600; text-decoration: none; box-shadow: 0 2px 10px rgba(0,0,0,.4); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+  body:not(.locked) header a::before { content: "\2039"; font-size: 20px; line-height: 14px; margin-top: -2px; }
+  /* Small buttons in the bottom left: the key and the map credits */
+  .mini { position: absolute; z-index: 1000; bottom: calc(14px + env(safe-area-inset-bottom)); height: 34px; border-radius: 999px; border: 1px solid rgba(245,230,200,.18); background: rgba(17,17,17,.86); color: var(--tan); font: 600 13px system-ui, -apple-system, sans-serif; padding: 0 12px; box-shadow: 0 2px 10px rgba(0,0,0,.4); cursor: pointer; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+  .mini[aria-expanded="true"] { color: var(--gold); }
+  #key-btn { left: 10px; }
+  #cred-btn { left: 72px; width: 34px; padding: 0; font: 700 15px Georgia, serif; }
+  body.locked .mini { display: none; }
+  body:not(.key-open) .key { display: none; }
+  body.key-open .leaflet-bottom.leaflet-left { visibility: hidden; }
+  .leaflet-bottom.leaflet-left { bottom: calc(52px + env(safe-area-inset-bottom)); }
+  .leaflet-control-scale-line { background: rgba(17,17,17,.7); color: var(--tan); border-color: var(--tan); font-size: 11px; font-weight: 600; }
+  #map { flex: 1; min-height: 0; }
+  #map.leaflet-container { background: #1c1917; } /* dark, not gray, while pictures load */
+  /* Fade the base map so the trails stand out */
+  .base-topo { filter: saturate(.35) brightness(1.06) contrast(.9); }
+  /* Satellite photo a little darker and softer, so the gray roads and white names read clearly */
+  .sat { filter: brightness(.8) saturate(.8) contrast(1.05); }
+  #find { display: none; }
+  body:not(.locked) header { right: 8px; }
+  body:not(.locked) header a { flex: none; }
+  body:not(.locked) #find { display: flex; flex: 1; min-width: 0; max-width: 340px; margin-left: auto; height: 34px; background: rgba(17,17,17,.86); border: 1px solid rgba(245,230,200,.18); border-radius: 999px; box-shadow: 0 2px 10px rgba(0,0,0,.4); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); overflow: hidden; }
+  #find input { flex: 1; min-width: 0; border: 0; background: none; color: #f5e6c8; font: inherit; font-size: 16px; padding: 0 4px 0 13px; outline: none; }
+  #find input::placeholder { color: rgba(245,230,200,.6); }
+  #find button { flex: none; width: 38px; border: 0; background: none; color: var(--tan); display: grid; place-items: center; cursor: pointer; padding: 0; }
+  #find button svg { width: 18px; height: 18px; }
+  #find:focus-within { border-color: var(--tan); }
+  .gopin { width: 30px; height: 30px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); background: #ef4444; border: 3px solid #111; box-shadow: 0 0 0 2px #fff, 0 2px 6px rgba(0,0,0,.55); box-sizing: border-box; display: grid; place-items: center; }
+  .gopin::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #fff; }
+  #note { position: absolute; left: 50%; transform: translateX(-50%); top: calc(56px + env(safe-area-inset-top)); z-index: 1000; background: rgba(17,17,17,.88); color: #fff; padding: 8px 14px; border-radius: 999px; font-size: 15px; display: none; max-width: 88vw; text-align: center; }
+  /* Local America look: black panels, tan text, gold trails */
+  .key { position: absolute; left: 10px; right: 76px; bottom: calc(56px + env(safe-area-inset-bottom)); z-index: 1000; max-width: 420px; background: rgba(17,17,17,.86); color: var(--tan); border-radius: 14px; box-shadow: 0 2px 10px rgba(0,0,0,.35); padding: 8px 12px; font-size: 13px; display: flex; gap: 6px 14px; flex-wrap: wrap; pointer-events: none; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+  .key span { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .key i { display: inline-block; width: 22px; height: 6px; background: var(--gold); border: 2px solid #111; border-radius: 4px; box-shadow: 0 0 0 1px rgba(255,255,255,.45); }
+  .key i.dirt { height: 3px; background: #b9bdc4; border: 1px solid #27272a; box-shadow: none; }
+  .key i.topo { height: 0; background: none; border: 0; border-top: 2px solid #c98a4e; border-radius: 0; box-shadow: none; }
+  .key i.land { width: 16px; height: 12px; background: rgba(74,222,128,.35); border: 2px solid #bbf7d0; border-radius: 3px; box-shadow: none; }
+  .key i.hwy { height: 5px; background: #cfd3d9; border: 1px solid #27272a; box-shadow: none; }
+  .key i.pin { width: 12px; height: 12px; border: 2px solid var(--tan); border-radius: 50% 50% 50% 0; transform: rotate(-45deg); background: #111; box-shadow: none; }
+  .fab { position: absolute; right: 12px; z-index: 1000; width: 54px; height: 54px; border-radius: 16px; border: 1px solid rgba(245,230,200,.18); background: rgba(17,17,17,.88); box-shadow: 0 2px 10px rgba(0,0,0,.4); font-size: 11px; font-weight: 600; color: var(--tan); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: pointer; padding: 0; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+  .fab svg { width: 24px; height: 24px; }
+  .fab:active { transform: scale(.95); }
+  #me-btn { bottom: calc(14px + env(safe-area-inset-bottom)); color: #60a5fa; }
+  #sat-btn { bottom: calc(80px + env(safe-area-inset-bottom)); }
+  #topo-btn { bottom: calc(146px + env(safe-area-inset-bottom)); }
+  #topo-btn[aria-pressed="false"] { color: #a8a29e; }
+  /* Place names drawn by us over the satellite photo */
+  .lbl { color: #fff; font-weight: 600; white-space: nowrap; text-shadow: 0 0 3px #000, 0 0 3px #000, 0 1px 2px #000; pointer-events: none; transform: translate(-50%, -50%); position: absolute; text-align: center; line-height: 1.15; }
+  .lbl.peak { font-size: 12px; }
+  .lbl.peak b { display: block; width: 0; height: 0; margin: 0 auto 2px; border-left: 6px solid transparent; border-right: 6px solid transparent; border-bottom: 9px solid #fff; filter: drop-shadow(0 0 1px #000) drop-shadow(0 0 1px #000); }
+  .lbl.peak small { display: block; font-size: 11px; font-weight: 500; }
+  .lbl.valley { font-size: 12px; font-style: italic; font-weight: 500; color: #f5f5f4; }
+  .lbl.town { font-size: 14px; font-weight: 700; letter-spacing: .02em; }
+  .lbl.road { font-size: 11px; font-weight: 700; color: var(--tan); background: rgba(17,17,17,.85); border: 1px solid rgba(245,230,200,.35); border-radius: 6px; padding: 1px 6px; text-shadow: none; }
+  .lbl.shield { font-size: 11px; font-weight: 700; color: #27272a; background: #e4e4e7; border: 1.5px solid #3f3f46; border-radius: 999px; min-width: 22px; height: 22px; line-height: 19px; padding: 0 5px; box-sizing: border-box; text-shadow: none; box-shadow: 0 1px 2px rgba(0,0,0,.5); }
+  .lbl.shield.us { background: #fff; }
+  /* Brighten the brown topo lines so they show on the dark satellite photo */
+  /* Topo lines: thin copper-brown, so they never look like the cream dirt roads */
+  .contours { filter: brightness(1.05) saturate(1.15); opacity: .8; }
+  .me-dot { width: 20px; height: 20px; border-radius: 50%; background: var(--me); border: 3px solid #fff; box-shadow: 0 0 0 2px rgba(37,99,235,.35), 0 1px 4px rgba(0,0,0,.4); box-sizing: border-box; position: relative; }
+  .me-dot::after { content: ""; position: absolute; inset: -12px; border-radius: 50%; background: rgba(37,99,235,.25); animation: pulse 2s ease-out infinite; z-index: -1; }
+  @keyframes pulse { from { transform: scale(.4); opacity: 1; } to { transform: scale(1.4); opacity: 0; } }
+  .pin { width: 30px; height: 30px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); background: #111; border: 3px solid var(--tan); box-shadow: 0 2px 6px rgba(0,0,0,.55); box-sizing: border-box; display: grid; place-items: center; }
+  .pin::after { content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--tan); }
+  .leaflet-popup-content-wrapper { border-radius: 14px; }
+  .pop { font-size: 15px; }
+  .pop h3 { margin: 0 0 4px; font-size: 17px; }
+  .pop .big { font-weight: 600; }
+  .pop .closed { color: #b91c1c; font-weight: 600; }
+  .pop .small { color: var(--muted); font-size: 13px; margin-top: 6px; }
+  .pop a.btn { display: inline-block; margin-top: 8px; background: #15803d; color: #fff; padding: 6px 12px; border-radius: 8px; text-decoration: none; font-weight: 600; }
+  #lay-btn { bottom: calc(212px + env(safe-area-inset-bottom)); }
+  #lay-btn[aria-expanded="true"] { color: var(--gold); }
+  /* Layers panel: slides up from the bottom */
+  :is(#panel, #trip) { position: absolute; left: 0; right: 0; bottom: 0; z-index: 1100; max-height: 72vh; overflow-y: auto; background: #111; color: var(--tan); border-radius: 18px 18px 0 0; box-shadow: 0 -4px 18px rgba(0,0,0,.5); padding: 8px 16px calc(18px + env(safe-area-inset-bottom)); transform: translateY(105%); transition: transform .22s ease; -webkit-overflow-scrolling: touch; }
+  :is(#panel, #trip).open { transform: none; }
+  :is(#panel, #trip) .grab { width: 40px; height: 5px; border-radius: 3px; background: #44403c; margin: 2px auto 8px; }
+  :is(#panel, #trip) .top { display: flex; align-items: center; justify-content: space-between; }
+  :is(#panel, #trip) h2 { margin: 0; font-size: 18px; color: #fff; }
+  :is(#panel, #trip) .close { background: none; border: 0; color: var(--tan); font-size: 15px; font-weight: 600; padding: 8px 4px; cursor: pointer; }
+  :is(#panel, #trip) h3 { margin: 16px 0 4px; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: #a8a29e; font-weight: 600; }
+  #panel .sec-h { display: flex; align-items: center; gap: 10px; width: 100%; background: none; border: 0; border-bottom: 1px solid #292524; color: #fff; padding: 14px 0; font: 600 17px system-ui, -apple-system, sans-serif; cursor: pointer; text-align: left; }
+  #panel .sec-h .ic { width: 30px; height: 30px; border-radius: 9px; background: #1c1917; display: grid; place-items: center; font-size: 16px; flex: none; }
+  #panel .sec-h .nm { flex: 1; }
+  #panel .sec-h .cnt { font-size: 13px; font-weight: 600; color: #a8a29e; }
+  #panel .sec-h .cnt.on { color: #4ade80; }
+  #panel .sec-h::after { content: ""; width: 8px; height: 8px; border-right: 2px solid #a8a29e; border-bottom: 2px solid #a8a29e; transform: rotate(45deg); margin: -4px 4px 0 2px; transition: transform .15s; }
+  #panel .sec-h[aria-expanded="true"]::after { transform: rotate(-135deg); margin-top: 4px; }
+  #panel .sec-b { padding: 0 0 6px 40px; }
+  #panel .sec-b[hidden] { display: none; }
+  #panel .row .ri { flex: none; width: 24px; text-align: center; font-size: 17px; margin-left: -34px; }
+  :is(#panel, #trip) .row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid #292524; cursor: pointer; }
+  :is(#panel, #trip) .row:last-child { border-bottom: 0; }
+  :is(#panel, #trip) .row .txt { flex: 1; min-width: 0; }
+  :is(#panel, #trip) .row b { display: block; font-weight: 600; color: #fff; font-size: 16px; }
+  :is(#panel, #trip) .row small { display: block; color: #a8a29e; font-size: 13px; line-height: 1.3; }
+  :is(#panel, #trip) .sw { flex: none; width: 46px; height: 28px; border-radius: 14px; background: #44403c; position: relative; transition: background .15s; }
+  :is(#panel, #trip) .sw::after { content: ""; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; transition: transform .15s; }
+  :is(#panel, #trip) .row[aria-checked="true"] .sw { background: #15803d; }
+  :is(#panel, #trip) .row[aria-checked="true"] .sw::after { transform: translateX(18px); }
+  :is(#panel, #trip, #planbar) .chips { display: flex; flex-wrap: wrap; gap: 8px; padding: 6px 0 10px; }
+  :is(#panel, #trip, #planbar) .chip { border: 1px solid #57534e; background: #1c1917; color: var(--tan); border-radius: 999px; padding: 7px 12px; font-size: 14px; font-weight: 600; cursor: pointer; }
+  :is(#panel, #trip, #planbar) .chip[aria-pressed="true"] { background: var(--tan); color: #111; border-color: var(--tan); }
+  :is(#panel, #trip, #planbar) .chips.off { display: none; }
+  .key i.easy, .key i.mod, .key i.hard, .key i.unk { height: 0; background: none; border: 0; border-top: 4px dashed #22c55e; border-radius: 0; box-shadow: none; }
+  .key i.mod { border-top-color: #3b82f6; } .key i.hard { border-top-color: #ef4444; } .key i.unk { border-top-color: #fff; }
+  .key .k-trail { display: none; } body.trails-on .key .k-trail { display: inline-flex; }
+  .pop .uses { color: #15803d; font-weight: 600; }
+  .pop .lvl { font-weight: 700; }
+  body.locked #map, body.locked .fab, body.locked .key, body.locked #panel, body.locked #trip, body.locked #planbar { display: none; }
+  #gate { display: none; max-width: 420px; margin: 32px auto; padding: 0 16px; text-align: center; }
+  body.locked #gate { display: block; }
+  #gate h2 { font-size: 20px; margin: 0 0 8px; }
+  #gate p { color: var(--muted); margin: 0 0 16px; }
+  #gate .err { background: #fee2e2; color: #991b1b; padding: 10px; border-radius: 8px; font-size: 14px; }
+  #gate a.go { display: block; background: #15803d; color: #fff; padding: 12px 16px; border-radius: 10px; text-decoration: none; font-weight: 600; }
+  .leaflet-control-attribution { display: none; white-space: normal; max-width: min(420px, calc(100vw - 96px)); font-size: 11px; line-height: 1.4; background: rgba(17,17,17,.88) !important; color: #d6d3d1; border-radius: 10px; padding: 6px 9px !important; margin: 0 0 6px 10px !important; }
+  body.creds-open .leaflet-control-attribution { display: block; }
+  .leaflet-control-attribution a { color: var(--tan); }
+  .leaflet-control-zoom { display: none; }
+  .leaflet-top.leaflet-left { top: calc(44px + env(safe-area-inset-top)); }
+  @media (min-width: 700px) { .leaflet-control-zoom { display: block; } }
+  .shade { mix-blend-mode: multiply; }
+  .place-ic { width:26px;height:26px;border-radius:50%;background:#fff;border:2px solid #1c1917;box-shadow:0 1px 4px rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;font-size:14px;line-height:1; }
+  .camp-ic { width:24px;height:24px;border-radius:6px;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:700; }
+  /* Trip tools: route builder and your own pins */
+  #trip-btn { bottom: calc(278px + env(safe-area-inset-bottom)); }
+  #trip-btn[aria-expanded="true"] { color: var(--gold); }
+  .tbtns { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px 0 4px; }
+  .tbtn { border: 1px solid #57534e; background: #1c1917; color: var(--tan); border-radius: 10px; padding: 10px 14px; font-size: 15px; font-weight: 600; cursor: pointer; }
+  .tbtn.pri { background: #15803d; border-color: #15803d; color: #fff; }
+  .tbtn.bad { background: #1c1917; border-color: #7f1d1d; color: #fca5a5; }
+  .tbtn:disabled { opacity: .45; cursor: default; }
+  #trip .empty { color: #a8a29e; font-size: 14px; padding: 6px 0; }
+  #trip label { display: block; font-size: 13px; color: #a8a29e; margin: 12px 0 4px; }
+  #trip input[type=text], #trip textarea, #planbar input { width: 100%; box-sizing: border-box; background: #1c1917; color: #fff; border: 1px solid #57534e; border-radius: 10px; padding: 10px 12px; font: inherit; font-size: 16px; }
+  #trip textarea { min-height: 84px; resize: vertical; }
+  #trip .ph { margin-top: 8px; max-width: 100%; max-height: 180px; border-radius: 10px; display: block; }
+  #planbar { position: absolute; top: 52px; left: 8px; right: 8px; z-index: 1050; max-width: 520px; margin: 0 auto; background: rgba(17,17,17,.94); color: var(--tan); border-radius: 14px; box-shadow: 0 2px 12px rgba(0,0,0,.5); padding: 10px 12px 8px; }
+  #planbar[hidden] { display: none; }
+  #planbar .pb-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  #planbar .pb-top b { color: #fff; font-size: 15px; }
+  #planbar .chips { padding: 8px 0 4px; }
+  #planbar .tbtns { padding: 4px 0; }
+  #planbar .tbtn { padding: 8px 12px; font-size: 14px; }
+  #planbar .pb-name { display: flex; gap: 8px; padding-top: 6px; }
+  #planbar .pb-name[hidden] { display: none; }
+  #planbar small { display: block; color: #a8a29e; font-size: 11px; margin-top: 4px; }
+  #planbar small a { color: var(--tan); }
+  body.planning #note { top: 200px; }
+  body.trip-tap .leaflet-overlay-pane, body.trip-tap .leaflet-overlay-pane *, body.trip-tap .leaflet-marker-pane, body.trip-tap .leaflet-marker-pane * { pointer-events: none !important; }
+  body.trip-tap #map { cursor: crosshair; }
+  .stop-ic { width: 24px; height: 24px; border-radius: 50%; background: #fb923c; border: 3px solid #111; color: #111; font: 700 12px/18px system-ui, sans-serif; text-align: center; box-sizing: border-box; box-shadow: 0 0 0 2px #fff, 0 1px 5px rgba(0,0,0,.6); }
+  .mypin { width: 30px; height: 30px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); background: #fb923c; border: 3px solid #111; box-shadow: 0 0 0 2px #fff, 0 2px 6px rgba(0,0,0,.55); box-sizing: border-box; display: grid; place-items: center; }
+  .mypin::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #111; }
+  .pop .note { white-space: pre-wrap; margin-top: 4px; }
+  .pop img.ph { display: block; width: 220px; max-width: 100%; border-radius: 8px; margin-top: 8px; background: #e7e5e4; min-height: 60px; }
+  .pop .acts { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .pop .acts button { border: 1px solid #d6d3d1; background: #fff; color: #1c1917; border-radius: 8px; padding: 6px 10px; font: 600 14px system-ui, sans-serif; cursor: pointer; }
+  .pop .acts button.bad { color: #b91c1c; border-color: #fecaca; }
+</style>
+</head>
+<body class="locked">
+<header>
+  <h1>Trails near you</h1>
+  <a href="/">Back to Local America</a>
+  <form id="find" role="search" autocomplete="off"><input id="find-in" type="text" enterkeyhint="go" spellcheck="false" placeholder="Paste GPS here" aria-label="Go to GPS coordinates"><button type="submit" aria-label="Go to these coordinates"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg></button></form>
+</header>
+<div id="gate"><h2 id="gate-title">Checking your sign-in…</h2><p id="gate-text"></p><div id="gate-extra"></div></div>
+<div id="note"></div>
+<div id="map"></div>
+<button class="fab" id="trip-btn" type="button" aria-label="Open trips" aria-expanded="false" aria-controls="trip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="18" r="2.4" fill="currentColor"/><circle cx="18" cy="6" r="2.4" fill="currentColor"/><path d="M8 17c4-1 2-6 6-6s3-3 2.5-3.5"/></svg><span>Trips</span></button>
+<button class="fab" id="lay-btn" type="button" aria-label="Open layers" aria-expanded="false" aria-controls="panel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="9" cy="6" r="2" fill="currentColor"/><circle cx="15" cy="12" r="2" fill="currentColor"/><circle cx="7" cy="18" r="2" fill="currentColor"/></svg><span>Layers</span></button>
+<button class="fab" id="topo-btn" type="button" aria-label="Show topo lines" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 17c3-4 6-4 9-1s6 2 9-2"/><path d="M3 12c3-4 6-4 9-1s6 2 9-2"/><path d="M3 7c3-4 6-4 9-1s6 2 9-2"/></svg><span>Topo off</span></button>
+<button class="fab" id="sat-btn" type="button" aria-label="Switch to the plain map"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 3 2 8l10 5 10-5-10-5Z"/><path d="m2 13 10 5 10-5"/></svg><span>Map</span></button>
+<button class="fab" id="me-btn" type="button" aria-label="Show where I am">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="12" cy="12" r="4" fill="currentColor"/><circle cx="12" cy="12" r="8"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3"/></svg>
+</button>
+<button class="mini" id="key-btn" type="button" aria-expanded="false" aria-label="Show the map key">Key</button>
+<button class="mini" id="cred-btn" type="button" aria-expanded="false" aria-label="Show map credits">i</button>
+<div class="key"><span><i class="hwy"></i>Highway</span><span><i></i>Open to drive</span><span><i class="dirt"></i>Other roads</span><span><i class="topo"></i>Topo line</span><span><i class="land"></i>Public land</span><span><i class="pin"></i>Local America place</span><span class="k-trail"><i class="easy"></i>Easy trail</span><span class="k-trail"><i class="mod"></i>Moderate</span><span class="k-trail"><i class="hard"></i>Hard</span><span class="k-trail"><i class="unk"></i>Not rated</span></div>
+<div id="trip" role="dialog" aria-label="Trips" aria-hidden="true"><div class="grab"></div><div class="top"><h2 id="trip-title">Trips</h2><button class="close" type="button">Done</button></div><div id="trip-body"></div></div>
+<div id="planbar" hidden><div class="pb-top"><b id="pb-sum">Tap the map to add stops</b><button class="tbtn" id="pb-x" type="button">Close</button></div><div id="pb-modes"></div><div class="tbtns"><button class="tbtn" id="pb-undo" type="button">Undo</button><button class="tbtn" id="pb-clear" type="button">Clear</button><button class="tbtn" id="pb-share" type="button">Share</button><button class="tbtn pri" id="pb-save" type="button">Save</button></div><div class="pb-name" hidden><input id="pb-input" type="text" maxlength="80" placeholder="Name this route" aria-label="Route name"><button class="tbtn pri" id="pb-ok" type="button">Save</button></div><small>Tap a stop to take it out, or drag it to move it. Routes follow roads and trails in OpenStreetMap (routing by FOSSGIS Valhalla). <a href="https://www.openstreetmap.org/fixthemap" target="_blank" rel="noopener">Fix the map</a></small></div>
+<div id="panel" role="dialog" aria-label="Map layers" aria-hidden="true"><div class="grab"></div><div class="top"><h2>Layers</h2><button class="close" type="button">Done</button></div><div id="panel-body"></div></div>
+<script>
+// ---------- Owner only ----------
+// Same sign-in as the Traffic page. The map starts only after Supabase confirms this is the owner account.
+const sb = supabase.createClient('https://ycdlxdijrlfsxvxksyrq.supabase.co', 'sb_publishable_2ExdXbNtW9HpuOGAq1Oa7g_gPdONH_s', {
+  auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: 'pkce', storageKey: 'la-traffic-auth' }
+});
+function gate(title, text, extra) {
+  document.getElementById('gate-title').textContent = title;
+  document.getElementById('gate-text').textContent = text || '';
+  document.getElementById('gate-extra').innerHTML = extra || '';
+}
+const SIGN_IN = '<a class="go" href="/traffic.html">Go to the Traffic page to sign in</a>';
+(async () => {
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) return gate('Sign in to see this page', 'This page is private. It uses the same sign-in as the Traffic page. Sign in there, then come back here.', SIGN_IN);
+    const { data: ok, error } = await sb.rpc('is_traffic_admin');
+    if (error) return gate('Could not check your sign-in', 'Pull down to reload the page.');
+    if (ok !== true) {
+      const email = session.user && session.user.email;
+      await sb.auth.signOut();
+      return gate('Sign in to see this page', `${email || 'That account'} is not allowed to see this page. Sign in with the Local America Gmail.`, SIGN_IN);
+    }
+    document.body.classList.remove('locked');
+    startMap();
+  } catch (e) {
+    gate('Could not check your sign-in', 'Pull down to reload the page.');
+  }
+})();
+
+function startMap() {
+// Phone memory: keeps map squares already seen on this phone (see trails-sw.js). Its scope is this page's own
+// address, so it never touches the rest of the site.
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/trails-sw.js', { scope: location.pathname.replace(/\.html$/, '') }).catch(() => {});
+}
+// Owner-only trails map (only the Local America owner account can open it; not linked from the app).
+// - starts where you are (blue dot), or Willow Springs if location is off
+// - satellite photo underneath (USGS, public domain); the Map button switches to the plain topo map
+// - green = public land (Forest Service land from PAD-US)
+// - cream lines with dark edges = Forest Service roads and trails open to vehicles today
+// - thin pale gray lines = OpenStreetMap dirt and gravel roads (nobody has checked who may drive them)
+// - pins = free Local America places (paid places have no public GPS)
+const SUPABASE_URL = 'https://ycdlxdijrlfsxvxksyrq.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_2ExdXbNtW9HpuOGAq1Oa7g_gPdONH_s';
+const WILLOW_SPRINGS = [36.9923, -91.9690];
+const VEH_OK = ['any', 'jeep', 'wide', 'atv', 'moto'];
+const MISSOURI = L.latLngBounds([35.99, -95.77], [40.62, -89.10]);
+
+const map = L.map('map', { zoomControl: true, preferCanvas: true, tap: true, maxZoom: 19 }).setView(WILLOW_SPRINGS, 12);
+L.control.scale({ metric: false, position: 'bottomleft', maxWidth: 110 }).addTo(map);
+
+// ---------- Layers panel ----------
+// The Layers button opens a panel of switches. Choices are kept on this phone only (browser
+// storage); if the phone won't keep them, the map just starts with the usual choices.
+const PREF_KEY = 'la-trails-layers';
+const prefs = (() => { try { const p = JSON.parse(localStorage.getItem(PREF_KEY)); return p && typeof p === 'object' && !Array.isArray(p) ? p : {}; } catch (e) { return {}; } })();
+if (!VEH_OK.includes(prefs.veh)) prefs.veh = 'any';
+function savePrefs() { try { localStorage.setItem(PREF_KEY, JSON.stringify(prefs)); } catch (e) { /* not kept, that's fine */ } }
+const panel = document.getElementById('panel'), panelBody = document.getElementById('panel-body'), layBtn = document.getElementById('lay-btn');
+function setPanel(open) { panel.classList.toggle('open', open); panel.setAttribute('aria-hidden', String(!open)); layBtn.setAttribute('aria-expanded', String(open)); }
+layBtn.addEventListener('click', () => setPanel(!panel.classList.contains('open')));
+panel.querySelector('.close').addEventListener('click', () => setPanel(false));
+map.on('click', () => setPanel(false));
+// Each group of switches folds up under a heading that says how many are on. Open or shut is kept like the switches.
+const sections = {};
+const SEC_ICONS = { trails: '\u{1F97E}', veh: '\u{1F699}', live: '\u{1F4E1}', maplayers: '\u{1F5FA}\uFE0F', places: '\u{1F4CD}', trips: '\u{1F9ED}' };
+function countOn(id) {
+  const sec = sections[id]; if (!sec) return;
+  const cnt = sec.head.querySelector('.cnt');
+  const chip = sec.box.querySelector('.chips .chip[aria-pressed="true"]');
+  if (id === 'veh') { cnt.textContent = chip ? chip.textContent : ''; cnt.classList.toggle('on', !!chip && chip.dataset.k !== 'any'); return; }
+  const n = sec.box.querySelectorAll('.row[role="switch"][aria-checked="true"]').length;
+  cnt.textContent = n ? n + ' on' : 'Off'; cnt.classList.toggle('on', n > 0);
+}
+function section(id, title, sub) {
+  if (!sections[id]) {
+    const head = document.createElement('button'); head.type = 'button'; head.className = 'sec-h';
+    head.innerHTML = '<span class="ic" aria-hidden="true"></span><span class="nm"></span><span class="cnt"></span>';
+    head.querySelector('.ic').textContent = SEC_ICONS[id] || '';
+    head.querySelector('.nm').textContent = title;
+    const box = document.createElement('div'); box.className = 'sec-b'; box.id = 'sec-' + id;
+    head.setAttribute('aria-controls', box.id);
+    const setOpen = (v) => { head.setAttribute('aria-expanded', String(v)); box.hidden = !v; };
+    setOpen(!!prefs['open-' + id]);
+    head.addEventListener('click', () => { const v = box.hidden; setOpen(v); prefs['open-' + id] = v; savePrefs(); });
+    panelBody.append(head, box);
+    if (sub) { const p = document.createElement('div'); p.className = 'row'; p.style.cursor = 'default'; p.innerHTML = '<div class="txt"><small></small></div>'; p.querySelector('small').textContent = sub; box.append(p); }
+    sections[id] = { head, box };
+  }
+  return sections[id].box;
+}
+const secOf = (el) => { const b = el.closest('.sec-b'); return b ? b.id.slice(4) : null; };
+const ROW_ICONS = { trails: '\u{1F97E}', radar: '\u{1F327}\uFE0F', fires: '\u{1F525}', rivers: '\u{1F30A}', closures: '\u{1F6A7}', shade: '\u26F0\uFE0F', oldtopo: '\u{1F4DC}', night: '\u{1F30C}', cell: '\u{1F4F6}', camping: '\u{1F3D5}\uFE0F', 'trip-routes': '\u3030\uFE0F', 'trip-pins': '\u{1F4CC}' };
+// One on/off switch. key is the saved name; on(true/false) shows or hides the layer.
+function toggle(sec, key, title, sub, on, def = false) {
+  const row = document.createElement('div');
+  row.className = 'row'; row.setAttribute('role', 'switch'); row.tabIndex = 0;
+  row.innerHTML = '<div class="txt"><b></b><small></small></div><span class="sw"></span>';
+  // a small picture in front of each switch; Places already start with one in the title
+  const m = /^(\p{Extended_Pictographic}\uFE0F?)\s+(.*)$/u.exec(title);
+  const ic = m ? m[1] : ROW_ICONS[key];
+  if (ic) { const i = document.createElement('span'); i.className = 'ri'; i.setAttribute('aria-hidden', 'true'); i.textContent = ic; row.prepend(i); }
+  if (m) title = m[2];
+  row.querySelector('b').textContent = title;
+  row.querySelector('small').textContent = sub || '';
+  const set = (v, save) => { row.setAttribute('aria-checked', String(v)); prefs[key] = v; if (save) savePrefs(); on(v); countOn(secOf(row)); };
+  row.addEventListener('click', () => set(row.getAttribute('aria-checked') !== 'true', true));
+  row.addEventListener('keydown', (e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); row.click(); } });
+  sec.append(row);
+  set(prefs[key] != null ? !!prefs[key] : def, false);
+  return row;
+}
+// A row of buttons to pick from
+function chips(sec, items, isOn, onTap) {
+  const box = document.createElement('div'); box.className = 'chips';
+  const paint = () => { box.querySelectorAll('.chip').forEach((b) => b.setAttribute('aria-pressed', String(isOn(b.dataset.k)))); countOn(secOf(box)); };
+  items.forEach(([k, label]) => {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'chip'; b.textContent = label; b.dataset.k = k;
+    b.addEventListener('click', () => { onTap(k); paint(); });
+    box.append(b);
+  });
+  sec.append(box); paint();
+  return box;
+}
+const renderer = L.canvas({ tolerance: 12, padding: 0.5 }); // draws half a screen past the edges so lines are there as you pan
+
+const topo = L.tileLayer('https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{z}/{y}/{x}', {
+  maxNativeZoom: 16, maxZoom: 19, className: 'base-topo', keepBuffer: 4, crossOrigin: true, attribution: 'Base map: USGS The National Map'
+});
+// On sharp phone screens (2 or 3 screen dots per pixel) each photo square is drawn half size, one zoom step closer,
+// so the picture has twice the detail. These saved squares come back fast (about a tenth of a second each).
+const HI_DPI = (window.devicePixelRatio || 1) >= 1.5;
+const imagery = L.tileLayer('https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/{z}/{y}/{x}', HI_DPI
+  ? { tileSize: 128, zoomOffset: 1, maxNativeZoom: 15, maxZoom: 19, zIndex: 1, keepBuffer: 3, crossOrigin: true, className: 'sat', attribution: 'Base map: USGS The National Map' }
+  : { maxNativeZoom: 16, maxZoom: 19, zIndex: 1, keepBuffer: 4, crossOrigin: true, className: 'sat', attribution: 'Base map: USGS The National Map' }
+).addTo(map);
+// A rough copy of the same photos underneath, from a few big squares, so zooming never shows empty gray squares
+// while the sharp ones load.
+const backstop = L.tileLayer('https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/{z}/{y}/{x}', {
+  maxNativeZoom: 10, maxZoom: 16, zIndex: 0, keepBuffer: 1, crossOrigin: true, className: 'sat'
+}).addTo(map);
+
+// Close up, the saved satellite squares above run out of detail (they stop at about 2.4 m per pixel).
+// From zoom 16 Missouri's own statewide aerial photo (6 inch, about 0.15 m per pixel, flown with the leaves off
+// in 2023 and 2024 by the state, served free by MSDIS) is drawn on top, so trails show under the trees.
+// Zoomed out the green summer photo stays. Squares are made to order (1 to 2 seconds each) and kept on the
+// phone by trails-sw.js, so a spot you've seen opens at once next time. Outside Missouri the photo is see-through
+// and the regular satellite shows instead.
+// Topo lines: USGS elevation contours (brown lines with heights), drawn over the satellite from zoom 11.
+const MERC = 20037508.342789244;
+const ArcExport = L.TileLayer.extend({
+  getTileUrl(c) {
+    const size = (2 * MERC) / Math.pow(2, c.z);
+    const bbox = [-MERC + c.x * size, MERC - (c.y + 1) * size, -MERC + (c.x + 1) * size, MERC - c.y * size].join(',');
+    return this._base + '&bbox=' + bbox;
+  }
+});
+const sharp = new ArcExport('', { minZoom: 16, maxNativeZoom: 19, maxZoom: 19, zIndex: 2, tileSize: 256, keepBuffer: 4, updateWhenZooming: false, crossOrigin: true, className: 'sat' });
+sharp._base = 'https://stateimagery.msdis.missouri.edu/arcgis/rest/services/Missouri_6inch_Statewide_2023_2024_Cached/ImageServer/exportImage?f=image&format=jpgpng&bandIds=0,1,2&bboxSR=3857&imageSR=3857&size=512,512';
+sharp.addTo(map);
+const contours = new ArcExport('', { minZoom: 11, maxZoom: 19, zIndex: 5, className: 'contours', keepBuffer: 4, updateWhenZooming: false, crossOrigin: true });
+contours._base = 'https://carto.nationalmap.gov/arcgis/rest/services/contours/MapServer/export?f=image&format=png32&transparent=true&bboxSR=3857&imageSR=3857&size=512,512';
+// Zoomed out: only the bold every-5th lines, no numbers. From zoom 15: heights you can read. Close up (16+): every line.
+// Each 512 px picture is shown at 256 px: dpi 120 keeps the lines hairline thin; close up, dpi 192 makes the numbers big enough to read.
+contours.getTileUrl = function (c) {
+  const show = c.z >= 16 ? '2,10,11,15,16,21,22,25,26' : c.z >= 15 ? '2,10,11,15,16,21,25' : '2,11,16,25';
+  return ArcExport.prototype.getTileUrl.call(this, c) + '&dpi=' + (c.z >= 15 ? 192 : 120) + '&layers=show:' + show;
+};
+// Topo lines start off every time; the Topo button turns them on.
+map.attributionControl.addAttribution('Close-up aerial photo: State of Missouri 6-inch 2023-2024 (MSDIS); Topo lines: USGS 3DEP');
+map.attributionControl.setPrefix('');
+map.attributionControl.setPosition('bottomleft');
+// Key and credits open from the two small buttons in the bottom left; tapping the map closes them.
+function miniToggle(id, cls) {
+  const b = document.getElementById(id);
+  b.addEventListener('click', (e) => { e.stopPropagation(); const v = !document.body.classList.contains(cls); document.body.classList.toggle(cls, v); b.setAttribute('aria-expanded', String(v)); });
+  map.on('click', () => { document.body.classList.remove(cls); b.setAttribute('aria-expanded', 'false'); });
+}
+miniToggle('key-btn', 'key-open');
+miniToggle('cred-btn', 'creds-open');
+map.attributionControl.addAttribution('Roads: Forest Service; Public land: USGS PAD-US; © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors');
+
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+let noteTimer;
+const note = (msg, ms) => {
+  const n = document.getElementById('note'); clearTimeout(noteTimer);
+  n.textContent = msg || ''; n.style.display = msg ? 'block' : 'none';
+  if (msg && ms) noteTimer = setTimeout(() => note(''), ms);
+};
+const titleCase = (t) => String(t).toLowerCase().replace(/\b([a-z])/g, (m) => m.toUpperCase()).replace(/'S\b/g, "'s");
+const miles = (m) => (m < 0.1 ? 'under 0.1' : m < 10 ? m.toFixed(1) : Math.round(m)) + ' mi';
+
+// ---------- Where am I ----------
+let me = null, meMarker = null, followed = false;
+const meIcon = L.divIcon({ className: '', html: '<div class="me-dot"></div>', iconSize: [20, 20], iconAnchor: [10, 10] });
+function showMe(ll) {
+  me = L.latLng(ll);
+  if (!meMarker) meMarker = L.marker(me, { icon: meIcon, interactive: false, zIndexOffset: 1000 }).addTo(map);
+  else meMarker.setLatLng(me);
+}
+function startLocation(centerOnIt) {
+  if (!navigator.geolocation) { fallback("This phone isn't sharing its location, so here's Willow Springs."); return; }
+  if (centerOnIt) note('Finding you…');
+  navigator.geolocation.watchPosition((p) => {
+    showMe([p.coords.latitude, p.coords.longitude]);
+    if (!followed || centerOnIt) {
+      followed = true; centerOnIt = false;
+      if (MISSOURI.contains(me)) { map.setView(me, 14); note(''); }
+      else fallback("You're outside Missouri, where this map has trails. Here's Willow Springs.");
+    }
+  }, () => { if (!followed) { followed = true; fallback('Location is off, so here is Willow Springs. Tap the blue button to try again.'); } },
+  { enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 });
+}
+function fallback(msg) { map.setView(WILLOW_SPRINGS, 12); note(msg, 6000); }
+document.getElementById('me-btn').onclick = () => {
+  if (me) { map.setView(me, Math.max(map.getZoom(), 14)); return; }
+  followed = false; startLocation(true);
+};
+let sat = true;
+let topoOn = false;
+document.getElementById('topo-btn').onclick = (e) => {
+  topoOn = !topoOn;
+  if (topoOn) contours.addTo(map); else map.removeLayer(contours);
+  e.currentTarget.querySelector('span').textContent = topoOn ? 'Topo on' : 'Topo off';
+  e.currentTarget.setAttribute('aria-pressed', String(topoOn));
+  e.currentTarget.ariaLabel = topoOn ? 'Hide topo lines' : 'Show topo lines';
+};
+document.getElementById('sat-btn').onclick = (e) => {
+  sat = !sat;
+  if (sat) { map.removeLayer(topo); backstop.addTo(map); imagery.addTo(map); sharp.addTo(map); if (topoOn) contours.addTo(map); e.currentTarget.querySelector('span').textContent = 'Map'; e.currentTarget.ariaLabel = 'Switch to the plain map'; }
+  else { map.removeLayer(backstop); map.removeLayer(imagery); map.removeLayer(sharp); map.removeLayer(contours); topo.addTo(map); e.currentTarget.querySelector('span').textContent = 'Satellite'; e.currentTarget.ariaLabel = 'Switch to satellite'; }
+  document.getElementById('topo-btn').style.display = sat ? '' : 'none';
+};
+
+// ---------- Places (pins) ----------
+const placeList = [];
+const pinIcon = L.divIcon({ className: '', html: '<div class="pin"></div>', iconSize: [30, 30], iconAnchor: [4, 30], popupAnchor: [11, -28] });
+fetch(`${SUPABASE_URL}/rest/v1/poi_public_locations?select=id,name,category,latitude,longitude`, {
+  headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+}).then((r) => r.json()).then((rows) => {
+  (rows || []).filter((l) => l.latitude != null && l.longitude != null).forEach((l) => {
+    const ll = L.latLng(l.latitude, l.longitude);
+    placeList.push({ name: l.name, ll });
+    L.marker(ll, { icon: pinIcon, zIndexOffset: 500 }).bindPopup(() => {
+      const away = me ? `<div>${miles(me.distanceTo(ll) / 1609.34)} from you</div>` : '';
+      return `<div class="pop"><h3>${esc(l.name)}</h3><div>${esc(l.category || '')}</div>${away}<a class="btn" href="/#/p/${encodeURIComponent(l.id)}">Open in Local America</a></div>`;
+    }).addTo(map);
+  });
+}).catch(() => {});
+
+// Closest place to a line, and how far
+function nearestPlace(latlngs) {
+  const pts = latlngs.flat(3);
+  const step = Math.max(1, Math.floor(pts.length / 40));
+  let best = null;
+  for (const p of placeList) {
+    for (let i = 0; i < pts.length; i += step) {
+      const d = p.ll.distanceTo(pts[i]);
+      if (!best || d < best.d) best = { name: p.name, d };
+    }
+  }
+  return best && best.d < 16000 ? best : null; // within about 10 miles
+}
+function lineMiles(latlngs) {
+  let m = 0;
+  (Array.isArray(latlngs[0]) ? latlngs : [latlngs]).forEach((seg) => { for (let i = 1; i < seg.length; i++) m += L.latLng(seg[i - 1]).distanceTo(seg[i]); });
+  return m / 1609.34;
+}
+function placeAndYou(latlngs) {
+  let out = '';
+  const near = nearestPlace(latlngs);
+  if (near) out += `<div>Leads toward <b>${esc(near.name)}</b>${near.d > 400 ? ' (' + miles(near.d / 1609.34) + ' away)' : ''}</div>`;
+  if (me) {
+    const pts = latlngs.flat(3); let d = Infinity;
+    pts.forEach((p) => { d = Math.min(d, me.distanceTo(p)); });
+    out += `<div>${d < 150 ? "You're on it" : miles(d / 1609.34) + ' from you'}</div>`;
+  }
+  return out;
+}
+
+// ---------- Public land (green) ----------
+// Drawn first on the same canvas as the roads, so roads sit on top and win a tap when you're close
+// to one; a tap anywhere else inside the green says what land it is.
+function landPopup(a) {
+  const name = a.n ? `${a.k}: ${a.n}` : a.k;
+  const access = a.o ? 'Open to the public.' : 'Open to the public with some limits. Check the rules before you go.';
+  return `<div class="pop"><h3>${esc(name)}</h3><div>${access}</div>${me ? `<div>${miles(nearestOnLand(a.ll) / 1609.34)} from you</div>` : ''}
+    <div class="small">Public land from USGS PAD-US and the Forest Service. Driving is only allowed on roads marked open.</div></div>`;
+}
+function nearestOnLand(rings) {
+  let best = Infinity;
+  for (const ring of rings) for (const p of ring) best = Math.min(best, me.distanceTo(p));
+  return best;
+}
+function drawLand(j) {
+  (j.areas || []).forEach((a) => {
+    a.ll = a.r.map((ring) => ring.map(([x, y]) => L.latLng(y, x)));
+    L.polygon(a.ll, { renderer, color: '#bbf7d0', weight: 2, opacity: 0.85, fillColor: '#4ade80', fillOpacity: 0.16 })
+      .bindPopup(() => landPopup(a)).addTo(landLayer);
+  });
+}
+const landLayer = L.layerGroup().addTo(map);
+
+// ---------- Forest Service roads and trails open to vehicles ----------
+const fsLayer = L.layerGroup().addTo(map);
+const isOpen = (v) => v != null && String(v).trim() !== '' && !/^(n|no|null)$/i.test(String(v).trim());
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+// Dates look like "04/01-12/15" (sometimes several, split by commas)
+function ranges(s) {
+  return String(s || '').split(/[,;]/).map((r) => r.trim().match(/^(\d{1,2})\/(\d{1,2})\s*-\s*(\d{1,2})\/(\d{1,2})$/)).filter(Boolean)
+    .map((m) => ({ a: +m[1] * 100 + +m[2], b: +m[3] * 100 + +m[4], text: `${MONTHS[+m[1] - 1]} ${+m[2]} to ${MONTHS[+m[3] - 1]} ${+m[4]}` }));
+}
+function openToday(rs) {
+  if (!rs.length) return true;
+  const t = new Date(), today = (t.getMonth() + 1) * 100 + t.getDate();
+  return rs.some(({ a, b }) => (a <= b ? today >= a && today <= b : today >= a || today <= b));
+}
+// Which vehicles each Forest Service field covers (Motor Vehicle Use Map)
+const VEHICLES = {
+  any: { name: 'Any vehicle' },
+  jeep: { name: 'Jeep or truck', short: 'Jeeps and trucks', f: [['passengervehicle', 'passengervehicle_datesopen'], ['highclearancevehicle', 'highclearancevehicle_datesopen'], ['fourwd_gt50inches', 'fourwd_gt50_datesopen']] },
+  wide: { name: 'Side-by-side over 50 in', short: 'side-by-sides over 50 inches wide', f: [['otherwheeled_ohv', 'otherwheeled_ohv_datesopen'], ['fourwd_gt50inches', 'fourwd_gt50_datesopen']] },
+  atv: { name: 'ATV or side-by-side 50 in or less', short: 'ATVs and side-by-sides 50 inches or less', f: [['atv', 'atv_datesopen'], ['otherwheeled_ohv', 'otherwheeled_ohv_datesopen'], ['fourwd_gt50inches', 'fourwd_gt50_datesopen']] },
+  moto: { name: 'Dirt bike', short: 'dirt bikes', f: [['motorcycle', 'motorcycle_datesopen']] },
+};
+function fsInfo(a, veh) {
+  const jeep = isOpen(a.highclearancevehicle) || isOpen(a.fourwd_gt50inches);
+  const car = isOpen(a.passengervehicle);
+  const atv = isOpen(a.atv) || isOpen(a.otherwheeled_ohv);
+  const moto = isOpen(a.motorcycle);
+  if (!jeep && !car && !atv && !moto) return null;
+  const label = car ? 'Any car' : jeep ? 'Jeep friendly' : atv ? 'ATV and side-by-side only' : 'Dirt bikes only';
+  const extra = (car || jeep) && atv ? ', ATVs too' : '';
+  let dateField = car ? a.passengervehicle_datesopen : jeep ? (a.highclearancevehicle_datesopen || a.fourwd_gt50_datesopen) : atv ? (a.atv_datesopen || a.otherwheeled_ohv_datesopen) : a.motorcycle_datesopen;
+  let pick = '';
+  const v = VEHICLES[veh];
+  if (v && v.f) {
+    const hit = v.f.find(([k]) => isOpen(a[k]));
+    if (!hit) return null; // not open to the vehicle picked in Layers
+    dateField = a[hit[1]];
+    pick = 'Open to ' + v.short;
+  }
+  const rs = ranges(dateField).filter((r) => !(r.a === 101 && r.b === 1231));
+  return { label: label + extra, pick, rough: /^\s*[12]\b/.test(String(a.operationalmaintlevel || '')), rs, open: openToday(rs) };
+}
+function fsPopup(a, info, latlngs, isTrail) {
+  const num = a.id ? (isTrail ? 'Trail ' : 'Forest Road ') + a.id : '';
+  const name = a.name && a.name.trim() ? titleCase(a.name) : (num || 'Forest Service road');
+  const len = a.gis_miles != null ? Number(a.gis_miles) : lineMiles(latlngs);
+  const season = !info.open ? `<div class="closed">Closed right now. Open ${esc(info.rs.map((r) => r.text).join(', '))}</div>`
+    : info.rs.length ? `<div>Open ${esc(info.rs.map((r) => r.text).join(', '))}</div>` : '';
+  return `<div class="pop"><h3>${esc(name)}</h3><div class="big">${esc(info.label)} · ${miles(len).replace(' mi', ' miles')}</div>${info.pick ? `<div>${esc(info.pick)}</div>` : ''}${season}${info.rough && info.label === 'Any car' ? '<div>Rough in spots</div>' : ''}${placeAndYou(latlngs)}
+    <div class="small">${esc(num && name !== num ? num + ' · ' : '')}From the Forest Service. Open means allowed, not that it's in good shape today.</div></div>`;
+}
+// Forest Service roads come from our own site (a saved copy), not live from the Forest Service.
+// Dirt roads draw first and Forest Service roads on top, all on one canvas so taps work everywhere.
+const DIRT_KINDS = { 'Dirt track': 'Dirt track', 'Dirt road': 'Dirt road', 'Unpaved road': 'Gravel or dirt road', 'Gravel road': 'Gravel road' };
+const getJson = (url, tries = 3) => fetch(url).then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
+  .catch((e) => (tries > 1 ? new Promise((ok) => setTimeout(ok, 1500)).then(() => getJson(url, tries - 1)) : Promise.reject(e)));
+// Map data files live on Cloudflare R2 (bucket localamerica-trails), apart from the app videos
+const DATA = 'https://pub-2db698c77b2e4668a900baa59fbc0af0.r2.dev/';
+// ---------- Dirt and gravel roads (OpenStreetMap), all of Missouri ----------
+// One file holds the whole state cut into small pieces by area (0.25 degree squares). The map
+// reads only the pieces on screen, a few KB each, so the phone never downloads the whole state.
+const DIRT_FILES = [DATA + 'dirt-roads-mo.bin'];
+const DIRT_MIN_ZOOM = 10;
+let dirtSrc = null, dirtWhole = null, dirtIdx = null, dirtStart = 0, dirtIdxP = null, dirtFailed = false;
+const dirtAsked = new Set(), dirtShown = new Set();
+async function getRange(url, from, to) {
+  if (dirtWhole && url === dirtSrc) return dirtWhole.slice(from, to + 1);
+  const r = await fetch(url, { headers: { Range: `bytes=${from}-${to}` } });
+  if (!r.ok) throw new Error(r.status);
+  const b = new Uint8Array(await r.arrayBuffer());
+  if (r.status === 206) return b;
+  dirtWhole = b; // server sent the whole file instead of a piece; keep it and cut pieces from it
+  return b.slice(from, to + 1);
+}
+async function dirtIndex() {
+  for (const url of DIRT_FILES) {
+    try {
+      dirtSrc = url; dirtWhole = null;
+      let head = await getRange(url, 0, 65535);
+      const len = +new TextDecoder().decode(head.slice(0, 10));
+      if (!len) throw new Error('bad file');
+      if (10 + len > head.length) head = await getRange(url, 0, 9 + len);
+      dirtIdx = JSON.parse(new TextDecoder().decode(head.slice(10, 10 + len)));
+      dirtStart = 10 + len;
+      if (new URLSearchParams(location.search).has('debug')) note('Dirt roads from ' + (url.startsWith('http') ? 'R2' : 'this site'), 8000);
+      return;
+    } catch (e) { /* try the next copy */ }
+  }
+  throw new Error('dirt roads unavailable');
+}
+async function gunzipJson(bytes) {
+  const s = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+  return JSON.parse(await new Response(s).text());
+}
+function drawDirt(fc) {
+  // same plain gray road style as every other road, so only trails look like trails
+  L.geoJSON(fc, { interactive: false, style: () => ({ renderer, color: '#27272a', weight: 4.5, opacity: 0.7, lineCap: 'round', lineJoin: 'round' }) }).addTo(map)
+    .eachLayer((l) => l.bringToBack());
+  L.geoJSON(fc, {
+    style: () => ({ renderer, color: '#b9bdc4', weight: 2.5, opacity: 1, lineCap: 'round', lineJoin: 'round' }),
+    onEachFeature: (f, layer) => {
+      const p = f.properties;
+      layer.bindPopup(() => `<div class="pop"><h3>${esc(p.n || DIRT_KINDS[p.k])}</h3><div class="big">${esc(DIRT_KINDS[p.k])} · ${miles(Number(p.mi)).replace(' mi', ' miles')}</div>${placeAndYou(layer.getLatLngs())}
+        <div class="small">Nobody has checked who may drive this one. Some are private land. Map data © OpenStreetMap contributors.</div></div>`);
+    }
+  }).addTo(map);
+  // keep the highways, then the Forest Service roads, drawn on top
+  roadHigh.eachLayer((l) => l.bringToFront());
+  if (map.hasLayer(fsLayer)) { fsLayer.remove(); fsLayer.addTo(map); }
+}
+async function loadDirt() {
+  if (dirtFailed || map.getZoom() < DIRT_MIN_ZOOM) return;
+  try { await (dirtIdxP = dirtIdxP || dirtIndex()); }
+  catch (e) { dirtFailed = true; note("Couldn't load the dirt roads. Pull down to reload the page.", 6000); return; }
+  const C = dirtIdx.cell, b = map.getBounds().pad(0.2), keys = [];
+  for (let i = Math.floor(b.getWest() / C); i <= Math.floor(b.getEast() / C); i++) {
+    for (let j = Math.floor(b.getSouth() / C); j <= Math.floor(b.getNorth() / C); j++) {
+      const k = i + '_' + j;
+      if (dirtIdx.tiles[k] && !dirtAsked.has(k)) { dirtAsked.add(k); keys.push(k); }
+    }
+  }
+  if (!keys.length) return;
+  const rows = (await Promise.all(keys.map(async (k) => {
+    const [off, len] = dirtIdx.tiles[k];
+    try { return await gunzipJson(await getRange(dirtSrc, dirtStart + off, dirtStart + off + len - 1)); }
+    catch (e) { dirtAsked.delete(k); return []; }
+  }))).flat();
+  const features = [];
+  for (const [k, mi, n, coords, id] of rows) {
+    if (dirtShown.has(id) || !DIRT_KINDS[k]) continue;
+    dirtShown.add(id);
+    features.push({ type: 'Feature', properties: { k, mi, n }, geometry: { type: typeof coords[0][0] === 'number' ? 'LineString' : 'MultiLineString', coordinates: coords } });
+  }
+  if (features.length) drawDirt({ type: 'FeatureCollection', features });
+}
+
+Promise.allSettled([getJson(DATA + 'fs-roads.json'), getJson(DATA + 'public-land.json')]).then(([fs, land]) => {
+  if (land.status === 'fulfilled') { drawLand(land.value); roadLow.eachLayer((l) => l.bringToFront()); roadHigh.eachLayer((l) => l.bringToFront()); if (map.hasLayer(fsLayer)) { fsLayer.remove(); fsLayer.addTo(map); } }
+  else note("Couldn't load the public land. Pull down to reload the page.", 6000);
+  // dirt roads start after the land so they draw above it, and load more as the map moves
+  loadDirt();
+  map.on('moveend', loadDirt);
+  if (fs.status !== 'fulfilled') { note("Couldn't load the Forest Service roads. Pull down to reload the page.", 8000); return; }
+  fsFeatures = fs.value.features || [];
+  drawFs();
+});
+// Draws the Forest Service roads for the vehicle picked in Layers (or any vehicle)
+let fsFeatures = [];
+function drawFs() {
+  fsLayer.clearLayers();
+  roadLabels.length = 0;
+  const round = { lineCap: 'round', lineJoin: 'round' };
+  fsFeatures.forEach((f) => {
+    const a = f.a || {};
+    const info = fsInfo(a, prefs.veh);
+    if (!info) return;
+    const ll = f.ll || (f.ll = f.p.map((path) => path.map(([x, y]) => L.latLng(y, x))));
+    if (info.open) L.polyline(ll, { renderer, color: '#fff', weight: 13, opacity: 0.22, interactive: false, ...round }).addTo(fsLayer);
+    L.polyline(ll, { renderer, color: '#111', weight: info.open ? 9 : 5, opacity: info.open ? 0.95 : 0.6, interactive: false, ...round }).addTo(fsLayer);
+    L.polyline(ll, { renderer, color: info.open ? '#f2b134' : '#a8a29e', weight: info.open ? 4.5 : 2.5, opacity: 1, dashArray: info.open ? null : '6 6', ...round })
+      .bindPopup(() => fsPopup(a, info, ll, f.t === 2)).addTo(fsLayer);
+    const p0 = ll[0] || [];
+    if (info.open && p0.length) roadLabels.push({ ll: p0[Math.floor(p0.length / 2)], text: fsLabel(a, f.t === 2) });
+  });
+  drawLabels();
+}
+
+// ---------- Paved roads: highways, county roads and town streets ----------
+// All of Missouri's paved roads (OpenStreetMap data) live in two files on this site, cut into squares.
+// The map reads only the squares on screen with small range requests, so roads show up in a blink
+// instead of waiting on a slow government server every time the map moves.
+//   roads-mo-main.bin: highways only, simplified, for zoomed out (zoom 8-11)
+//   roads-mo-all.bin: every paved road, town streets too, full detail (zoom 12 and closer)
+// Dirt and gravel roads stay in their own file (dirt-roads-mo.bin).
+const ROAD_FILES = { main: '/trails-data/roads-mo-main.bin?v=1', all: '/trails-data/roads-mo-all.bin?v=1' };
+const roadFile = { main: null, all: null };
+const roadCells = new Map(); // "set|i_j|width" -> { set, cas: [], low: [], high: [], shields: [] } or a promise while loading
+const roadBytes = new Map(); // downloaded squares (still packed, so they stay small), kept so panning back needs no new download
+let roadBytesSize = 0;
+const roadCase = L.layerGroup().addTo(map), roadLow = L.layerGroup().addTo(map), roadHigh = L.layerGroup().addTo(map);
+const mainLayer = roadHigh; // kept so other code can find the highways
+let mainLabels = [], mainRun = 0;
+const retiredRoads = new Map(); // squares on screen that the latest move no longer wants
+async function rangeOf(f, from, to) {
+  if (f.whole) return f.whole.slice(from, to + 1);
+  const r = await fetch(f.url, { headers: { Range: `bytes=${from}-${to}` } });
+  if (!r.ok) throw new Error(r.status);
+  const b = new Uint8Array(await r.arrayBuffer());
+  if (r.status === 206) return b;
+  f.whole = b; // server sent the whole file; cut pieces from it from now on
+  return b.slice(from, to + 1);
+}
+function openRoadFile(set) {
+  if (!roadFile[set]) {
+    const f = { url: ROAD_FILES[set], whole: null };
+    roadFile[set] = (async () => {
+      let head = await rangeOf(f, 0, 65535);
+      const len = +new TextDecoder().decode(head.slice(0, 10));
+      if (!len) throw new Error('bad file');
+      if (10 + len > head.length) head = await rangeOf(f, 0, 9 + len);
+      f.idx = JSON.parse(new TextDecoder().decode(head.slice(10, 10 + len)));
+      f.start = 10 + len;
+      return f;
+    })().catch((e) => { roadFile[set] = null; throw e; });
+  }
+  return roadFile[set];
+}
+// one packed square, from the cache or the file (the cache holds about 12 MB at most)
+function squareBytes(f, key, tile) {
+  if (roadBytes.has(key)) { const p = roadBytes.get(key); roadBytes.delete(key); roadBytes.set(key, p); return p; }
+  const [off, len] = f.idx.tiles[tile];
+  const p = rangeOf(f, f.start + off, f.start + off + len - 1);
+  roadBytes.set(key, p); roadBytesSize += len; p.len = len;
+  p.catch(() => { if (roadBytes.get(key) === p) { roadBytes.delete(key); roadBytesSize -= len; } });
+  while (roadBytesSize > 12e6 && roadBytes.size > 1) { const [k0, p0] = roadBytes.entries().next().value; roadBytes.delete(k0); roadBytesSize -= p0.len || 0; }
+  return p;
+}
+// "I-44", "US 60", "Hwy 76", "Rte CC" (or "Rte MO CC") -> the number or letters for the small round badge
+function shieldOf(text) {
+  if (!text) return null;
+  const m = /^(I-|US |Hwy |Rte )(?:MO )?(.+)$/.exec(text);
+  if (!m) return null;
+  return { text: m[1] + m[2], short: m[2], cls: m[1] === 'I-' || m[1] === 'US ' ? 'us' : '', rank: { 'I-': 3, 'US ': 2, 'Hwy ': 1, 'Rte ': 1 }[m[1]] };
+}
+// one line from the file: [x0, y0, dx, dy, ...] in 1/100000 degrees -> Leaflet points
+function unpack(a) {
+  const out = []; let x = 0, y = 0;
+  for (let i = 0; i < a.length; i += 2) { x += a[i]; y += a[i + 1]; out.push([y / 1e5, x / 1e5]); }
+  return out;
+}
+const ROAD_KIND = { 1: 'Freeway', 2: 'Paved highway', 3: 'Paved road', 4: 'Paved road' };
+function roadWidth(kind, z) {
+  const close = z >= 13 ? 1 : z >= 12 ? 0.8 : 0.6;
+  return (kind === 1 ? 4.5 : kind === 2 ? 3.5 : kind === 3 ? 3 : 2.5) * close;
+}
+// which drawing a square needs at this zoom; a square drawn for another one is rebuilt
+function widthKey(set, z) { return set === 'main' ? (z < 10 ? 'a' : 'b') + roadWidth(2, z) : 'c' + roadWidth(2, z); }
+// The file keeps each road in many short pieces. Pieces of the same road are joined into one map line,
+// so a square is about a hundred lines instead of thousands (fast on a phone, even in a city).
+function buildCell(set, rows, z) {
+  const cell = { set, cas: [], low: [], high: [], shields: [] };
+  const round = { lineCap: 'round', lineJoin: 'round' };
+  const roads = new Map(), edges = new Map();
+  for (const [kind, name, sh, parts] of rows) {
+    if (set === 'main' && kind === 3 && z < 10) continue;
+    const ll = parts.map(unpack), key = kind + '|' + name + '|' + sh;
+    let r = roads.get(key);
+    if (!r) roads.set(key, r = { kind, name, sh, ll: [] });
+    r.ll.push(...ll);
+    if (!edges.has(kind)) edges.set(kind, []);
+    edges.get(kind).push(...ll);
+  }
+  for (const [kind, ll] of edges) cell.cas.push(L.polyline(ll, { renderer, color: '#27272a', weight: roadWidth(kind, z) + 2, opacity: 0.85, interactive: false, ...round }));
+  for (const { kind, name, sh, ll } of roads.values()) {
+    const s = shieldOf(sh), hwy = kind <= 2 || !!sh;
+    const title = name || (s && s.text) || (hwy ? 'Highway' : 'Road');
+    const line = L.polyline(ll, { renderer, color: hwy ? '#cfd3d9' : '#b9bdc4', weight: roadWidth(kind, z), opacity: 1, ...round })
+      .bindPopup(() => `<div class="pop"><h3>${esc(title)}</h3><div class="big">${ROAD_KIND[kind]}${s && s.text !== title ? ' · ' + esc(s.text) : ''}</div><div class="small">Map data © OpenStreetMap contributors.</div></div>`);
+    (hwy ? cell.high : cell.low).push(line);
+    if (s) cell.shields.push({ text: s.short, cls: s.cls, rank: s.rank, ll });
+  }
+  return cell;
+}
+// Keeps crossings clean: every dark edge under every gray line, highways over small roads,
+// Forest Service roads on top. Runs once per screen refresh, however many squares came in.
+let restackQueued = false;
+function restackRoads() {
+  if (restackQueued) return;
+  restackQueued = true;
+  requestAnimationFrame(() => {
+    restackQueued = false;
+    roadHigh.eachLayer((l) => l.bringToFront());
+    if (map.hasLayer(fsLayer)) { fsLayer.remove(); fsLayer.addTo(map); }
+  });
+}
+function showCell(c) {
+  c.cas.forEach((l) => { roadCase.addLayer(l); l.bringToBack(); });
+  c.low.forEach((l) => roadLow.addLayer(l));
+  c.high.forEach((l) => roadHigh.addLayer(l));
+  c.shown = true;
+  restackRoads();
+}
+function hideCell(c) {
+  c.cas.forEach((l) => roadCase.removeLayer(l));
+  c.low.forEach((l) => roadLow.removeLayer(l));
+  c.high.forEach((l) => roadHigh.removeLayer(l));
+  c.shown = false;
+}
+async function drawMain() {
+  const run = ++mainRun, z = map.getZoom();
+  const set = z >= 12 ? 'all' : z >= 8 ? 'main' : null;
+  let f = null;
+  if (set) { try { f = await openRoadFile(set); } catch (e) { note("Couldn't load the roads. Move the map to try again.", 5000); return; } }
+  if (run !== mainRun) return;
+  const want = new Set();
+  if (f) {
+    const C = f.idx.cell, b = map.getBounds().pad(0.25), wk = widthKey(set, z);
+    for (let i = Math.floor(b.getWest() / C); i <= Math.floor(b.getEast() / C); i++)
+      for (let j = Math.floor(b.getSouth() / C); j <= Math.floor(b.getNorth() / C); j++)
+        if (f.idx.tiles[i + '_' + j]) want.add(set + '|' + i + '_' + j + '|' + wk);
+  }
+  // squares no longer wanted (off screen, the other file, or drawn for another zoom) stay up
+  // until the newest move has drawn its squares, so the roads never blink off
+  for (const [k, c] of roadCells) if (!want.has(k)) { roadCells.delete(k); if (!(c instanceof Promise) && c.shown) retiredRoads.set(k, c); }
+  await Promise.all([...want].map(async (k) => {
+    let c = roadCells.get(k);
+    if (!c && retiredRoads.has(k)) { c = retiredRoads.get(k); retiredRoads.delete(k); roadCells.set(k, c); }
+    if (!c) {
+      const [, tile] = k.split('|');
+      const p = squareBytes(f, set + '|' + tile, tile).then(gunzipJson).then((rows) => buildCell(set, rows, z));
+      roadCells.set(k, p);
+      try { c = await p; } catch (e) { if (roadCells.get(k) === p) roadCells.delete(k); return; }
+      if (roadCells.get(k) !== p) return;
+      roadCells.set(k, c);
+    } else if (c instanceof Promise) { const p = c; try { c = await p; } catch (e) { return; } if (roadCells.get(k) !== p && roadCells.get(k) !== c) return; roadCells.set(k, c); }
+    if (run !== mainRun || roadCells.get(k) !== c) return;
+    if (!c.shown) showCell(c);
+  }));
+  if (run !== mainRun) return;
+  for (const c of retiredRoads.values()) if (c.shown) hideCell(c);
+  retiredRoads.clear();
+  mainLabels = [];
+  for (const k of want) { const c = roadCells.get(k); if (c && !(c instanceof Promise)) mainLabels.push(...c.shields); }
+}
+
+// ---------- Names on the map ----------
+// Peaks (with height), hollows and towns come from the USGS place-name list (GNIS), one small file on this site
+// loaded once, so names show up right away. Forest road numbers come from our own Forest Service file.
+// Labels that would overlap are skipped.
+const roadLabels = [];
+function fsLabel(a, isTrail) {
+  const num = a.id ? (isTrail ? 'Trail ' : 'FS ') + a.id : '';
+  const name = a.name && a.name.trim() ? titleCase(a.name) : '';
+  return name && num && !name.includes(a.id) ? `${name} · ${num}` : (name || num);
+}
+const heightCache = new Map();
+const labelLayer = L.layerGroup().addTo(map);
+// Rows: [kind, name, lng, lat]; kind T incorporated town, t other town, p peak, v hollow, r ridge, g gap
+let namesP = null;
+function placeNames() {
+  if (!namesP) namesP = fetch('/trails-data/names-mo.bin?v=1').then((r) => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); })
+    .then((b) => gunzipJson(new Uint8Array(b))).catch(() => { namesP = null; return []; });
+  return namesP;
+}
+function peakHeight(ll) {
+  const key = ll.lat.toFixed(5) + ',' + ll.lng.toFixed(5);
+  if (!heightCache.has(key)) {
+    heightCache.set(key, fetch(`https://epqs.nationalmap.gov/v1/json?x=${ll.lng}&y=${ll.lat}&units=Feet&wkid=4326`)
+      .then((r) => r.json()).then((j) => (Number(j.value) > 0 ? Math.round(j.value) : null)).catch(() => null));
+  }
+  return heightCache.get(key);
+}
+let labelRun = 0;
+async function drawLabels() {
+  const run = ++labelRun, z = map.getZoom();
+  if (z < 8) { labelLayer.clearLayers(); return; }
+  const b = map.getBounds();
+  const names = z >= 10 ? (await placeNames()).filter((n) => b.contains([n[3], n[2]])) : [];
+  if (run !== labelRun) return;
+  const items = [];
+  // highway shields: one per route, halfway along the part that is on screen (kept off the edges)
+  const inner = b.pad(-0.1);
+  mainLabels.forEach((m) => {
+    const on = [];
+    m.ll.forEach((path) => path.forEach((pt, i) => {
+      if (i) { const half = [(pt[0] + path[i - 1][0]) / 2, (pt[1] + path[i - 1][1]) / 2]; if (inner.contains(half)) on.push(half); }
+      if (inner.contains(pt)) on.push(pt);
+    }));
+    if (on.length) items.push({ kind: 'shield' + (m.cls ? ' ' + m.cls : ''), name: m.text, ll: L.latLng(on[Math.floor(on.length / 2)]), pri: 2.7 + m.rank / 10 + on.length / 1e6 });
+  });
+  const LAND = { p: 'peak', v: 'valley', r: 'valley', g: 'valley' };
+  names.forEach(([k, name, x, y]) => {
+    const ll = L.latLng(y, x);
+    if (k === 'T' || (k === 't' && z >= 12)) items.push({ kind: 'town', name, ll, pri: k === 'T' ? 3 : 2.8 });
+    else if (k === 'p' && z >= 12) items.push({ kind: 'peak', name, ll, pri: 2.5 });
+    else if (LAND[k] && k !== 'p' && z >= 13) items.push({ kind: 'valley', name, ll, pri: 0 });
+  });
+  if (z >= 13) roadLabels.forEach((r) => { if (b.contains(r.ll) && r.text) items.push({ kind: 'road', name: r.text, ll: r.ll, pri: 2 }); });
+  items.sort((x, y) => y.pri - x.pri);
+  const taken = [], seen = new Set(), out = [];
+  for (const it of items) {
+    const k = it.kind + it.name; if (seen.has(k)) continue;
+    const p = map.latLngToContainerPoint(it.ll);
+    const w = it.name.length * (it.kind === 'town' ? 8.5 : 7.5) + 16, h = it.kind === 'peak' ? 44 : it.kind.startsWith('shield') ? 24 : 22;
+    const box = [p.x - w / 2, p.y - h / 2, p.x + w / 2, p.y + h / 2];
+    if (taken.some((t) => box[0] < t[2] && box[2] > t[0] && box[1] < t[3] && box[3] > t[1])) continue;
+    taken.push(box); seen.add(k); out.push(it);
+    if (out.length >= 45) break;
+  }
+  labelLayer.clearLayers();
+  out.forEach((it) => {
+    const id = 'h' + Math.random().toString(36).slice(2);
+    const inner = it.kind === 'peak' ? `<b></b>${esc(it.name)}<small id="${id}"></small>` : esc(it.name);
+    L.marker(it.ll, { interactive: false, keyboard: false, zIndexOffset: -100,
+      icon: L.divIcon({ className: '', iconSize: [0, 0], html: `<div class="lbl ${it.kind}">${inner}</div>` }) }).addTo(labelLayer);
+    if (it.kind === 'peak') peakHeight(it.ll).then((ft) => { const el = document.getElementById(id); if (el && ft) el.textContent = ft.toLocaleString('en-US') + ' ft'; });
+  });
+}
+let labelTimer;
+map.on('moveend', () => { clearTimeout(labelTimer); labelTimer = setTimeout(() => drawMain().finally(drawLabels), 250); });
+setTimeout(() => drawMain().finally(drawLabels), 400);
+map.attributionControl.addAttribution('Names and heights: USGS GNIS, 3DEP; Trails: USDA Forest Service; Roads: © OpenStreetMap contributors');
+
+// ---------- Hiking, bike and horse trails (off until switched on in Layers) ----------
+// Forest Service trails (Mark Twain National Forest) and OpenStreetMap paths. They load one small
+// square at a time through our own site (api/trails-data), only while the switch is on.
+const trailLayer = L.layerGroup();
+const TRAIL_MIN_ZOOM = 11, PATH_MIN_ZOOM = 12, CELL = 0.25;
+const TRAIL_SQ = { x0: -384, x1: -356, y0: 143, y1: 163 }; // same squares the map data service takes
+const TRAIL_COLORS = { easy: '#22c55e', mod: '#3b82f6', hard: '#ef4444', unk: '#ffffff' };
+const TRAIL_LEVEL = { easy: 'Easy', mod: 'Moderate', hard: 'Hard', unk: 'Not rated' };
+if (!prefs.uses || typeof prefs.uses !== 'object') prefs.uses = { foot: true, bike: true, horse: true };
+const trailAsked = new Set(), fsTrailNames = new Map(), fsCellLoads = new Map(), trailItems = [];
+// Forest Service trail names by square, so a copy of the same trail from OpenStreetMap is only skipped close by
+function fsNamesNear(i, j, key) {
+  for (let di = -1; di <= 1; di++) for (let dj = -1; dj <= 1; dj++) { const s = fsTrailNames.get((i + di) + '_' + (j + dj)); if (s && s.has(key)) return true; }
+  return false;
+}
+let trailsOn = false, trailZoomNote = false, trailFailNote = false;
+const said = (v) => v != null && String(v).trim() !== '';
+const nameKey = (n) => String(n || '').toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\b(trail|tr|spur|loop|section|segment|the|nrt|ot)\b/g, ' ').replace(/\s+/g, ' ').trim();
+function usesText(u) {
+  const t = [u.foot && 'Hiking', u.horse && 'horses', u.bike && 'bikes'].filter(Boolean);
+  return t.length ? t.join(', ').replace(/^./, (c) => c.toUpperCase()) : '';
+}
+// Forest Service trail class 1 is the roughest, 5 the most built up
+function fsTrailLevel(a) {
+  const c = String(a.trail_class || '').trim();
+  return c === '1' || c === '2' ? 'hard' : c === '3' ? 'mod' : c === '4' || c === '5' ? 'easy' : 'unk';
+}
+const CLASS_TEXT = { 1: 'barely built, rough and hard to follow', 2: 'narrow and rough', 3: 'a clear, worn path', 4: 'wide and smooth', 5: 'fully built, often paved' };
+const YES = /^(yes|designated|permissive|official)$/;
+function osmUses(a) {
+  const h = a.highway;
+  return {
+    foot: a.foot ? YES.test(a.foot) : h === 'path' || h === 'footway',
+    bike: a.bicycle ? YES.test(a.bicycle) : h === 'cycleway' || said(a['mtb:scale']),
+    horse: a.horse ? YES.test(a.horse) : h === 'bridleway',
+  };
+}
+// OpenStreetMap hiking and bike scales, plus "hard to see" trails
+function osmLevel(a) {
+  const rank = { easy: 1, mod: 2, hard: 3 };
+  let lvl = 'unk';
+  const up = (l) => { if (lvl === 'unk' || rank[l] > rank[lvl]) lvl = l; };
+  const sac = a.sac_scale;
+  if (sac === 'hiking') up('easy'); else if (sac === 'mountain_hiking') up('mod'); else if (sac) up('hard');
+  const mtb = parseInt(a['mtb:scale'], 10);
+  if (Number.isFinite(mtb)) up(mtb <= 0 ? 'easy' : mtb <= 2 ? 'mod' : 'hard');
+  if (/^(bad|horrible|no)$/.test(a.trail_visibility || '')) up('hard');
+  return lvl;
+}
+const OSM_KIND = { path: 'Trail', footway: 'Footpath', bridleway: 'Horse trail', cycleway: 'Bike path' };
+function trailPopup(t, latlngs) {
+  const lvl = `<span class="lvl" style="color:${t.lvl === 'unk' ? '#57534e' : TRAIL_COLORS[t.lvl]}">${TRAIL_LEVEL[t.lvl]}</span>`;
+  const len = t.mi != null ? t.mi : lineMiles(latlngs);
+  return `<div class="pop"><h3>${esc(t.name)}</h3><div class="big">${lvl} · ${miles(len).replace(' mi', ' miles')}</div>` +
+    `${t.uses ? `<div class="uses">${esc(t.uses)}</div>` : ''}${t.extra ? `<div>${esc(t.extra)}</div>` : ''}${placeAndYou(latlngs)}<div class="small">${esc(t.src)}</div></div>`;
+}
+function addTrail(ll, uses, t) {
+  const round = { lineCap: 'round', lineJoin: 'round' };
+  const edge = L.polyline(ll, { renderer, color: '#111', weight: 6.5, opacity: 0.75, interactive: false, ...round });
+  const line = L.polyline(ll, { renderer, color: TRAIL_COLORS[t.lvl], weight: 3.5, opacity: 1, dashArray: '8 6', ...round }).bindPopup(() => trailPopup(t, ll));
+  const item = { uses, edge, line };
+  trailItems.push(item);
+  showTrail(item);
+}
+function showTrail(item) {
+  const on = ['foot', 'bike', 'horse'].some((u) => prefs.uses[u] && item.uses[u]);
+  [item.edge, item.line].forEach((l) => (on ? l.addTo(trailLayer) : l.remove()));
+}
+function drawFsTrails(j, cell) {
+  (j.features || []).forEach((f) => {
+    const a = f.a || {};
+    const uses = { foot: said(a.hiker_pedestrian_managed) || said(a.hiker_pedestrian_accpt), horse: said(a.pack_saddle_managed) || said(a.pack_saddle_accpt), bike: said(a.bicycle_managed) || said(a.bicycle_accpt) };
+    if (!uses.foot && !uses.horse && !uses.bike) return; // motor-only trails are already on the map in gold
+    const id = 'fs' + (a.trail_no || '') + '|' + (f.p[0] && f.p[0][0] && f.p[0][0].join(','));
+    if (trailAsked.has(id)) return; trailAsked.add(id);
+    const nk = a.trail_name ? nameKey(a.trail_name) : '';
+    if (nk && cell) { if (!fsTrailNames.has(cell)) fsTrailNames.set(cell, new Set()); fsTrailNames.get(cell).add(nk); }
+    const width = String(a.typical_tread_width || '').match(/(\d+\s*-\s*\d+|\d+\+?)\s*(INCHES|IN|FEET|FT)/i);
+    const extra = [a.trail_surface && a.trail_surface !== 'NATIVE MATERIAL' ? titleCase(a.trail_surface) : 'Dirt', width ? width[1].replace(/\s/g, '') + ' ' + (/^F/i.test(width[2]) ? 'feet' : 'inches') + ' wide' : ''].filter(Boolean).join(', ');
+    const cls = String(a.trail_class || '').trim();
+    addTrail(f.p.map((path) => path.map(([x, y]) => L.latLng(y, x))), uses, {
+      name: a.trail_name ? titleCase(a.trail_name) : a.trail_no ? 'Trail ' + a.trail_no : 'Forest Service trail',
+      lvl: fsTrailLevel(a), mi: a.gis_miles != null ? Number(a.gis_miles) : null, uses: usesText(uses), extra,
+      src: `From the Forest Service${CLASS_TEXT[cls] ? ` (trail class ${cls} of 5: ${CLASS_TEXT[cls]})` : ''}. Allowed doesn't mean it's in good shape today.`,
+    });
+  });
+}
+// OpenStreetMap paths for all of Missouri live in one file on our own site (trails-data/paths-mo.bin),
+// cut into 0.25 degree squares like the dirt road file, so the phone reads only the squares on screen.
+// Each row: [kind, miles, name, coordinates, id, surface]
+const PATHS_FILE = '/trails-data/paths-mo.bin';
+let pathsIdxP = null, pathsWhole = null;
+async function pathRange(from, to) {
+  if (pathsWhole) return pathsWhole.slice(from, to + 1);
+  const r = await fetch(PATHS_FILE, { headers: { Range: `bytes=${from}-${to}` } });
+  if (!r.ok) throw new Error(r.status);
+  const b = new Uint8Array(await r.arrayBuffer());
+  if (r.status === 206) return b;
+  pathsWhole = b; // the site sent the whole file; keep it and cut pieces from it
+  return b.slice(from, to + 1);
+}
+function pathsIndex() {
+  return pathsIdxP || (pathsIdxP = (async () => {
+    let head = await pathRange(0, 65535);
+    const len = +new TextDecoder().decode(head.slice(0, 10));
+    if (!len) throw new Error('bad file');
+    if (10 + len > head.length) head = await pathRange(0, 9 + len);
+    return { idx: JSON.parse(new TextDecoder().decode(head.slice(10, 10 + len))), start: 10 + len };
+  })().catch((e) => { pathsIdxP = null; throw e; }));
+}
+async function pathCell(i, j) {
+  const { idx, start } = await pathsIndex();
+  const t = idx.tiles[i + '_' + j];
+  if (!t) return [];
+  return gunzipJson(await pathRange(start + t[0], start + t[0] + t[1] - 1));
+}
+function drawPaths(rows, i, j) {
+  for (const [kind, mi, name, coords, id, surface] of rows) {
+    if (trailAsked.has('osm' + id)) continue; trailAsked.add('osm' + id);
+    const nk = name ? nameKey(name) : '';
+    if (nk && fsNamesNear(i, j, nk)) continue; // already shown from the Forest Service
+    const a = { highway: kind };
+    const uses = osmUses(a);
+    if (!uses.foot && !uses.horse && !uses.bike) continue;
+    const ll = typeof coords[0][0] === 'number' ? [coords.map(([x, y]) => L.latLng(y, x))] : coords.map((c) => c.map(([x, y]) => L.latLng(y, x)));
+    addTrail(ll, uses, {
+      name: name || OSM_KIND[kind] || 'Trail', lvl: osmLevel(a), mi, uses: usesText(uses),
+      extra: surface ? titleCase(String(surface).replace(/_/g, ' ')) : '',
+      src: 'Map data © OpenStreetMap contributors. Nobody has checked this one, and some cross private land.',
+    });
+  }
+}
+function getCell(src, i, j) {
+  return fetch(`/api/trails-data?src=${src}&x=${i}&y=${j}`).then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
+}
+function loadTrails() {
+  if (!trailsOn) return;
+  const z = map.getZoom();
+  if (z < TRAIL_MIN_ZOOM) { if (!trailZoomNote) { trailZoomNote = true; note('Zoom in to see the trails', 3000); } return; }
+  const b = map.getBounds().pad(0.15);
+  // only the squares the map data covers (Missouri plus a little edge)
+  const i0 = Math.max(TRAIL_SQ.x0, Math.floor(b.getWest() / CELL)), i1 = Math.min(TRAIL_SQ.x1, Math.floor(b.getEast() / CELL));
+  const j0 = Math.max(TRAIL_SQ.y0, Math.floor(b.getSouth() / CELL)), j1 = Math.min(TRAIL_SQ.y1, Math.floor(b.getNorth() / CELL));
+  for (let i = i0; i <= i1; i++) {
+    for (let j = j0; j <= j1; j++) {
+      const cell = i + '_' + j, osmKey = `cell-osm-${cell}`;
+      if (!fsCellLoads.has(cell)) {
+        fsCellLoads.set(cell, getCell('fstrails', i, j).then((d) => drawFsTrails(d, cell)).catch(() => { fsCellLoads.delete(cell); failNote(); }));
+      }
+      if (z >= PATH_MIN_ZOOM && !trailAsked.has(osmKey)) {
+        trailAsked.add(osmKey);
+        // wait for the Forest Service trails here and next door, so the same trail isn't drawn twice
+        const near = [];
+        for (let di = -1; di <= 1; di++) for (let dj = -1; dj <= 1; dj++) { const p = fsCellLoads.get((i + di) + '_' + (j + dj)); if (p) near.push(p); }
+        Promise.all(near).then(() => pathCell(i, j)).then((rows) => drawPaths(rows, i, j)).catch(() => { trailAsked.delete(osmKey); failNote(); });
+      }
+    }
+  }
+}
+function failNote() { if (!trailFailNote) { trailFailNote = true; note("Couldn't load some trails. Move the map to try again.", 5000); setTimeout(() => { trailFailNote = false; }, 20000); } }
+map.on('moveend', loadTrails);
+
+const trailSec = section('trails', 'Trails');
+let useChips;
+toggle(trailSec, 'trails', 'Hiking, bike and horse trails', 'Colored by how hard they are. Forest Service and OpenStreetMap.', (v) => {
+  trailsOn = v;
+  document.body.classList.toggle('trails-on', v);
+  if (useChips) useChips.classList.toggle('off', !v);
+  if (v) { trailLayer.addTo(map); loadTrails(); } else trailLayer.remove();
+});
+useChips = chips(trailSec, [['foot', 'Hiking'], ['bike', 'Bikes'], ['horse', 'Horses']], (k) => !!prefs.uses[k], (k) => {
+  prefs.uses[k] = !prefs.uses[k]; savePrefs();
+  trailItems.forEach(showTrail);
+});
+useChips.classList.toggle('off', !trailsOn);
+
+const vehSec = section('veh', 'Forest roads open to', 'Hides Forest Service roads and trails your vehicle may not use. Dirt roads from OpenStreetMap stay on, unchecked.');
+chips(vehSec, VEH_OK.map((k) => [k, VEHICLES[k].name]), (k) => prefs.veh === k, (k) => {
+  prefs.veh = k; savePrefs();
+  drawFs();
+  if (k !== 'any') note('Showing Forest Service roads open to ' + VEHICLES[k].short, 4000);
+});
+
+// ---------- Live: weather radar, wildfires, river levels, road closures ----------
+// All off by default. Each one is fetched fresh while it is on (radar every 5 minutes, the rest every 10).
+const liveSec = section('live', 'Live', 'Updated while switched on. Check the source before you rely on it.');
+const when = (t) => { if (!t) return ''; const d = new Date(t); return isNaN(d) ? '' : d.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }); };
+const ago = (t) => { if (!t) return ''; const m = Math.round((Date.now() - t) / 60000); return m < 2 ? 'just now' : m < 90 ? m + ' min ago' : Math.round(m / 60) + ' hr ago'; };
+const nf = (n) => Number(n).toLocaleString();
+function liveLayer(src, draw, everyMin) {
+  const group = L.layerGroup();
+  let timer = null, busy = false, first = true;
+  const load = () => {
+    if (busy || (document.hidden && !first)) return; busy = true;
+    fetch('/api/trails-data?src=' + src).then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then((d) => { if (!map.hasLayer(group)) return; group.clearLayers(); draw(group, d, first); first = false; })
+      .catch(() => note("Couldn't load the live " + src + ' right now. It will try again.', 5000))
+      .finally(() => { busy = false; });
+  };
+  return {
+    group,
+    on(v) {
+      clearInterval(timer); timer = null;
+      if (v) { first = true; group.addTo(map); load(); timer = setInterval(load, everyMin * 60000); } else { group.remove(); group.clearLayers(); }
+    }
+  };
+}
+
+// Weather radar: NOAA NEXRAD picture, about 5 minutes old at most
+map.createPane('radar'); map.getPane('radar').style.zIndex = 350; map.getPane('radar').style.pointerEvents = 'none';
+// Live markers get their own canvas above the roads and trails (which share the main one)
+map.createPane('live'); map.getPane('live').style.zIndex = 450;
+const liveRenderer = L.canvas({ pane: 'live', tolerance: 12 });
+const RADAR = 'https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q-900913/{z}/{x}/{y}.png';
+const radar = L.tileLayer(RADAR + '?t={t}', { pane: 'radar', opacity: 0.6, maxNativeZoom: 12, maxZoom: 19, t: () => Math.floor(Date.now() / 300000), attribution: 'Radar: NOAA NEXRAD via Iowa Environmental Mesonet' });
+let radarTimer = null;
+toggle(liveSec, 'radar', 'Weather radar', 'Rain and storms from NOAA. Refreshes every 5 minutes.', (v) => {
+  clearInterval(radarTimer); radarTimer = null;
+  if (v) { radar.addTo(map); radarTimer = setInterval(() => radar.redraw(), 300000); } else radar.remove();
+});
+
+// Wildfires: current fires and their outlines from the national fire center (NIFC)
+const fireIcon = L.divIcon({ className: '', html: '<div style="width:22px;height:22px;border-radius:50%;background:#ea580c;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;font-weight:700">F</div>', iconSize: [22, 22], iconAnchor: [11, 11] });
+const firePop = (n, ac, pc, d) => '<div class="pop"><h3>' + esc(n || 'Wildfire') + '</h3>'
+  + (ac != null ? '<div class="big">' + nf(Math.round(ac)) + ' acres</div>' : '')
+  + (pc != null ? '<div>' + esc(pc) + '% contained</div>' : '')
+  + (d ? '<div class="small">Found ' + esc(when(d)) + '</div>' : '')
+  + '<div class="small">Source: NIFC. Stay clear and follow local orders.</div>' + (firesAt ? '<div class="small">Checked ' + esc(when(firesAt)) + '</div>' : '') + '</div>';
+let firesAt = 0;
+const fires = liveLayer('fires', (g, d, first) => {
+  firesAt = d.at;
+  (d.areas || []).forEach((a) => {
+    const rings = (a.r || []).map((ring) => ring.map(([x, y]) => [y, x]));
+    if (rings.length) L.polygon(rings, { renderer: liveRenderer, pane: 'live', color: '#ea580c', weight: 2, fillColor: '#ea580c', fillOpacity: 0.25 }).bindPopup(firePop(a.n, a.ac, a.pc)).addTo(g);
+  });
+  (d.fires || []).forEach((f) => L.marker(f.p, { icon: fireIcon }).bindPopup(firePop(f.n, f.ac, f.pc, f.d)).addTo(g));
+  if (first && !(d.fires || []).length && !(d.areas || []).length) note('No current wildfires in or near Missouri.', 4000);
+}, 10);
+toggle(liveSec, 'fires', 'Wildfires', 'Current fires and fire outlines from NIFC.', fires.on);
+
+// River levels: USGS stream gauges (height in feet and flow)
+const rivers = liveLayer('rivers', (g, d) => {
+  (d.gauges || []).forEach((s) => {
+    const html = '<div class="pop"><h3>' + esc(titleCase(s.n)) + '</h3>'
+      + (s.ft != null ? '<div class="big">' + esc(s.ft) + ' ft</div>' : '')
+      + (s.cfs != null ? '<div>' + nf(s.cfs) + ' cubic feet per second</div>' : '')
+      + (s.t ? '<div class="small">Read ' + esc(ago(s.t)) + '</div>' : '')
+      + '<a class="btn" target="_blank" rel="noopener" href="https://waterdata.usgs.gov/monitoring-location/' + encodeURIComponent(s.id) + '/">USGS page</a></div>';
+    L.circleMarker(s.p, { renderer: liveRenderer, pane: 'live', radius: 6, color: '#fff', weight: 1.5, fillColor: '#0284c7', fillOpacity: 0.95 }).bindPopup(html).addTo(g);
+  });
+}, 10);
+toggle(liveSec, 'rivers', 'River levels', 'USGS stream gauges: water height and flow.', rivers.on);
+
+// Road closures: MoDOT (crashes, winter weather, flooding and work zones that close the road)
+const CLOSE_KIND = { crash: 'Crash or incident', winter: 'Winter weather', flood: 'Flooding', work: 'Work zone' };
+const CLOSE_COLOR = { crash: '#dc2626', winter: '#7c3aed', flood: '#2563eb', work: '#ea580c' };
+const closures = liveLayer('closures', (g, d, first) => {
+  (d.closures || []).forEach((c) => {
+    const a = c.a || {};
+    const road = [a.DESIGNATION, a.TRAVELWAY_NAME].filter(Boolean).join(' ').trim() || 'Road';
+    const fromTo = [a.BEGIN_DESCRIPTION || a.BEG_REF_PT, a.END_DESCRIPTION || a.END_REF_PT].filter((v) => v != null && v !== '');
+    const dt = (v) => (typeof v === 'number' ? when(v) : String(v));
+    const html = '<div class="pop"><h3>' + esc(road) + (a.DIRECTION ? ' ' + esc(a.DIRECTION) : '') + '</h3>'
+      + '<div class="closed">Closed: ' + esc(a.TYPE_CODE ? titleCase(a.TYPE_CODE) : (CLOSE_KIND[c.k] || 'Closure')) + '</div>'
+      + (a.COUNTY_NAME ? '<div>' + esc(titleCase(a.COUNTY_NAME)) + ' County</div>' : '')
+      + (a.RIVER_NAME ? '<div>' + esc(a.RIVER_NAME) + '</div>' : '')
+      + (a.WORK_TYPE ? '<div>Work zone: ' + esc(titleCase(a.WORK_TYPE)) + '</div>' : '')
+      + (a.START_TIME && a.END_TIME && !(a.START_TIME === '12:00 AM' && a.END_TIME === '12:00 AM') ? '<div class="small">Closed ' + esc(a.START_TIME) + ' to ' + esc(a.END_TIME) + ' each day</div>' : '')
+      + (fromTo.length ? '<div class="small">' + esc(fromTo.join(' to ')) + '</div>' : '')
+      + (a.EXT_COMMENT ? '<div class="small">' + esc(a.EXT_COMMENT) + '</div>' : '')
+      + ((a.START_DATE || a.END_DATE) ? '<div class="small">' + esc([a.START_DATE && 'From ' + dt(a.START_DATE), a.END_DATE && 'until ' + dt(a.END_DATE)].filter(Boolean).join(' ')) + '</div>' : '')
+      + '<div class="small">Source: MoDOT Traveler Information' + (d.at ? ', checked ' + esc(when(d.at)) : '') + '.</div></div>';
+    L.circleMarker(c.p, { renderer: liveRenderer, pane: 'live', radius: 7, color: '#fff', weight: 2, fillColor: CLOSE_COLOR[c.k] || '#dc2626', fillOpacity: 1 }).bindPopup(html).addTo(g);
+  });
+  if (first && !(d.closures || []).length) note('No road closures listed by MoDOT right now.', 4000);
+}, 10);
+toggle(liveSec, 'closures', 'Road closures', 'Closed roads from MoDOT: crashes, winter weather, flooding, work zones.', closures.on);
+map.attributionControl.addAttribution('Live: NIFC, USGS Water Data, MoDOT');
+
+// ---------- Map layers: hill shading, old topo maps, night lights, cell coverage, forest camping ----------
+const layerSec = section('maplayers', 'Map layers');
+// Hill shading: USGS shaded relief, blended into the map below so ridges and hollows stand out
+const shade = L.tileLayer('https://basemap.nationalmap.gov/arcgis/rest/services/USGSShadedReliefOnly/MapServer/tile/{z}/{y}/{x}', {
+  maxNativeZoom: 16, maxZoom: 19, zIndex: 4.5, opacity: 0.8, className: 'shade', attribution: 'Hill shading: USGS 3DEP'
+});
+toggle(layerSec, 'shade', 'Hill shading', 'Shadows that make ridges and hollows easy to see. USGS.', (v) => { if (v) shade.addTo(map); else shade.remove(); });
+
+// Old topo maps: the oldest USGS topo map for each spot (about 1880s to 1990s), from the USGS map collection hosted by Esri
+const oldTopo = new ArcExport('', { minZoom: 9, maxZoom: 19, maxNativeZoom: 17, zIndex: 4, attribution: 'Old topo maps: USGS Historical Topographic Map Collection, Esri' });
+oldTopo._base = 'https://historical1.arcgis.com/arcgis/rest/services/USA_Historical_Topo_Maps/ImageServer/exportImage?f=image&format=jpg&bboxSR=3857&imageSR=3857&size=512,512&mosaicRule='
+  + encodeURIComponent('{"mosaicMethod":"esriMosaicAttribute","sortField":"DateCurrent","sortValue":"1800","ascending":true,"where":"Map_Scale<=62500"}');
+// Switch hidden Nov 27, 2026 at the owner's ask; the layer stays here. To bring it back, call addOldTopoSwitch().
+function addOldTopoSwitch() {
+  toggle(layerSec, 'oldtopo', 'Old topo maps', 'The oldest USGS map of each area. Shows old roads, mills, schools and homesteads. Zoom in to see it.', (v) => {
+    if (v) { oldTopo.addTo(map); if (map.getZoom() < 9) note('Zoom in to see the old topo maps.', 4000); } else oldTopo.remove();
+  });
+}
+
+// Dark skies: NASA night lights (Black Marble, 2016). Bright spots are towns; dark areas are best for stars.
+const nightLights = L.tileLayer('https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_Black_Marble/default/2016-01-01/GoogleMapsCompatible_Level8/{z}/{y}/{x}.png', {
+  maxNativeZoom: 8, maxZoom: 19, zIndex: 6, opacity: 0.6, attribution: 'Night lights: NASA Black Marble 2016 (GIBS)'
+});
+toggle(layerSec, 'night', 'Dark skies', 'Night lights from NASA. The darker the area, the better for stars.', (v) => { if (v) nightLights.addTo(map); else nightLights.remove(); });
+
+// Cell coverage: FCC National Broadband Map, Missouri 4G LTE (as of Jun 30, 2026), all carriers combined, as carriers report it.
+// Made from the FCC's H3 hexagon file into one picture of Missouri (trails-data/cell-4g-mo.png, about 140 m per pixel).
+// Red = no carrier reports 4G there. Orange = 4G only outdoors standing still, not in a moving vehicle. Clear = 4G in a vehicle.
+map.createPane('cellPane'); map.getPane('cellPane').style.zIndex = 340; map.getPane('cellPane').style.pointerEvents = 'none';
+const cellCov = L.imageOverlay('/trails-data/cell-4g-mo.png?v=1', [[35.99, -95.78], [40.62, -89.09]], {
+  pane: 'cellPane', opacity: 0.5, interactive: false, attribution: 'Cell coverage: FCC National Broadband Map, Jun 2026'
+});
+toggle(layerSec, 'cell', 'Cell coverage', 'Red: no 4G. Orange: 4G only standing still outside, not while driving. All carriers, as they report it to the FCC.', (v) => { if (v) cellCov.addTo(map); else cellCov.remove(); });
+
+// Forest camping: dispersed camping spots and campgrounds in the Mark Twain National Forest (Forest Service list)
+const campLayer = L.layerGroup();
+const campIcon = (k, closed) => L.divIcon({ className: '', html: '<div class="camp-ic" style="background:' + (closed ? '#78716c' : k === 'dispersed' ? '#15803d' : '#0f766e') + '">' + (k === 'dispersed' ? 'DC' : 'CG') + '</div>', iconSize: [24, 24], iconAnchor: [12, 12] });
+let campLoaded = false;
+function loadCamping() {
+  if (campLoaded) return; campLoaded = true;
+  fetch('/api/trails-data?src=camping').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); }).then((d) => {
+    (d.spots || []).forEach((c) => {
+      const html = '<div class="pop"><h3>' + esc(c.n || 'Camping') + '</h3>'
+        + '<div class="big">' + (c.k === 'dispersed' ? 'Dispersed camping' : 'Campground') + '</div>'
+        + (c.closed ? '<div class="closed">Listed as closed</div>' : '')
+        + '<div class="small">Mark Twain National Forest: camping is limited to 14 days in any 30 (Forest Order 09-05-20-01). Follow posted signs.</div>'
+        + (c.u ? '<a class="btn" target="_blank" rel="noopener" href="' + esc(c.u) + '">Forest Service page</a>' : '') + '</div>';
+      L.marker(c.p, { icon: campIcon(c.k, c.closed) }).bindPopup(html).addTo(campLayer);
+    });
+    if (!(d.spots || []).length) note('No forest camping spots came back. Try again later.', 4000);
+  }).catch(() => { campLoaded = false; note("Couldn't load the forest camping spots. Try again later.", 5000); });
+}
+toggle(layerSec, 'camping', 'Forest camping', 'Dispersed camping spots (DC) and campgrounds (CG) in the Mark Twain National Forest.', (v) => {
+  if (v) { campLayer.addTo(map); loadCamping(); } else campLayer.remove();
+});
+map.attributionControl.addAttribution('Camping: USDA Forest Service');
+
+// ---------- Places: river accesses, campgrounds, gas, food, springs, waterfalls, caves, cemeteries, old towns, old mines ----------
+// Most places live in one file on our own site (trails-data/places-mo.bin), cut into 0.25 degree squares like the paths file.
+// Each row: [kind, name, lng, lat, extra]. MDC areas come from the MDC list (whole state) and old mines from USGS (by square).
+const PLACES_FILE = '/trails-data/places-mo.bin?v=1'; // change v when the file is rebuilt
+const PK = {
+  mdc: { ic: '🛶', title: 'River accesses & conservation areas', sub: 'Boat ramps, river accesses and conservation areas from MDC.', z: 9 },
+  camp: { ic: '⛺', title: 'Campgrounds', sub: 'Campgrounds and RV parks, public and private. OpenStreetMap and Overture.', z: 10, name: 'Campground' },
+  gas: { ic: '⛽', title: 'Gas', sub: 'Gas stations and truck stops.', z: 12, name: 'Gas station' },
+  food: { ic: '🍴', title: 'Food', sub: 'Restaurants, fast food and cafes.', z: 12, name: 'Restaurant' },
+  spring: { ic: '💧', title: 'Springs', sub: 'Named and mapped springs. USGS and OpenStreetMap.', z: 11, name: 'Spring' },
+  falls: { ic: '💦', title: 'Waterfalls', sub: 'Waterfalls and named falls. USGS and OpenStreetMap.', z: 11, name: 'Waterfall' },
+  cave: { ic: '🦇', title: 'Caves', sub: 'Cave openings and show caves. Many are closed to protect bats.', z: 11, name: 'Cave' },
+  cem: { ic: '🪦', title: 'Cemeteries', sub: 'Mapped cemeteries, including small family plots.', z: 11, name: 'Cemetery' },
+  ghost: { ic: '🏚️', title: 'Ghost towns', sub: 'Old town sites from USGS records. Little or nothing may be left.', z: 11, name: 'Old town site' },
+  mines: { ic: '⛏️', title: 'Old mines', sub: 'History markers from USGS. Look only: never enter old mines or shafts.', z: 11 },
+};
+const PLACE_NOTE = {
+  camp: 'Call or check their site before you go. Hours, fees and openings change.',
+  gas: 'Hours change. Call ahead in the backcountry, where stations are far apart.',
+  food: 'Hours change. Check before you drive out.',
+  spring: "Don't drink spring water without treating it. Some springs are on private land.",
+  falls: 'Many only run after rain. Some are on private land.',
+  cave: 'Never go in a cave without permission and the right gear. Many caves are closed to protect bats (white-nose syndrome), and many are on private land.',
+  cem: 'Many are on private land. Ask before you visit, and be respectful.',
+  ghost: 'Often on private land now. Ask before you walk in.',
+};
+const placeLayers = {}, placeOn = {}, placeRows = new Map(), placeAsked = new Set(), mineRows = new Map(), mineAsked = new Set();
+let mdcAreas = null, mdcLoading = false, placeFailNote = false, placeZoomNote = {};
+for (const k of Object.keys(PK)) placeLayers[k] = L.layerGroup();
+const placeIcon = (ic) => L.divIcon({ className: '', html: '<div class="place-ic">' + ic + '</div>', iconSize: [26, 26], iconAnchor: [13, 13], popupAnchor: [0, -10] });
+const placeIcons = {}; for (const k of Object.keys(PK)) placeIcons[k] = placeIcon(PK[k].ic);
+placeIcons.access = placeIcon('🛶'); placeIcons.area = placeIcon('🌳');
+let placesIdxP = null, placesWhole = null;
+async function placeRange(from, to) {
+  if (placesWhole) return placesWhole.slice(from, to + 1);
+  const r = await fetch(PLACES_FILE, { headers: { Range: `bytes=${from}-${to}` } });
+  if (!r.ok) throw new Error(r.status);
+  const b = new Uint8Array(await r.arrayBuffer());
+  if (r.status === 206) return b;
+  placesWhole = b;
+  return b.slice(from, to + 1);
+}
+function placesIndex() {
+  return placesIdxP || (placesIdxP = (async () => {
+    let head = await placeRange(0, 65535);
+    const len = +new TextDecoder().decode(head.slice(0, 10));
+    if (!len) throw new Error('bad file');
+    if (10 + len > head.length) head = await placeRange(0, 9 + len);
+    return { idx: JSON.parse(new TextDecoder().decode(head.slice(10, 10 + len))), start: 10 + len };
+  })().catch((e) => { placesIdxP = null; throw e; }));
+}
+async function placeCell(i, j) {
+  const { idx, start } = await placesIndex();
+  const t = idx.tiles[i + '_' + j];
+  if (!t) return [];
+  return gunzipJson(await placeRange(start + t[0], start + t[0] + t[1] - 1));
+}
+function placePop(k, name, extra) {
+  const label = PK[k].name;
+  return '<div class="pop"><h3>' + esc(name || label) + '</h3>'
+    + (name || extra ? '<div class="big">' + esc([name ? label : '', extra || ''].filter(Boolean).join(' · ')) + '</div>' : '')
+    + (PLACE_NOTE[k] ? '<div class="small">' + esc(PLACE_NOTE[k]) + '</div>' : '')
+    + '<div class="small">' + (k === 'ghost' ? 'From USGS place names (GNIS).' : 'Map data © OpenStreetMap contributors, Overture Maps and USGS. Nobody has checked this one.') + '</div></div>';
+}
+function mdcPop(a) {
+  return '<div class="pop"><h3>' + esc(a.n) + '</h3>'
+    + '<div class="big">' + (a.k === 'access' ? 'River or lake access' : 'Conservation area') + (a.ac ? ' · ' + a.ac.toLocaleString() + ' acres' : '') + '</div>'
+    + (a.c ? '<div class="small">' + esc(a.c) + ' County</div>' : '')
+    + '<div class="small">Missouri Department of Conservation. Check the area rules, hours and hunting seasons before you go.</div>'
+    + (a.u && /^https:\/\/mdc\.mo\.gov\/conservation-area\/a\d{1,6}$/.test(a.u) ? '<a class="btn" target="_blank" rel="noopener" href="' + esc(a.u) + '">MDC area page</a>' : '') + '</div>';
+}
+function minePop(m) {
+  return '<div class="pop"><h3>' + esc(m.n || 'Old mine') + '</h3>'
+    + '<div class="big">' + (m.s === 'producer' ? 'Mine' : 'Old mine') + (m.m && m.m.length ? ' · ' + esc(m.m.join(', ')) : '') + '</div>'
+    + '<div class="closed">Look only. Never enter old mines or shafts: bad air, cave-ins and deep drops. Most are on private land.</div>'
+    + '<div class="small">History marker from the USGS Mineral Resources Data System. The spot can be off by a long way.</div>'
+    + (m.id ? '<a class="btn" target="_blank" rel="noopener" href="https://mrdata.usgs.gov/mrds/show-mrds.php?dep_id=' + encodeURIComponent(m.id) + '">USGS record</a>' : '') + '</div>';
+}
+// Only draws what's on screen (plus a margin), closest to the middle first, so busy towns stay quick.
+// Markers that stay on screen are kept (an open info box stays open when the map moves).
+const PLACE_MAX = 300;
+const placeMarks = {}; for (const k of Object.keys(PK)) placeMarks[k] = new Map();
+let placeBusy = '';
+function drawPlaces() {
+  const z = map.getZoom(), b = map.getBounds().pad(0.3), c = map.getCenter();
+  const busy = [];
+  for (const k of Object.keys(PK)) {
+    const lay = placeLayers[k], marks = placeMarks[k];
+    if (!placeOn[k] || z < PK[k].z) { lay.clearLayers(); marks.clear(); continue; }
+    const cand = [];
+    const add = (key, ll, icon, pop) => { if (b.contains(ll)) cand.push({ key, ll: L.latLng(ll), icon, pop }); };
+    if (k === 'mdc') (mdcAreas || []).forEach((a) => add('m' + a.p, a.p, placeIcons[a.k], () => mdcPop(a)));
+    else if (k === 'mines') { for (const rows of mineRows.values()) rows.forEach((m) => add(m.id || 'p' + m.p, m.p, placeIcons.mines, () => minePop(m))); }
+    else { for (const rows of placeRows.values()) for (const r of rows) if (r[0] === k) add(r[2] + ',' + r[3], [r[3], r[2]], placeIcons[k], () => placePop(k, r[1], r[4])); }
+    if (cand.length > PLACE_MAX) { cand.forEach((o) => { o.d = c.distanceTo(o.ll); }); cand.sort((x, y) => x.d - y.d); busy.push(PK[k].title.toLowerCase()); }
+    const want = new Map();
+    for (const o of cand) { if (want.size >= PLACE_MAX) break; if (!want.has(o.key)) want.set(o.key, o); }
+    for (const [key, m] of marks) if (!want.has(key) && !m.isPopupOpen()) { lay.removeLayer(m); marks.delete(key); }
+    for (const [key, o] of want) if (!marks.has(key)) marks.set(key, L.marker(o.ll, { icon: o.icon, keyboard: false }).bindPopup(o.pop).addTo(lay));
+  }
+  const nowBusy = busy.join(' and ');
+  if (nowBusy && nowBusy !== placeBusy) note('Zoom in to see all the ' + nowBusy, 3000);
+  placeBusy = nowBusy;
+}
+function loadPlaces() {
+  const on = Object.keys(PK).filter((k) => placeOn[k]);
+  if (!on.length) return;
+  const z = map.getZoom();
+  for (const k of on) if (z < PK[k].z && !placeZoomNote[k]) { placeZoomNote[k] = true; note('Zoom in to see ' + PK[k].title.toLowerCase(), 3000); }
+  if (placeOn.mdc && !mdcAreas && !mdcLoading) {
+    mdcLoading = true;
+    fetch('/api/trails-data?src=mdc').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then((d) => { mdcAreas = d.areas || []; drawPlaces(); })
+      .catch(() => placeFail()).finally(() => { mdcLoading = false; });
+  }
+  const b = map.getBounds().pad(0.15);
+  const i0 = Math.max(TRAIL_SQ.x0, Math.floor(b.getWest() / CELL)), i1 = Math.min(TRAIL_SQ.x1, Math.floor(b.getEast() / CELL));
+  const j0 = Math.max(TRAIL_SQ.y0, Math.floor(b.getSouth() / CELL)), j1 = Math.min(TRAIL_SQ.y1, Math.floor(b.getNorth() / CELL));
+  const wantPack = on.some((k) => k !== 'mdc' && k !== 'mines' && z >= PK[k].z), wantMines = placeOn.mines && z >= PK.mines.z;
+  const squares = (i1 - i0 + 1) * (j1 - j0 + 1), packOk = wantPack && squares <= 49, minesOk = wantMines && squares <= 16;
+  if ((wantPack && !packOk) || (wantMines && !minesOk)) note('Zoom in a little more to see the places', 3000);
+  if (packOk || minesOk) {
+    for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) {
+      const cell = i + '_' + j;
+      if (packOk && !placeAsked.has(cell)) {
+        placeAsked.add(cell);
+        placeCell(i, j).then((rows) => { placeRows.set(cell, rows); drawPlaces(); }).catch(() => { placeAsked.delete(cell); placeFail(); });
+      }
+      if (minesOk && !mineAsked.has(cell)) {
+        mineAsked.add(cell);
+        getCell('mines', i, j).then((d) => { mineRows.set(cell, d.mines || []); drawPlaces(); }).catch(() => { mineAsked.delete(cell); placeFail(); });
+      }
+    }
+  }
+  drawPlaces();
+}
+function placeFail() { if (!placeFailNote) { placeFailNote = true; note("Couldn't load some places. Move the map to try again.", 5000); setTimeout(() => { placeFailNote = false; }, 20000); } }
+map.on('moveend', loadPlaces);
+const placeSec = section('places', 'Places', 'Zoom in to see them. Nobody checks these, so call ahead and ask before crossing private land.');
+for (const k of Object.keys(PK)) {
+  toggle(placeSec, 'place-' + k, PK[k].ic + ' ' + PK[k].title, PK[k].sub, (v) => {
+    placeOn[k] = v;
+    if (v) { placeLayers[k].addTo(map); loadPlaces(); } else { placeLayers[k].remove(); placeLayers[k].clearLayers(); placeMarks[k].clear(); }
+  });
+}
+map.attributionControl.addAttribution('Places: MDC; USGS GNIS and MRDS; Overture Maps; © OpenStreetMap contributors');
+
+// ---------- Trips: route builder and your own pins ----------
+// Plan a route by tapping stops; each part follows roads and trails (OpenStreetMap, routed by the free
+// FOSSGIS Valhalla server, at most one ask a second) or a straight line. Saved routes and pins are kept in
+// Supabase under your own sign-in (tables trail_routes and trail_pins); pin photos go to a private bucket,
+// shrunk on the phone first so no camera data or phone GPS is sent. Share makes a GPX file for any map app.
+const ROUTER = 'https://valhalla1.openstreetmap.de/route';
+const PHOTOS = 'trail-pin-photos';
+const MODES = { drive: 'Drive', hike: 'Hike', bike: 'Bike', line: 'Straight line' };
+const COSTING = {
+  drive: ['auto', { auto: { use_tracks: 1 } }],
+  hike: ['pedestrian', { pedestrian: { use_tracks: 1 } }],
+  bike: ['bicycle', { bicycle: { bicycle_type: 'Mountain', use_roads: 0.3 } }],
+};
+const MAX_STOPS = 25;
+map.createPane('tripPane').style.zIndex = 640;
+const tripSvg = L.svg({ pane: 'tripPane' });
+const routeLayer = L.layerGroup(), myPinLayer = L.layerGroup();
+const trip = { uid: null, routes: [], pins: [], loaded: false };
+const sleep = (ms) => new Promise((ok) => setTimeout(ok, ms));
+const r5 = (v) => Math.round(v * 1e5) / 1e5;
+const tripSheet = document.getElementById('trip'), tripBody = document.getElementById('trip-body'), tripBtn = document.getElementById('trip-btn');
+function setTrip(open) {
+  tripSheet.classList.toggle('open', open); tripSheet.setAttribute('aria-hidden', String(!open)); tripBtn.setAttribute('aria-expanded', String(open));
+  if (open) { setPanel(false); cancelPick(); }
+}
+function cancelPick() { if (pinPick) { pinPick = null; tapMode(plan.on); note(''); } }
+tripBtn.addEventListener('click', () => { if (tripSheet.classList.contains('open')) setTrip(false); else { tripMain(); setTrip(true); } });
+tripSheet.querySelector('.close').addEventListener('click', () => setTrip(false));
+layBtn.addEventListener('click', () => { setTrip(false); cancelPick(); });
+const el = (tag, attrs, ...kids) => {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) { if (k === 'on') Object.entries(v).forEach(([ev, f]) => e.addEventListener(ev, f)); else if (k === 'text') e.textContent = v; else e.setAttribute(k, v); }
+  e.append(...kids.filter((k) => k != null));
+  return e;
+};
+const dayOf = (t) => new Date(t).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+// ----- Routing: one part (stop to stop) at a time, kept so Undo and redraws cost nothing -----
+const legCache = new Map();
+let routerGate = Promise.resolve(), lastAsk = 0;
+function decode6(s) {
+  let i = 0, lat = 0, lng = 0; const out = [];
+  while (i < s.length) {
+    let b, sh = 0, r = 0;
+    do { b = s.charCodeAt(i++) - 63; r |= (b & 31) << sh; sh += 5; } while (b >= 32);
+    lat += r & 1 ? ~(r >> 1) : r >> 1; sh = 0; r = 0;
+    do { b = s.charCodeAt(i++) - 63; r |= (b & 31) << sh; sh += 5; } while (b >= 32);
+    lng += r & 1 ? ~(r >> 1) : r >> 1;
+    out.push([lat / 1e6, lng / 1e6]);
+  }
+  return out;
+}
+function straight(a, b) { return { ll: [[a.lat, a.lng], [b.lat, b.lng]], mi: a.distanceTo(b) / 1609.34, snapped: false }; }
+function routeLeg(a, b, mode) {
+  if (mode === 'line') return Promise.resolve(straight(a, b));
+  const key = [mode, a.lat.toFixed(6), a.lng.toFixed(6), b.lat.toFixed(6), b.lng.toFixed(6)].join(',');
+  if (legCache.has(key)) return legCache.get(key);
+  const [costing, costing_options] = COSTING[mode];
+  const body = { locations: [{ lat: a.lat, lon: a.lng }, { lat: b.lat, lon: b.lng }], costing, costing_options, units: 'miles', directions_type: 'none' };
+  // the free server asks for no more than one request a second
+  const p = (routerGate = routerGate.then(async () => { const w = 1100 - (Date.now() - lastAsk); if (w > 0) await sleep(w); lastAsk = Date.now(); }))
+    .then(async () => {
+      const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 15000);
+      try {
+        const r = await fetch(ROUTER + '?json=' + encodeURIComponent(JSON.stringify(body)), { signal: ctl.signal });
+        const j = await r.json();
+        const legs = j && j.trip && j.trip.legs;
+        if (!r.ok || !legs || !legs.length) throw new Error('no route');
+        const ll = legs.flatMap((l) => decode6(l.shape || ''));
+        if (ll.length < 2) throw new Error('no route');
+        return { ll, mi: Number(j.trip.summary && j.trip.summary.length) || 0, snapped: true };
+      } finally { clearTimeout(t); }
+    })
+    .catch(() => { legCache.delete(key); return Object.assign(straight(a, b), { failed: true }); });
+  legCache.set(key, p);
+  if (legCache.size > 300) legCache.delete(legCache.keys().next().value);
+  return p;
+}
+
+// ----- The planner -----
+const plan = { on: false, mode: 'drive', stops: [], legs: [], editId: null, run: 0, line: [], mi: 0 };
+const planLine = L.layerGroup(), stopLayer = L.layerGroup();
+const planbar = document.getElementById('planbar'), pbSum = document.getElementById('pb-sum');
+const pbName = planbar.querySelector('.pb-name'), pbInput = document.getElementById('pb-input');
+const modeChips = chips(document.getElementById('pb-modes'), Object.entries(MODES), (k) => plan.mode === k, (k) => { plan.mode = k; prefs.tripMode = k; savePrefs(); replan(); });
+if (MODES[prefs.tripMode]) plan.mode = prefs.tripMode;
+modeChips.querySelectorAll('.chip').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.k === plan.mode)));
+function tapMode(on) { document.body.classList.toggle('trip-tap', on); if (on) map.closePopup(); }
+function startPlan(r) {
+  if (plan.on && plan.stops.length > 1 && !confirm('Drop the route you are planning now?')) return;
+  pinPick = null;
+  plan.on = true; plan.editId = r ? r.id : null; plan.stops = r ? r.stops.map(([a, b]) => L.latLng(a, b)) : [];
+  if (r && MODES[r.mode]) plan.mode = r.mode;
+  modeChips.querySelectorAll('.chip').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.k === plan.mode)));
+  pbInput.value = r ? r.name : ''; pbName.hidden = true;
+  planbar.hidden = false; document.body.classList.add('planning'); tapMode(true); setTrip(false);
+  planLine.addTo(map); stopLayer.addTo(map);
+  drawSaved();
+  replan();
+  if (r && plan.stops.length) map.fitBounds(L.latLngBounds(plan.stops).pad(0.2));
+}
+function endPlan() {
+  plan.on = false; plan.editId = null; plan.stops = []; plan.line = []; plan.mi = 0; plan.run++;
+  planbar.hidden = true; document.body.classList.remove('planning'); tapMode(false);
+  planLine.clearLayers(); stopLayer.clearLayers(); planLine.remove(); stopLayer.remove();
+  drawSaved();
+}
+document.getElementById('pb-x').onclick = () => {
+  if (plan.stops.length > 1 && !confirm('Close without saving this route?')) return;
+  endPlan();
+};
+document.getElementById('pb-undo').onclick = () => { plan.stops.pop(); replan(); };
+document.getElementById('pb-clear').onclick = () => { plan.stops = []; replan(); };
+document.getElementById('pb-share').onclick = () => { if (plan.line.length > 1) shareGpx(pbInput.value.trim() || 'Route', plan.line, []); };
+document.getElementById('pb-save').onclick = () => {
+  if (!trip.uid) { note('Sign in on the Traffic page to save routes. Share still works.', 6000); return; }
+  pbName.hidden = false; if (!pbInput.value) pbInput.value = 'Route ' + new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); pbInput.focus(); pbInput.select();
+};
+document.getElementById('pb-ok').onclick = saveRoute;
+pbInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') saveRoute(); });
+const stopIcon = (n) => L.divIcon({ className: '', html: `<div class="stop-ic">${n}</div>`, iconSize: [24, 24], iconAnchor: [12, 12] });
+function drawStops() {
+  stopLayer.clearLayers();
+  plan.stops.forEach((ll, i) => {
+    const m = L.marker(ll, { icon: stopIcon(i + 1), draggable: true, pane: 'tripPane', keyboard: false, title: 'Stop ' + (i + 1), autoPan: true });
+    m.on('dragend', () => { plan.stops[i] = m.getLatLng(); replan(); });
+    m.on('click', (e) => { L.DomEvent.stop(e); plan.stops.splice(i, 1); replan(); });
+    m.addTo(stopLayer);
+  });
+}
+async function replan() {
+  const run = ++plan.run;
+  drawStops();
+  const s = plan.stops, saveBtn = document.getElementById('pb-save'), shareBtn = document.getElementById('pb-share');
+  document.getElementById('pb-undo').disabled = !s.length; document.getElementById('pb-clear').disabled = !s.length;
+  if (s.length < 2) {
+    planLine.clearLayers(); plan.line = []; plan.mi = 0; saveBtn.disabled = shareBtn.disabled = true;
+    pbSum.textContent = s.length ? 'Tap the map to add the next stop' : 'Tap the map to add stops';
+    return;
+  }
+  saveBtn.disabled = shareBtn.disabled = true;
+  pbSum.textContent = 'Finding the way…';
+  // draw each part as it comes back
+  const parts = new Array(s.length - 1).fill(null);
+  const paint = () => {
+    planLine.clearLayers();
+    parts.forEach((p, i) => {
+      const ll = p ? p.ll : [[s[i].lat, s[i].lng], [s[i + 1].lat, s[i + 1].lng]];
+      L.polyline(ll, { renderer: tripSvg, interactive: false, color: '#111', weight: 9, opacity: 0.9, lineCap: 'round', lineJoin: 'round' }).addTo(planLine);
+      L.polyline(ll, { renderer: tripSvg, interactive: false, color: '#fb923c', weight: 5, opacity: 1, dashArray: p && p.snapped ? null : '2 9', lineCap: 'round', lineJoin: 'round' }).addTo(planLine);
+    });
+  };
+  paint();
+  await Promise.all(s.slice(1).map((b, i) => routeLeg(s[i], b, plan.mode).then((p) => { if (run === plan.run) { parts[i] = p; paint(); } })));
+  if (run !== plan.run) return;
+  plan.line = []; parts.forEach((p, i) => plan.line.push(...(i ? p.ll.slice(1) : p.ll)));
+  plan.mi = parts.reduce((t, p) => t + p.mi, 0);
+  const failed = parts.some((p) => p.failed);
+  pbSum.textContent = `${miles(plan.mi).replace(' mi', ' miles')} · ${s.length} stops${failed ? ' · part straight line' : ''}`;
+  if (failed) note("Couldn't find a road or trail for part of it, so that part is a dotted straight line. Move the stop onto a road to try again.", 7000);
+  saveBtn.disabled = shareBtn.disabled = false;
+}
+map.on('click', (e) => {
+  if (pinPick) { const ll = e.latlng.wrap(); pinPick = null; tapMode(plan.on); note(''); pinForm(null, ll); return; }
+  if (!plan.on) return;
+  if (plan.stops.length >= MAX_STOPS) { note(`A route can have up to ${MAX_STOPS} stops.`, 4000); return; }
+  plan.stops.push(e.latlng.wrap()); replan();
+});
+// Keep a saved line small enough to store: thin out points that don't change its shape
+function thin(line) {
+  if (line.length <= 12000) return line;
+  const pts = line.map((p) => map.project(p, 15));
+  let tol = 1, out = pts;
+  while (out.length > 12000 && tol < 1024) { out = L.LineUtil.simplify(pts, tol); tol *= 2; }
+  return out.map((p) => { const ll = map.unproject(p, 15); return [ll.lat, ll.lng]; });
+}
+async function saveRoute() {
+  if (plan.saving || document.getElementById('pb-save').disabled) return;
+  const name = pbInput.value.trim().slice(0, 80);
+  if (!name) { pbInput.focus(); return; }
+  if (plan.line.length < 2) return;
+  const row = { name, mode: plan.mode, stops: plan.stops.map((p) => [r5(p.lat), r5(p.lng)]), line: thin(plan.line).map(([a, b]) => [r5(a), r5(b)]), miles: Math.round(plan.mi * 100) / 100 };
+  const ok = document.getElementById('pb-ok'); ok.disabled = true; plan.saving = true;
+  let data, error;
+  try {
+    const q = plan.editId ? sb.from('trail_routes').update(row).eq('id', plan.editId) : sb.from('trail_routes').insert(row);
+    ({ data, error } = await q.select('id,name,mode,stops,line,miles,created_at').single());
+  } finally { ok.disabled = false; plan.saving = false; }
+  if (error || !data) { note(error && error.code === '23514' ? "That route is too long to save. Try fewer or closer stops." : "Couldn't save the route. Check your signal and try again.", 6000); return; }
+  trip.routes = [data, ...trip.routes.filter((r) => r.id !== data.id)];
+  endPlan();
+  note('Saved ' + data.name, 3000);
+}
+
+// ----- Saved routes on the map -----
+function drawSaved() {
+  routeLayer.clearLayers();
+  trip.routes.forEach((r) => {
+    if (plan.on && r.id === plan.editId) return;
+    const ll = r.line;
+    L.polyline(ll, { renderer, interactive: false, color: '#111', weight: 8, opacity: 0.85, lineCap: 'round', lineJoin: 'round' }).addTo(routeLayer);
+    const line = L.polyline(ll, { renderer, color: '#fb923c', weight: 4, opacity: 1, lineCap: 'round', lineJoin: 'round' }).addTo(routeLayer);
+    line.bindPopup(() => routePop(r));
+    r.layer = line;
+  });
+}
+function routePop(r) {
+  return el('div', { class: 'pop' },
+    el('h3', { text: r.name }),
+    el('div', { class: 'big', text: `${MODES[r.mode] || ''} · ${miles(Number(r.miles)).replace(' mi', ' miles')}` }),
+    el('div', { class: 'small', text: 'Saved ' + dayOf(r.created_at) }),
+    el('div', { class: 'acts' },
+      el('button', { type: 'button', text: 'Share', on: { click: () => shareGpx(r.name, r.line, []) } }),
+      el('button', { type: 'button', text: 'Edit', on: { click: () => startPlan(r) } }),
+      el('button', { type: 'button', class: 'bad', text: 'Delete', on: { click: () => delRoute(r) } })));
+}
+async function delRoute(r) {
+  if (!confirm(`Delete the route "${r.name}"? This can't be undone.`)) return;
+  const { error } = await sb.from('trail_routes').delete().eq('id', r.id);
+  if (error) { note("Couldn't delete it. Try again.", 5000); return; }
+  trip.routes = trip.routes.filter((x) => x.id !== r.id); map.closePopup(); drawSaved(); if (tripSheet.classList.contains('open')) tripMain();
+}
+
+// ----- Your own pins -----
+const myPinIcon = L.divIcon({ className: '', html: '<div class="mypin"></div>', iconSize: [30, 30], iconAnchor: [4, 30], popupAnchor: [11, -28] });
+let pinPick = null;
+const photoUrls = new Map();
+async function photoUrl(path) {
+  const c = photoUrls.get(path);
+  if (c && c.exp > Date.now()) return c.url;
+  const { data, error } = await sb.storage.from(PHOTOS).createSignedUrl(path, 3600);
+  if (error || !data) return null;
+  photoUrls.set(path, { url: data.signedUrl, exp: Date.now() + 3300e3 });
+  return data.signedUrl;
+}
+function drawPins() {
+  myPinLayer.clearLayers();
+  trip.pins.forEach((p) => {
+    const ll = L.latLng(p.lat, p.lng);
+    p.marker = L.marker(ll, { icon: myPinIcon, zIndexOffset: 600, title: p.name }).bindPopup(() => pinPop(p), { maxWidth: 260 }).addTo(myPinLayer);
+  });
+}
+function pinPop(p) {
+  const ll = L.latLng(p.lat, p.lng);
+  const img = p.photo ? el('img', { class: 'ph', alt: 'Photo of ' + p.name }) : null;
+  if (img) photoUrl(p.photo).then((u) => { if (u) img.src = u; else img.replaceWith(el('div', { class: 'small', text: "Couldn't load the photo." })); });
+  return el('div', { class: 'pop' },
+    el('h3', { text: p.name }),
+    p.note ? el('div', { class: 'note', text: p.note }) : null,
+    img,
+    me ? el('div', { text: miles(me.distanceTo(ll) / 1609.34) + ' from you' }) : null,
+    el('div', { class: 'small', text: 'Your pin · ' + dayOf(p.created_at) }),
+    el('div', { class: 'acts' },
+      el('button', { type: 'button', text: 'Share', on: { click: () => shareGpx(p.name, [], [p]) } }),
+      el('button', { type: 'button', text: 'Edit', on: { click: () => { map.closePopup(); pinForm(p, ll); } } }),
+      el('button', { type: 'button', class: 'bad', text: 'Delete', on: { click: () => delPin(p) } })));
+}
+// Phone photos are shrunk to 1600 px and saved again as JPEG, which also drops the camera data and GPS inside them
+async function shrink(file) {
+  let src, w, h;
+  try { src = await createImageBitmap(file, { imageOrientation: 'from-image' }); w = src.width; h = src.height; }
+  catch (e) {
+    const url = URL.createObjectURL(file);
+    try { src = await new Promise((ok, no) => { const im = new Image(); im.onload = () => ok(im); im.onerror = () => no(new Error('bad photo')); im.src = url; }); }
+    finally { setTimeout(() => URL.revokeObjectURL(url), 1000); }
+    w = src.naturalWidth; h = src.naturalHeight;
+  }
+  if (!w || !h) throw new Error('bad photo');
+  const k = Math.min(1, 1600 / Math.max(w, h)), c = document.createElement('canvas');
+  c.width = Math.round(w * k); c.height = Math.round(h * k);
+  c.getContext('2d').drawImage(src, 0, 0, c.width, c.height);
+  if (src.close) src.close();
+  for (const q of [0.85, 0.7, 0.55]) {
+    const b = await new Promise((ok) => c.toBlob(ok, 'image/jpeg', q));
+    if (b && b.size < 2.5e6) return b;
+  }
+  throw new Error('photo too big');
+}
+function pinForm(p, ll) {
+  if (!trip.uid) { note('Sign in on the Traffic page to save pins.', 6000); return; }
+  document.getElementById('trip-title').textContent = p ? 'Edit pin' : 'New pin';
+  let file = null, drop = false;
+  const name = el('input', { type: 'text', maxlength: '80', id: 'pin-name', value: p ? p.name : '' });
+  const txt = el('textarea', { maxlength: '1000', id: 'pin-note' }); txt.value = p ? p.note : '';
+  const prev = el('img', { class: 'ph', alt: '' }); prev.hidden = true;
+  if (p && p.photo) photoUrl(p.photo).then((u) => { if (u && !file && !drop) { prev.src = u; prev.hidden = false; } });
+  const pick = el('input', { type: 'file', accept: 'image/*', id: 'pin-photo' });
+  const rm = el('button', { type: 'button', class: 'tbtn bad', text: 'Remove photo' });
+  rm.hidden = !(p && p.photo);
+  pick.addEventListener('change', () => {
+    file = pick.files && pick.files[0] || null; drop = false;
+    if (file) { prev.src = URL.createObjectURL(file); prev.hidden = false; rm.hidden = false; }
+  });
+  rm.addEventListener('click', () => { file = null; drop = true; pick.value = ''; prev.hidden = true; prev.removeAttribute('src'); rm.hidden = true; });
+  const save = el('button', { type: 'button', class: 'tbtn pri', text: 'Save pin' });
+  save.addEventListener('click', async () => {
+    const n = name.value.trim().slice(0, 80);
+    if (!n) { name.focus(); note('Give the pin a name.', 3000); return; }
+    save.disabled = true; save.textContent = 'Saving…';
+    try {
+      let photo = p ? p.photo : null; const old = photo;
+      if (file) {
+        const blob = await shrink(file);
+        const path = `${trip.uid}/${crypto.randomUUID()}.jpg`;
+        const up = await sb.storage.from(PHOTOS).upload(path, blob, { contentType: 'image/jpeg', upsert: false });
+        if (up.error) throw up.error;
+        photo = path;
+      } else if (drop) photo = null;
+      const row = { name: n, note: txt.value.slice(0, 1000), lat: r5(ll.lat), lng: r5(ll.lng), photo };
+      const q = p ? sb.from('trail_pins').update(row).eq('id', p.id) : sb.from('trail_pins').insert(row);
+      const { data, error } = await q.select('id,name,note,lat,lng,photo,created_at').single();
+      if (error || !data) { if (photo && photo !== old) await sb.storage.from(PHOTOS).remove([photo]); throw error || new Error('not saved'); }
+      if (old && old !== data.photo) sb.storage.from(PHOTOS).remove([old]);
+      trip.pins = [data, ...trip.pins.filter((x) => x.id !== data.id)];
+      drawPins(); tripMain(); setTrip(false);
+      const m = trip.pins[0].marker; if (m) m.openPopup();
+    } catch (e) {
+      save.disabled = false; save.textContent = 'Save pin';
+      note(/photo/.test(String(e && e.message)) ? "Couldn't use that photo. Try another one." : "Couldn't save the pin. Check your signal and try again.", 6000);
+    }
+  });
+  const cancel = el('button', { type: 'button', class: 'tbtn', text: 'Cancel', on: { click: () => { tripMain(); setTrip(false); } } });
+  tripBody.replaceChildren(
+    el('label', { for: 'pin-name', text: 'Name' }), name,
+    el('label', { for: 'pin-note', text: 'Note' }), txt,
+    el('label', { for: 'pin-photo', text: 'Photo' }), pick, prev, el('div', { class: 'tbtns' }, rm),
+    el('div', { class: 'tbtns' }, save, cancel));
+  setTrip(true);
+  if (!p) name.focus();
+}
+async function delPin(p) {
+  if (!confirm(`Delete the pin "${p.name}"${p.photo ? ' and its photo' : ''}? This can't be undone.`)) return;
+  const { error } = await sb.from('trail_pins').delete().eq('id', p.id);
+  if (error) { note("Couldn't delete it. Try again.", 5000); return; }
+  if (p.photo) sb.storage.from(PHOTOS).remove([p.photo]);
+  trip.pins = trip.pins.filter((x) => x.id !== p.id); map.closePopup(); drawPins(); if (tripSheet.classList.contains('open')) tripMain();
+}
+
+// ----- Share as a GPX file (opens in most map apps) -----
+function shareGpx(name, line, pins) {
+  const x = (v) => esc(String(v).replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, ''));
+  const gpx = '<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="Local America" xmlns="http://www.topografix.com/GPX/1/1">\n'
+    + `<metadata><name>${x(name)}</name></metadata>\n`
+    + pins.map((p) => `<wpt lat="${p.lat}" lon="${p.lng}"><name>${x(p.name)}</name>${p.note ? `<desc>${x(p.note)}</desc>` : ''}</wpt>\n`).join('')
+    + (line.length ? `<trk><name>${x(name)}</name><trkseg>\n${line.map(([a, b]) => `<trkpt lat="${a}" lon="${b}"/>`).join('\n')}\n</trkseg></trk>\n` : '')
+    + '</gpx>\n';
+  const base = String(name).replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-').slice(0, 60) || 'route';
+  const file = new File([gpx], base + '.gpx', { type: 'application/gpx+xml' });
+  const download = () => { const a = el('a', { href: URL.createObjectURL(file), download: file.name }); document.body.append(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000); };
+  if (navigator.canShare && navigator.canShare({ files: [file] })) navigator.share({ files: [file], title: name }).catch((e) => { if (e && e.name !== 'AbortError') download(); });
+  else download();
+}
+
+// ----- The Trips sheet -----
+function tripMain() {
+  document.getElementById('trip-title').textContent = 'Trips';
+  const acts = el('div', { class: 'tbtns' },
+    el('button', { type: 'button', class: 'tbtn pri', text: 'Plan a route', on: { click: () => startPlan(null) } }),
+    el('button', { type: 'button', class: 'tbtn', text: 'Drop a pin', on: { click: () => {
+      if (!trip.uid) { note('Sign in on the Traffic page to save pins.', 6000); return; }
+      setTrip(false); pinPick = true; tapMode(true); note('Tap the map where the pin goes.');
+    } } }),
+    me ? el('button', { type: 'button', class: 'tbtn', text: 'Pin where I am', on: { click: () => pinForm(null, me) } }) : null);
+  const kids = [acts];
+  if (!trip.uid) kids.push(el('div', { class: 'empty', text: 'Sign in on the Traffic page to save routes and pins. You can still plan a route and share it.' }));
+  else {
+    kids.push(el('h3', { text: 'Saved routes' }));
+    if (!trip.loaded) kids.push(el('div', { class: 'empty', text: 'Loading…' }));
+    else if (!trip.routes.length) kids.push(el('div', { class: 'empty', text: 'No saved routes yet.' }));
+    trip.routes.forEach((r) => kids.push(el('div', { class: 'row', role: 'button', tabindex: '0', on: { click: () => showRoute(r) } },
+      el('div', { class: 'txt' }, el('b', { text: r.name }), el('small', { text: `${MODES[r.mode] || ''} · ${miles(Number(r.miles)).replace(' mi', ' miles')} · ${dayOf(r.created_at)}` })))));
+    kids.push(el('h3', { text: 'My pins' }));
+    if (trip.loaded && !trip.pins.length) kids.push(el('div', { class: 'empty', text: 'No pins yet.' }));
+    trip.pins.forEach((p) => kids.push(el('div', { class: 'row', role: 'button', tabindex: '0', on: { click: () => showPin(p) } },
+      el('div', { class: 'txt' }, el('b', { text: p.name }), el('small', { text: (p.photo ? 'Photo · ' : '') + (p.note ? p.note.slice(0, 80) : dayOf(p.created_at)) })))));
+  }
+  tripBody.replaceChildren(...kids);
+}
+function showRoute(r) {
+  setTrip(false);
+  if (!map.hasLayer(routeLayer)) routeLayer.addTo(map);
+  const b = L.latLngBounds(r.line); map.fitBounds(b.pad(0.15));
+  if (r.layer) setTimeout(() => r.layer.openPopup(r.line[Math.floor(r.line.length / 2)]), 400);
+}
+function showPin(p) {
+  setTrip(false);
+  if (!map.hasLayer(myPinLayer)) myPinLayer.addTo(map);
+  map.setView([p.lat, p.lng], Math.max(map.getZoom(), 15));
+  if (p.marker) setTimeout(() => p.marker.openPopup(), 400);
+}
+async function loadTrips() {
+  const { data: { session } } = await sb.auth.getSession().catch(() => ({ data: {} }));
+  trip.uid = session && session.user ? session.user.id : null;
+  if (!trip.uid) { trip.loaded = true; return; }
+  const [rs, ps] = await Promise.all([
+    sb.from('trail_routes').select('id,name,mode,stops,line,miles,created_at').order('created_at', { ascending: false }).limit(200),
+    sb.from('trail_pins').select('id,name,note,lat,lng,photo,created_at').order('created_at', { ascending: false }).limit(500),
+  ]);
+  if (rs.error || ps.error) note("Couldn't load your saved routes and pins. Pull down to reload.", 6000);
+  trip.routes = rs.data || []; trip.pins = ps.data || []; trip.loaded = true;
+  drawSaved(); drawPins();
+  if (tripSheet.classList.contains('open') && document.getElementById('trip-title').textContent === 'Trips') tripMain();
+}
+const tripSec = section('trips', 'Trips', 'Your saved routes and pins. Only you can see them.');
+toggle(tripSec, 'trip-routes', 'My routes', 'Orange lines', (v) => { if (v) routeLayer.addTo(map); else routeLayer.remove(); }, true);
+toggle(tripSec, 'trip-pins', 'My pins', 'Orange pins, with your photos and notes', (v) => { if (v) myPinLayer.addTo(map); else myPinLayer.remove(); }, true);
+map.attributionControl.addAttribution('Routes: FOSSGIS Valhalla, © OpenStreetMap contributors');
+loadTrips();
+
+// ---------- Start ----------
+// For checking the page: ?at=lat,lng skips location; ?open=fs or ?open=dirt opens one line's info box
+// ----- Go to GPS: reads the numbers on this phone; nothing is sent anywhere -----
+// Reads GPS text people paste: "36.98123, -91.97456", "36.98123 N 91.97456 W",
+// "N36 58.874 W91 58.474", 36°58'52.4"N 91°58'28.4"W, or a Google Maps link.
+// Returns { lat, lng, fixed } or null. fixed is true when a Missouri longitude typed without its minus sign was turned west.
+function parseGPS(raw) {
+  let s = String(raw || '').trim();
+  if (!s) return null;
+  const at = s.match(/!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/) || s.match(/@(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/) || s.match(/[?&](?:q|query|ll)=(-?\d+(?:\.\d+)?)(?:,|%2C)\s*(-?\d+(?:\.\d+)?)/i);
+  if (at) s = at[1] + ', ' + at[2];
+  // Split letters from numbers (N36 -> N 36), then keep lone N/S/E/W letters and numbers
+  const toks = s.replace(/[−–—]/g, '-').replace(/(\d)([NSEWnsew])/g, '$1 $2').replace(/([NSEWnsew])(-?\d)/g, '$1 $2')
+    .split(/[^A-Za-z0-9.\-]+/).filter((t) => /^[NSEW]$/i.test(t) || /^-?\d+(?:\.\d+)?$/.test(t));
+  const nums = [], hems = [];
+  for (const t of toks) {
+    if (/^[NSEW]$/i.test(t)) hems.push({ h: t.toUpperCase() }); else nums.push(t);
+  }
+  let per;
+  if (nums.length === 2) per = 1; else if (nums.length === 4) per = 2; else if (nums.length === 6) per = 3; else return null;
+  const part = (arr) => {
+    const d = Number(arr[0]), m = arr[1] != null ? Number(arr[1]) : 0, sec = arr[2] != null ? Number(arr[2]) : 0;
+    if (![d, m, sec].every(Number.isFinite)) return null;
+    if (arr.length > 1 && (m < 0 || m >= 60 || sec < 0 || sec >= 60 || !Number.isInteger(d))) return null;
+    if (arr.length > 2 && !Number.isInteger(m)) return null;
+    const v = Math.abs(d) + m / 60 + sec / 3600;
+    return (String(arr[0]).startsWith('-') ? -v : v);
+  };
+  let a = part(nums.slice(0, per)), b = part(nums.slice(per));
+  if (a == null || b == null) return null;
+  // Letters go with the numbers in the order typed (N36 W91 or 36N 91W); a lone letter goes by its kind
+  let ha = null, hb = null;
+  if (hems.length === 2) { ha = hems[0].h; hb = hems[1].h; }
+  else if (hems.length === 1) { if ('NS'.includes(hems[0].h)) ha = hems[0].h; else hb = hems[0].h; }
+  else if (hems.length > 2) return null;
+  if (ha && 'EW'.includes(ha) && (!hb || 'NS'.includes(hb))) { [a, b] = [b, a]; [ha, hb] = [hb, ha]; }
+  if ((ha && !'NS'.includes(ha)) || (hb && !'EW'.includes(hb))) return null;
+  const sign = (v, h, neg) => (h ? (h === neg ? -Math.abs(v) : Math.abs(v)) : v);
+  let lat = sign(a, ha, 'S'), lng = sign(b, hb, 'W'), fixed = false;
+  if (!ha && !hb) {
+    // Longitude first by mistake (e.g. -91.97, 36.98)
+    if (Math.abs(lat) > 90 || (lat <= -88 && lat >= -96 && lng >= 35 && lng <= 41)) [lat, lng] = [lng, lat];
+    // Missouri longitude without its minus sign
+    if (lat >= 35 && lat <= 41 && lng >= 88 && lng <= 96) { lng = -lng; fixed = true; }
+  }
+  if (!(Math.abs(lat) <= 90 && Math.abs(lng) <= 180)) return null;
+  if (lat === 0 && lng === 0) return null;
+  return { lat, lng, fixed };
+}
+const goIcon = L.divIcon({ className: '', html: '<div class="gopin"></div>', iconSize: [30, 30], iconAnchor: [4, 30], popupAnchor: [11, -28] });
+let goMarker = null;
+const fmtGPS = (ll) => ll.lat.toFixed(5) + ', ' + ll.lng.toFixed(5);
+function goPop(ll) {
+  return el('div', { class: 'pop' },
+    el('h3', { text: 'Your GPS spot' }),
+    el('div', { class: 'note', text: fmtGPS(ll) }),
+    me ? el('div', { text: miles(me.distanceTo(ll) / 1609.34) + ' from you (straight line)' }) : null,
+    MISSOURI.contains(ll) ? null : el('div', { class: 'small', text: 'Outside Missouri, so some layers stop short of here.' }),
+    el('div', { class: 'acts' },
+      el('button', { type: 'button', text: 'Save as my pin', on: { click: () => { map.closePopup(); pinForm(null, ll); } } }),
+      el('button', { type: 'button', class: 'bad', text: 'Clear', on: { click: () => { if (goMarker) { map.removeLayer(goMarker); goMarker = null; } findIn.value = ''; } } })));
+}
+const findIn = document.getElementById('find-in');
+document.getElementById('find').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const r = parseGPS(findIn.value);
+  if (!r) {
+    note(/goo\.gl|maps\.app/i.test(findIn.value) ? "Short map links can't be read here. Open the link and copy the numbers." : "Couldn't read that. Paste it like 36.98123, -91.97456", 6000);
+    return;
+  }
+  const ll = L.latLng(r.lat, r.lng);
+  findIn.blur();
+  setPanel(false);
+  if (goMarker) map.removeLayer(goMarker);
+  goMarker = L.marker(ll, { icon: goIcon, zIndexOffset: 700, title: 'Your GPS spot' }).bindPopup(() => goPop(ll), { maxWidth: 260 }).addTo(map);
+  map.flyTo(ll, Math.max(map.getZoom(), 15), { duration: 1.2 });
+  map.once('moveend', () => { if (goMarker) goMarker.openPopup(); });
+  if (r.fixed) note('Read the second number as west (' + ll.lng.toFixed(5) + ').', 5000);
+});
+
+const qs = new URLSearchParams(location.search);
+const at = qs.get('at');
+const atLL = at ? at.split(',').map(Number) : [];
+if (atLL.length === 2 && atLL.every(Number.isFinite)) { showMe(atLL); followed = true; map.setView(me, 14); }
+else startLocation(false);
+const openParam = qs.get('open');
+let tries = 0;
+function demoOpen() {
+  let first;
+  const take = (l) => { if (!first && l.getPopup && l.getPopup()) first = l; };
+  if (openParam === 'fs') fsLayer.eachLayer(take); else if (openParam === 'land') landLayer.eachLayer((l) => { if (!first && /Conservation area: Peck/.test(l.getPopup()._content() || '')) first = l; }); else map.eachLayer((l) => { if (l.feature) take(l); });
+  if (!first) { if (++tries < 30) setTimeout(demoOpen, 1000); return; }
+  const ll = first.getLatLngs().flat(3); first.openPopup(ll[Math.floor(ll.length / 2)]);
+}
+if (openParam) setTimeout(demoOpen, 1500);
+}
+</script>
+</body>
+</html>
