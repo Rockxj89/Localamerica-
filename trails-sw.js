@@ -15,6 +15,7 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys()
       .then((keys) => Promise.all(keys.filter((k) => k.startsWith('trails-tiles-') && k !== TILES).map((k) => caches.delete(k))))
+      .then(() => trim())
       .then(() => self.clients.claim())
   );
 });
@@ -41,7 +42,7 @@ self.addEventListener('fetch', (event) => {
     // Only keep good pictures that the page is allowed to read (no empty or error squares)
     if (res && res.ok && res.type === 'cors' && (res.headers.get('content-type') || '').startsWith('image/')) {
       const copy = res.clone();
-      event.waitUntil(c.put(req, copy).then(() => { if (++puts % 50 === 0) return trim(); }).catch(() => {}));
+      event.waitUntil(c.put(req, copy).then(() => { if (++puts % 50 === 0 || Math.random() < 0.02) return trim(); }).catch(() => {}));
     }
     return res;
   })());
