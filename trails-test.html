@@ -883,6 +883,9 @@ function liveLayer(src, draw, everyMin) {
 
 // Weather radar: NOAA NEXRAD picture, about 5 minutes old at most
 map.createPane('radar'); map.getPane('radar').style.zIndex = 350; map.getPane('radar').style.pointerEvents = 'none';
+// Live markers get their own canvas above the roads and trails (which share the main one)
+map.createPane('live'); map.getPane('live').style.zIndex = 450;
+const liveRenderer = L.canvas({ pane: 'live', tolerance: 12 });
 const RADAR = 'https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q-900913/{z}/{x}/{y}.png';
 const radar = L.tileLayer(RADAR + '?t={t}', { pane: 'radar', opacity: 0.6, maxNativeZoom: 12, maxZoom: 19, t: () => Math.floor(Date.now() / 300000), attribution: 'Radar: NOAA NEXRAD via Iowa Environmental Mesonet' });
 let radarTimer = null;
@@ -903,7 +906,7 @@ const fires = liveLayer('fires', (g, d, first) => {
   firesAt = d.at;
   (d.areas || []).forEach((a) => {
     const rings = (a.r || []).map((ring) => ring.map(([x, y]) => [y, x]));
-    if (rings.length) L.polygon(rings, { renderer, color: '#ea580c', weight: 2, fillColor: '#ea580c', fillOpacity: 0.25 }).bindPopup(firePop(a.n, a.ac, a.pc)).addTo(g);
+    if (rings.length) L.polygon(rings, { renderer: liveRenderer, pane: 'live', color: '#ea580c', weight: 2, fillColor: '#ea580c', fillOpacity: 0.25 }).bindPopup(firePop(a.n, a.ac, a.pc)).addTo(g);
   });
   (d.fires || []).forEach((f) => L.marker(f.p, { icon: fireIcon }).bindPopup(firePop(f.n, f.ac, f.pc, f.d)).addTo(g));
   if (first && !(d.fires || []).length && !(d.areas || []).length) note('No current wildfires in or near Missouri.', 4000);
@@ -918,7 +921,7 @@ const rivers = liveLayer('rivers', (g, d) => {
       + (s.cfs != null ? '<div>' + nf(s.cfs) + ' cubic feet per second</div>' : '')
       + (s.t ? '<div class="small">Read ' + esc(ago(s.t)) + '</div>' : '')
       + '<a class="btn" target="_blank" rel="noopener" href="https://waterdata.usgs.gov/monitoring-location/' + encodeURIComponent(s.id) + '/">USGS page</a></div>';
-    L.circleMarker(s.p, { renderer, radius: 6, color: '#fff', weight: 1.5, fillColor: '#0284c7', fillOpacity: 0.95 }).bindPopup(html).addTo(g);
+    L.circleMarker(s.p, { renderer: liveRenderer, pane: 'live', radius: 6, color: '#fff', weight: 1.5, fillColor: '#0284c7', fillOpacity: 0.95 }).bindPopup(html).addTo(g);
   });
 }, 10);
 toggle(liveSec, 'rivers', 'River levels', 'USGS stream gauges: water height and flow.', rivers.on);
@@ -942,7 +945,7 @@ const closures = liveLayer('closures', (g, d, first) => {
       + (a.EXT_COMMENT ? '<div class="small">' + esc(a.EXT_COMMENT) + '</div>' : '')
       + ((a.START_DATE || a.END_DATE) ? '<div class="small">' + esc([a.START_DATE && 'From ' + dt(a.START_DATE), a.END_DATE && 'until ' + dt(a.END_DATE)].filter(Boolean).join(' ')) + '</div>' : '')
       + '<div class="small">Source: MoDOT Traveler Information' + (d.at ? ', checked ' + esc(when(d.at)) : '') + '.</div></div>';
-    L.circleMarker(c.p, { renderer, radius: 7, color: '#fff', weight: 2, fillColor: CLOSE_COLOR[c.k] || '#dc2626', fillOpacity: 1 }).bindPopup(html).addTo(g);
+    L.circleMarker(c.p, { renderer: liveRenderer, pane: 'live', radius: 7, color: '#fff', weight: 2, fillColor: CLOSE_COLOR[c.k] || '#dc2626', fillOpacity: 1 }).bindPopup(html).addTo(g);
   });
   if (first && !(d.closures || []).length) note('No road closures listed by MoDOT right now.', 4000);
 }, 10);
