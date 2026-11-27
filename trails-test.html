@@ -233,23 +233,88 @@ const getJson = (url, tries = 3) => fetch(url).then((r) => { if (!r.ok) throw ne
   .catch((e) => (tries > 1 ? new Promise((ok) => setTimeout(ok, 1500)).then(() => getJson(url, tries - 1)) : Promise.reject(e)));
 // Map data files live on Cloudflare R2 (bucket localamerica-trails), apart from the app videos
 const DATA = 'https://pub-2db698c77b2e4668a900baa59fbc0af0.r2.dev/';
-Promise.allSettled([getJson(DATA + 'osm-tracks.json'), getJson(DATA + 'fs-roads.json'), getJson(DATA + 'public-land.json')]).then(([dirt, fs, land]) => {
+// ---------- Dirt and gravel roads (OpenStreetMap), all of Missouri ----------
+// One file holds the whole state cut into small pieces by area (0.25 degree squares). The map
+// reads only the pieces on screen, a few KB each, so the phone never downloads the whole state.
+// It tries the copy on R2 first and falls back to the copy on this site.
+const DIRT_FILES = [DATA + 'dirt-roads-mo.bin', '/trails-test/dirt-roads-mo.bin'];
+const DIRT_MIN_ZOOM = 10;
+let dirtSrc = null, dirtWhole = null, dirtIdx = null, dirtStart = 0, dirtIdxP = null, dirtFailed = false;
+const dirtAsked = new Set(), dirtShown = new Set();
+async function getRange(url, from, to) {
+  if (dirtWhole && url === dirtSrc) return dirtWhole.slice(from, to + 1);
+  const r = await fetch(url, { headers: { Range: `bytes=${from}-${to}` } });
+  if (!r.ok) throw new Error(r.status);
+  const b = new Uint8Array(await r.arrayBuffer());
+  if (r.status === 206) return b;
+  dirtWhole = b; // server sent the whole file instead of a piece; keep it and cut pieces from it
+  return b.slice(from, to + 1);
+}
+async function dirtIndex() {
+  for (const url of DIRT_FILES) {
+    try {
+      dirtSrc = url; dirtWhole = null;
+      let head = await getRange(url, 0, 65535);
+      const len = +new TextDecoder().decode(head.slice(0, 10));
+      if (!len) throw new Error('bad file');
+      if (10 + len > head.length) head = await getRange(url, 0, 9 + len);
+      dirtIdx = JSON.parse(new TextDecoder().decode(head.slice(10, 10 + len)));
+      dirtStart = 10 + len;
+      return;
+    } catch (e) { /* try the next copy */ }
+  }
+  throw new Error('dirt roads unavailable');
+}
+async function gunzipJson(bytes) {
+  const s = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+  return JSON.parse(await new Response(s).text());
+}
+function drawDirt(fc) {
+  // dark edge first so the thin tan line shows on the satellite photo
+  L.geoJSON(fc, { interactive: false, style: () => ({ renderer, color: '#3b2f22', weight: 5, opacity: 0.55 }) }).addTo(map);
+  L.geoJSON(fc, {
+    style: () => ({ renderer, color: '#d9c7a3', weight: 2.5, opacity: 0.95 }),
+    onEachFeature: (f, layer) => {
+      const p = f.properties;
+      layer.bindPopup(() => `<div class="pop"><h3>${esc(p.n || DIRT_KINDS[p.k])}</h3><div class="big">${esc(DIRT_KINDS[p.k])} · ${miles(Number(p.mi)).replace(' mi', ' miles')}</div>${placeAndYou(layer.getLatLngs())}
+        <div class="small">Nobody has checked who may drive this one. Some are private land. Map data © OpenStreetMap contributors.</div></div>`);
+    }
+  }).addTo(map);
+  // keep the Forest Service roads drawn on top
+  if (map.hasLayer(fsLayer)) { fsLayer.remove(); fsLayer.addTo(map); }
+}
+async function loadDirt() {
+  if (dirtFailed || map.getZoom() < DIRT_MIN_ZOOM) return;
+  try { await (dirtIdxP = dirtIdxP || dirtIndex()); }
+  catch (e) { dirtFailed = true; note("Couldn't load the dirt roads. Pull down to reload the page.", 6000); return; }
+  const C = dirtIdx.cell, b = map.getBounds().pad(0.2), keys = [];
+  for (let i = Math.floor(b.getWest() / C); i <= Math.floor(b.getEast() / C); i++) {
+    for (let j = Math.floor(b.getSouth() / C); j <= Math.floor(b.getNorth() / C); j++) {
+      const k = i + '_' + j;
+      if (dirtIdx.tiles[k] && !dirtAsked.has(k)) { dirtAsked.add(k); keys.push(k); }
+    }
+  }
+  if (!keys.length) return;
+  const rows = (await Promise.all(keys.map(async (k) => {
+    const [off, len] = dirtIdx.tiles[k];
+    try { return await gunzipJson(await getRange(dirtSrc, dirtStart + off, dirtStart + off + len - 1)); }
+    catch (e) { dirtAsked.delete(k); return []; }
+  }))).flat();
+  const features = [];
+  for (const [k, mi, n, coords, id] of rows) {
+    if (dirtShown.has(id) || !DIRT_KINDS[k]) continue;
+    dirtShown.add(id);
+    features.push({ type: 'Feature', properties: { k, mi, n }, geometry: { type: typeof coords[0][0] === 'number' ? 'LineString' : 'MultiLineString', coordinates: coords } });
+  }
+  if (features.length) drawDirt({ type: 'FeatureCollection', features });
+}
+
+Promise.allSettled([getJson(DATA + 'fs-roads.json'), getJson(DATA + 'public-land.json')]).then(([fs, land]) => {
   if (land.status === 'fulfilled') drawLand(land.value);
   else note("Couldn't load the public land. Pull down to reload the page.", 6000);
-  if (dirt.status === 'fulfilled') {
-    const fc = dirt.value;
-    fc.features = fc.features.filter((f) => DIRT_KINDS[f.properties.k]);
-    // dark edge first so the thin tan line shows on the satellite photo
-    L.geoJSON(fc, { interactive: false, style: () => ({ renderer, color: '#3b2f22', weight: 5, opacity: 0.55 }) }).addTo(map);
-    L.geoJSON(fc, {
-      style: () => ({ renderer, color: '#d9c7a3', weight: 2.5, opacity: 0.95 }),
-      onEachFeature: (f, layer) => {
-        const p = f.properties;
-        layer.bindPopup(() => `<div class="pop"><h3>${esc(p.n || DIRT_KINDS[p.k])}</h3><div class="big">${esc(DIRT_KINDS[p.k])} · ${miles(Number(p.mi)).replace(' mi', ' miles')}</div>${placeAndYou(layer.getLatLngs())}
-          <div class="small">Nobody has checked who may drive this one. Some are private land. Map data © OpenStreetMap contributors.</div></div>`);
-      }
-    }).addTo(map);
-  }
+  // dirt roads start after the land so they draw above it, and load more as the map moves
+  loadDirt();
+  map.on('moveend', loadDirt);
   if (fs.status !== 'fulfilled') { note("Couldn't load the Forest Service roads. Pull down to reload the page.", 8000); return; }
   (fs.value.features || []).forEach((f) => {
     const a = f.a || {};
