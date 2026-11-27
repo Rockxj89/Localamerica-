@@ -134,12 +134,13 @@ async function camping() {
   for (const f of j.features || []) {
     const a = f.attributes || {}, lat = Number(a.latitude), lng = Number(a.longitude);
     if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < 35.9 || lat > 40.7 || lng < -95.8 || lng > -89) continue;
-    const key = a.recareaid + '|' + a.markeractivity;
+    const key = (a.recareaid || (a.recareaname + '@' + r5(lat) + ',' + r5(lng))) + '|' + a.markeractivity;
     if (seen.has(key)) continue; seen.add(key);
     const url = typeof a.recareaurl === 'string' && /^https:\/\/www\.fs\.usda\.gov\/[\w\/?=&.-]*$/.test(a.recareaurl) ? a.recareaurl : null;
     out.push({ n: String(a.recareaname || '').slice(0, 100), k: a.markeractivity === 'Dispersed Camping' ? 'dispersed' : 'campground',
       closed: String(a.openstatus || '').toLowerCase() === 'closed', u: url, p: [r5(lat), r5(lng)] });
   }
+  if (!out.length) throw new Error('camping: no spots');
   return { at: Date.now(), spots: out };
 }
 

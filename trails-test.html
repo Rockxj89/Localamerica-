@@ -958,21 +958,21 @@ map.attributionControl.addAttribution('Live: NIFC, USGS Water Data, MoDOT');
 const layerSec = section('maplayers', 'Map layers');
 // Hill shading: USGS shaded relief, blended into the map below so ridges and hollows stand out
 const shade = L.tileLayer('https://basemap.nationalmap.gov/arcgis/rest/services/USGSShadedReliefOnly/MapServer/tile/{z}/{y}/{x}', {
-  maxNativeZoom: 16, maxZoom: 19, zIndex: 3, opacity: 0.55, className: 'shade', attribution: 'Hill shading: USGS 3DEP'
+  maxNativeZoom: 16, maxZoom: 19, zIndex: 4.5, opacity: 0.8, className: 'shade', attribution: 'Hill shading: USGS 3DEP'
 });
 toggle(layerSec, 'shade', 'Hill shading', 'Shadows that make ridges and hollows easy to see. USGS.', (v) => { if (v) shade.addTo(map); else shade.remove(); });
 
 // Old topo maps: the oldest USGS topo map for each spot (about 1880s to 1990s), from the USGS map collection hosted by Esri
 const oldTopo = new ArcExport('', { minZoom: 9, maxZoom: 19, maxNativeZoom: 17, zIndex: 4, attribution: 'Old topo maps: USGS Historical Topographic Map Collection, Esri' });
 oldTopo._base = 'https://historical1.arcgis.com/arcgis/rest/services/USA_Historical_Topo_Maps/ImageServer/exportImage?f=image&format=jpg&bboxSR=3857&imageSR=3857&size=512,512&mosaicRule='
-  + encodeURIComponent('{"mosaicMethod":"esriMosaicAttribute","sortField":"DateCurrent","sortValue":"1800","ascending":true}');
+  + encodeURIComponent('{"mosaicMethod":"esriMosaicAttribute","sortField":"DateCurrent","sortValue":"1800","ascending":true,"where":"Map_Scale<=62500"}');
 toggle(layerSec, 'oldtopo', 'Old topo maps', 'The oldest USGS map of each area. Shows old roads, mills, schools and homesteads. Zoom in to see it.', (v) => {
   if (v) { oldTopo.addTo(map); if (map.getZoom() < 9) note('Zoom in to see the old topo maps.', 4000); } else oldTopo.remove();
 });
 
 // Dark skies: NASA night lights (Black Marble, 2016). Bright spots are towns; dark areas are best for stars.
 const nightLights = L.tileLayer('https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_Black_Marble/default/2016-01-01/GoogleMapsCompatible_Level8/{z}/{y}/{x}.png', {
-  maxNativeZoom: 8, maxZoom: 19, zIndex: 6, opacity: 0.75, attribution: 'Night lights: NASA Black Marble 2016 (GIBS)'
+  maxNativeZoom: 8, maxZoom: 19, zIndex: 6, opacity: 0.6, attribution: 'Night lights: NASA Black Marble 2016 (GIBS)'
 });
 toggle(layerSec, 'night', 'Dark skies', 'Night lights from NASA. The darker the area, the better for stars.', (v) => { if (v) nightLights.addTo(map); else nightLights.remove(); });
 
