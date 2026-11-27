@@ -53,10 +53,12 @@ const SOURCES = {
 
 module.exports = async (req, res) => {
   const q = req.query || {};
-  const src = SOURCES[q.src];
-  const x = Number(q.x), y = Number(q.y);
+  const src = typeof q.src === 'string' && Object.prototype.hasOwnProperty.call(SOURCES, q.src) ? SOURCES[q.src] : null;
+  const INT = /^-?\d{1,4}$/;
+  const x = typeof q.x === 'string' && INT.test(q.x) ? Number(q.x) : NaN, y = typeof q.y === 'string' && INT.test(q.y) ? Number(q.y) : NaN;
+  const extra = Object.keys(q).some((k) => k !== 'src' && k !== 'x' && k !== 'y');
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
-  if (!src || !Number.isInteger(x) || !Number.isInteger(y) || x < MO.x0 || x > MO.x1 || y < MO.y0 || y > MO.y1) {
+  if (!src || extra || !Number.isInteger(x) || !Number.isInteger(y) || x < MO.x0 || x > MO.x1 || y < MO.y0 || y > MO.y1) {
     res.statusCode = 400;
     res.setHeader('Cache-Control', 'no-store');
     return res.end(JSON.stringify({ error: 'unknown map data' }));
