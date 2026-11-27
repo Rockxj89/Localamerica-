@@ -77,7 +77,7 @@ const imagery = L.tileLayer('https://basemap.nationalmap.gov/arcgis/rest/service
   maxNativeZoom: 16, maxZoom: 17, attribution: 'Base map: USGS The National Map'
 }).addTo(map);
 map.attributionControl.setPrefix('');
-map.attributionControl.addAttribution('Roads and public land: Forest Service; © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors');
+map.attributionControl.addAttribution('Roads: Forest Service; Public land: USGS PAD-US; © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors');
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 let noteTimer;
